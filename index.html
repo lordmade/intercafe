@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internet Cafe Printing & Copying Machine</title>
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0e7ff, #f3f4f6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 2.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+    .container:hover {
+      transform: translateY(-2px);
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #2563eb, #4f46e5);
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 2rem;
+    }
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 1.5rem;
+    }
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      transform: scale(1);
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    .btn-blue {
+      background-color: #2563eb;
+      color: white;
+    }
+    .btn-blue:hover {
+      background-color: #1d4ed8;
+    }
+    .btn-gray {
+      background-color: #6b7280;
+      color: white;
+    }
+    .btn-gray:hover {
+      background-color: #4b5563;
+    }
+    .btn-green {
+      background-color: #10b981;
+      color: white;
+    }
+    .btn-green:hover {
+      background-color: #059669;
+    }
+    .form-group {
+      margin-bottom: 1.25rem;
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #374151;
+    }
+    input[type="number"], select, input[type="file"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      background: #f9fafb;
+      transition: border-color 0.3s ease;
+    }
+    input[type="number"]:focus, select:focus, input[type="file"]:focus {
+      border-color: #2563eb;
+      outline: none;
+    }
+    .flex {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    p {
+      margin: 0.75rem 0;
+      text-align: left;
+      color: #374151;
+    }
+    .capitalize {
+      text-transform: capitalize;
+    }
+    .alert-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+    .alert-box {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      text-align: left;
+    }
+    .alert-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .alert-icon {
+      width: 24px;
+      height: 24px;
+      background: #dc2626;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-right: 0.75rem;
+      font-weight: bold;
+    }
+    .alert-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .alert-message {
+      color: #374151;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container"></div>
+  <script>
+    // Pricing constants in ZAR
+    const PRICING = {
+      print: { bw: 2.00, color: 5.00 },
+      copy: { bw: 1.50, color: 4.00 },
+      scan: 3.00
+    };
+
+    // State
+    let state = {
+      screen: 'menu',
+      service: null,
+      file: null,
+      fileUploaded: false,
+      copies: 1,
+      color: 'bw',
+      totalCost: 0,
+      error: ''
+    };
+
+    // Render function
+    function render() {
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+      if (state.screen === 'menu') {
+        app.innerHTML = `
+          <h1>Internet Cafe Machine</h1>
+          <button class="btn-blue" onclick="selectService('print')">Print</button>
+          <button class="btn-blue" onclick="selectService('copy')">Copy</button>
+          <button class="btn-blue" onclick="selectService('scan')">Scan</button>
+        `;
+      } else if (state.screen === 'options') {
+        app.innerHTML = `
+          <h2 class="capitalize">${state.service} Options</h2>
+          ${state.service === 'print' ? `
+            <div class="form-group">
+              <label>Upload File:</label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt" onchange="handleFileSelect(this)">
+            </div>
+          ` : ''}
+          ${state.service !== 'scan' && (state.service !== 'print' || state.fileUploaded) ? `
+            <div class="form-group">
+              <label>Number of Copies:</label>
+              <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)">
+            </div>
+            <div class="form-group">
+              <label>Color:</label>
+              <select id="color" onchange="updateColor(this.value)">
+                <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
+                <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
+              </select>
+            </div>
+          ` : ''}
+          <div class="flex">
+            <button class="btn-gray" onclick="setScreen('menu')">Back</button>
+            <button class="btn-green" onclick="confirmTransaction()">Confirm</button>
+          </div>
+        `;
+      } else if (state.screen === 'summary') {
+        app.innerHTML = `
+          <h2>Transaction Summary</h2>
+          <p><strong>Service:</strong> ${state.service}</p>
+          ${state.service !== 'scan' ? `
+            <p><strong>Copies:</strong> ${state.copies}</p>
+            <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
+          ` : ''}
+          ${state.service === 'print' ? `
+            <p><strong>File:</strong> ${state.file || 'None'}</p>
+          ` : ''}
+          <p><strong>Total Cost:</strong> R${state.totalCost}</p>
+          <button class="btn-blue" onclick="reset()">Complete Transaction</button>
+        `;
+      }
+
+      // Render alert box if there's an error
+      if (state.error) {
+        const existingAlert = document.querySelector('.alert-overlay');
+        if (!existingAlert) {
+          const alertContainer = document.createElement('div');
+          alertContainer.className = 'alert-overlay';
+          alertContainer.innerHTML = `
+            <div class="alert-box" role="alert" aria-live="assertive">
+              <div class="alert-header">
+                <span class="alert-icon">!</span>
+                <span class="alert-title">Error</span>
+              </div>
+              <p class="alert-message">${state.error}</p>
+              <button class="btn-blue" onclick="clearError()">Close</button>
+            </div>
+          `;
+          document.body.appendChild(alertContainer);
+        }
+      }
+    }
+
+    // State update functions
+    function setScreen(screen) {
+      state.screen = screen;
+      state.error = '';
+      // Remove any existing alert overlay
+      const existingAlert = document.querySelector('.alert-overlay');
+      if (existingAlert) existingAlert.remove();
+      render();
+    }
+
+    function selectService(service) {
+      state.service = service;
+      state.file = null;
+      state.fileUploaded = false;
+      state.copies = 1;
+      state.color = 'bw';
+      state.error = '';
+      // Remove any existing alert overlay
+      const existingAlert = document.querySelector('.alert-overlay');
+      if (existingAlert) existingAlert.remove();
+      setScreen('options');
+    }
+
+    function updateCopies(value) {
+      state.copies = Math.max(1, parseInt(value) || 1);
+      render();
+    }
+
+    function updateColor(value) {
+      state.color = value;
+      render();
+    }
+
+    function handleFileSelect(input) {
+      state.file = input.files[0]?.name || 'sample.pdf';
+      state.fileUploaded = true;
+      state.error = '';
+      // Remove any existing alert overlay
+      const existingAlert = document.querySelector('.alert-overlay');
+      if (existingAlert) existingAlert.remove();
+      render();
+    }
+
+    function calculateCost() {
+      let costPerPage = 0;
+      if (state.service === 'print') {
+        costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
+      } else if (state.service === 'copy') {
+        costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
+      } else if (state.service === 'scan') {
+        costPerPage = PRICING.scan;
+      }
+      state.totalCost = (costPerPage * state.copies).toFixed(2);
+    }
+
+    function confirmTransaction() {
+      if (state.service === 'print' && !state.fileUploaded) {
+        state.error = 'Please upload a file before proceeding.';
+        render();
+        return;
+      }
+      calculateCost();
+      setScreen('summary');
+    }
+
+    function clearError() {
+      state.error = '';
+      const existingAlert = document.querySelector('.alert-overlay');
+      if (existingAlert) existingAlert.remove();
+      render();
+    }
+
+    function reset() {
+      state = {
+        screen: 'menu',
+        service: null,
+        file: null,
+        fileUploaded: false,
+        copies: 1,
+        color: 'bw',
+        totalCost: 0,
+        error: ''
+      };
+      // Remove any existing alert overlay
+      const existingAlert = document.querySelector('.alert-overlay');
+      if (existingAlert) existingAlert.remove();
+      render();
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
