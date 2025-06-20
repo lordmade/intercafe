@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Cafe Printing Machine</title>
+  <title>Internet Cafe Printing & Copying Machine</title>
   <style>
     body {
       background: linear-gradient(135deg, #e0e7ff, #f3f4f6);
@@ -50,7 +50,6 @@
       font-weight: 500;
       transition: all 0.3s ease;
       transform: scale(1);
-      margin: 0.5rem;
     }
     button:hover {
       transform: scale(1.05);
@@ -76,13 +75,6 @@
     .btn-green:hover {
       background-color: #059669;
     }
-    .btn-red {
-      background-color: #dc2626;
-      color: white;
-    }
-    .btn-red:hover {
-      background-color: #b91c1c;
-    }
     .form-group {
       margin-bottom: 1.25rem;
       text-align: left;
@@ -93,7 +85,7 @@
       font-weight: 500;
       color: #374151;
     }
-    input[type="number"], input[type="password"], select, input[type="file"] {
+    input[type="number"], select, input[type="file"] {
       width: 100%;
       padding: 0.75rem;
       border: 1px solid #d1d5db;
@@ -102,7 +94,7 @@
       background: #f9fafb;
       transition: border-color 0.3s ease;
     }
-    input[type="number"]:focus, input[type="password"]:focus, select:focus, input[type="file"]:focus {
+    input[type="number"]:focus, select:focus, input[type="file"]:focus {
       border-color: #2563eb;
       outline: none;
     }
@@ -185,21 +177,6 @@
       border-radius: 50%;
       cursor: pointer;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 1rem;
-    }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #d1d5db;
-      text-align: left;
-      font-size: 0.875rem;
-    }
-    th {
-      background: #f3f4f6;
-      font-weight: 600;
-    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -208,37 +185,12 @@
 </head>
 <body>
   <div id="app" class="container"></div>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <script>
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
-      authDomain: "fire-b-a8878.firebaseapp.com",
-      databaseURL: "https://fire-b-a8878.firebaseio.com",
-      projectId: "fire-b-a8878",
-      storageBucket: "fire-b-a8878.firebasestorage.app",
-      messagingSenderId: "658673187627",
-      appId: "1:658673187627:web:32699cbc33e85f4bafa36e",
-      measurementId: "G-2505EVBRWX"
-    };
-
-    // Initialize Firebase
-    let db;
-    try {
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.database();
-      console.log('Firebase initialized successfully');
-    } catch (error) {
-      console.error('Firebase initialization failed:', error);
-      state.error = 'Failed to connect to server. Please check your configuration.';
-      render();
-    }
-
     // Pricing constants in ZAR
     const PRICING = {
-      print: { bw: 2.00, color: 5.00 }
+      print: { bw: 2.00, color: 5.00 },
+      copy: { bw: 1.50, color: 4.00 },
+      scan: 3.00
     };
 
     // State
@@ -253,85 +205,60 @@
       copies: 1,
       color: 'bw',
       totalCost: 0,
-      error: '',
-      jobId: null,
-      jobStatus: null
+      error: ''
     };
 
     let videoStream = null;
-    let jobListener = null;
 
     // Render function
     function render() {
-      console.log('Rendering screen:', state.screen);
       const app = document.getElementById('app');
-      if (!app) {
-        console.error('App container not found');
-        return;
-      }
       app.innerHTML = '';
       if (state.screen === 'menu') {
         app.innerHTML = `
-          <h1>Internet Cafe Printing Machine</h1>
+          <h1>Internet Cafe Machine</h1>
           <button class="btn-blue" onclick="selectService('print')" aria-label="Select Print Service">Print</button>
-          <button class="btn-gray" onclick="showAdminLogin()" aria-label="Admin Login">Admin Login</button>
+          <button class="btn-blue" onclick="selectService('copy')" aria-label="Select Copy Service">Copy</button>
+          <button class="btn-blue" onclick="selectService('scan')" aria-label="Select Scan Service">Scan</button>
         `;
-        console.log('Main menu rendered with Print and Admin Login buttons');
-      } else if (state.screen === 'admin_login') {
-        app.innerHTML = `
-          <h2>Admin Login</h2>
-          <div class="form-group">
-            <label>Password:</label>
-            <input type="password" id="adminPassword" aria-label="Admin Password">
-          </div>
-          <div class="flex">
-            <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
-            <button class="btn-blue" onclick="attemptAdminLogin()" aria-label="Login">Login</button>
-          </div>
-        `;
-      } else if (state.screen === 'admin_panel') {
-        app.innerHTML = `
-          <h2>Admin Panel</h2>
-          <div id="adminJobs"></div>
-          <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Logout</button>
-        `;
-        if (db) loadAdminJobs();
       } else if (state.screen === 'options') {
         app.innerHTML = `
-          <h2>Print Options</h2>
-          ${state.scanMode ? `
-            <div class="form-group">
-              <label>Camera Preview:</label>
-              <video id="video" autoplay playsinline></video>
-              <div class="flex">
-                <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
-                <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
+          <h2 class="capitalize">${state.service} Options</h2>
+          ${state.service === 'print' ? `
+            ${state.scanMode ? `
+              <div class="form-group">
+                <label>Camera Preview:</label>
+                <video id="video" autoplay playsinline></video>
+                <div class="flex">
+                  <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
+                  <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
+                </div>
               </div>
-            </div>
-          ` : state.imageData ? `
-            <div class="form-group">
-              <label>Captured Image:</label>
-              <div class="crop-container">
-                <canvas id="canvas"></canvas>
-                <div class="crop-handle" id="top-left" style="top: ${state.crop.y}px; left: ${state.crop.x}px;"></div>
-                <div class="crop-handle" id="bottom-right" style="top: ${state.crop.y + state.crop.height}px; left: ${state.crop.x + state.crop.width}px;"></div>
+            ` : state.imageData ? `
+              <div class="form-group">
+                <label>Captured Image:</label>
+                <div class="crop-container">
+                  <canvas id="canvas"></canvas>
+                  <div class="crop-handle" id="top-left" style="top: ${state.crop.y}px; left: ${state.crop.x}px;"></div>
+                  <div class="crop-handle" id="bottom-right" style="top: ${state.crop.y + state.crop.height}px; left: ${state.crop.x + state.crop.width}px;"></div>
+                </div>
+                <div class="flex">
+                  <button class="btn-blue" onclick="confirmCrop()" aria-label="Confirm Crop">Confirm</button>
+                  <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
+                </div>
               </div>
-              <div class="flex">
-                <button class="btn-blue" onclick="confirmCrop()" aria-label="Confirm Crop">Confirm</button>
-                <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
+            ` : `
+              <div class="form-group">
+                <label>Choose Input Method:</label>
+                <div class="flex">
+                  <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
+                  <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
               </div>
-            </div>
-          ` : `
-            <div class="form-group">
-              <label>Choose Input Method:</label>
-              <div class="flex">
-                <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
-                <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
-              </div>
-              <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
-            </div>
-          `}
-          ${state.fileUploaded ? `
+            `}
+          ` : ''}
+          ${state.service !== 'scan' && (state.service !== 'print' || state.fileUploaded) ? `
             <div class="form-group">
               <label>Number of Copies:</label>
               <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
@@ -343,6 +270,8 @@
                 <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
               </select>
             </div>
+          ` : ''}
+          ${state.service !== 'print' || !state.scanMode && !state.imageData ? `
             <div class="flex">
               <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
               <button class="btn-green" onclick="confirmTransaction()" aria-label="Confirm Transaction">Confirm</button>
@@ -355,22 +284,17 @@
           drawCanvas();
           setupCropHandles();
         }
-      } else if (state.screen === 'pending') {
-        app.innerHTML = `
-          <h2>Transaction Submitted</h2>
-          <p><strong>Job ID:</strong> ${state.jobId}</p>
-          <p><strong>Status:</strong> Pending Admin Approval</p>
-          <p>Please wait for the admin to approve your request.</p>
-          <button class="btn-blue" onclick="checkJobStatus()" aria-label="Check Job Status">Check Status</button>
-          <button class="btn-gray" onclick="reset()" aria-label="Back to Menu">Back to Menu</button>
-        `;
       } else if (state.screen === 'summary') {
         app.innerHTML = `
           <h2>Transaction Summary</h2>
-          <p><strong>Service:</strong> Print</p>
-          <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
-          <p><strong>Copies:</strong> ${state.copies}</p>
-          <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
+          <p><strong>Service:</strong> ${state.service}</p>
+          ${state.service !== 'scan' ? `
+            <p><strong>Copies:</strong> ${state.copies}</p>
+            <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
+          ` : ''}
+          ${state.service === 'print' ? `
+            <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
+          ` : ''}
           <p><strong>Total Cost:</strong> R${state.totalCost}</p>
           <button class="btn-blue" onclick="reset()" aria-label="Complete Transaction">Complete Transaction</button>
         `;
@@ -395,168 +319,6 @@
           document.body.appendChild(alertContainer);
         }
       }
-      console.log('DOM updated:', app.innerHTML);
-    }
-
-    // Firebase functions
-    function sendToAdmin() {
-      if (!db) {
-        state.error = 'Server connection not available.';
-        render();
-        return;
-      }
-      const job = {
-        service: state.service,
-        file: state.file,
-        imageData: state.imageData,
-        copies: state.copies,
-        color: state.color,
-        totalCost: state.totalCost,
-        status: 'pending',
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      };
-      const newJobRef = db.ref('jobs').push();
-      newJobRef.set(job).catch((error) => {
-        console.error('Failed to submit job:', error);
-        state.error = 'Failed to submit job to server. Please try again.';
-        render();
-      });
-      state.jobId = newJobRef.key;
-      state.jobStatus = 'pending';
-      listenForJobStatus();
-      return state.jobId;
-    }
-
-    function listenForJobStatus() {
-      if (!db) return;
-      if (jobListener) jobListener.off();
-      jobListener = db.ref(`jobs/${state.jobId}`);
-      jobListener.on('value', (snapshot) => {
-        const job = snapshot.val();
-        if (job && job.status !== 'pending') {
-          state.jobStatus = job.status;
-          state.error = job.status === 'approved'
-            ? 'Your print job has been approved and sent to the printer.'
-            : 'Your print job was rejected by the admin.';
-          db.ref(`jobs/${state.jobId}`).remove().catch((error) => {
-            console.error('Failed to remove job:', error);
-          });
-          jobListener.off();
-          render();
-        }
-      }, (error) => {
-        console.error('Job status listener error:', error);
-      });
-    }
-
-    function loadAdminJobs() {
-      if (!db) return;
-      db.ref('jobs').orderByChild('status').equalTo('pending').on('value', (snapshot) => {
-        const jobs = [];
-        snapshot.forEach(child => {
-          jobs.push({ id: child.key, ...child.val() });
-        });
-        const adminJobs = document.getElementById('adminJobs');
-        if (adminJobs) {
-          adminJobs.innerHTML = `
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Service</th>
-                  <th>File</th>
-                  <th>Copies</th>
-                  <th>Color</th>
-                  <th>Cost</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${jobs.map(job => `
-                  <tr>
-                    <td>${job.id.slice(0, 8)}</td>
-                    <td>${job.service}</td>
-                    <td>${job.file || 'Scanned Image'}</td>
-                    <td>${job.copies}</td>
-                    <td>${job.color === 'bw' ? 'B&W' : 'Color'}</td>
-                    <td>R${job.totalCost}</td>
-                    <td>
-                      <button class="btn-green" onclick="approveJob('${job.id}')" aria-label="Approve Job ${job.id}">Approve</button>
-                      <button class="btn-red" onclick="rejectJob('${job.id}')" aria-label="Reject Job ${job.id}">Reject</button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
-        }
-      }, (error) => {
-        console.error('Load admin jobs error:', error);
-        state.error = 'Failed to load jobs. Please try again.';
-        render();
-      });
-    }
-
-    function approveJob(jobId) {
-      if (!db) return;
-      db.ref(`jobs/${jobId}`).once('value', (snapshot) => {
-        const job = snapshot.val();
-        if (job) {
-          console.log('Sending to printer:', {
-            file: job.file,
-            imageData: job.imageData,
-            copies: job.copies,
-            color: job.color
-          });
-          db.ref(`jobs/${jobId}`).update({ status: 'approved' }).then(() => {
-            db.ref(`jobs/${jobId}`).remove().catch((error) => {
-              console.error('Failed to remove job:', error);
-              state.error = 'Failed to remove job after approval.';
-              render();
-            });
-          }).catch((error) => {
-            console.error('Failed to approve job:', error);
-            state.error = 'Failed to approve job.';
-            render();
-          });
-        }
-      }, (error) => {
-        console.error('Approve job fetch error:', error);
-        state.error = 'Failed to fetch job details.';
-        render();
-      });
-    }
-
-    function rejectJob(jobId) {
-      if (!db) return;
-      db.ref(`jobs/${jobId}`).update({ status: 'rejected' }).then(() => {
-        db.ref(`jobs/${jobId}`).remove().catch((error) => {
-          console.error('Failed to remove job:', error);
-          state.error = 'Failed to remove job after rejection.';
-          render();
-        });
-      }).catch((error) => {
-        console.error('Failed to reject job:', error);
-        state.error = 'Failed to reject job.';
-        render();
-      });
-    }
-
-    // Admin functions
-    function showAdminLogin() {
-      state.screen = 'admin_login';
-      render();
-    }
-
-    function attemptAdminLogin() {
-      const password = document.getElementById('adminPassword').value;
-      if (password === 'admin123') {
-        state.screen = 'admin_panel';
-        render();
-      } else {
-        state.error = 'Incorrect password. Please try again.';
-        render();
-      }
     }
 
     // Camera functions
@@ -580,14 +342,9 @@
           const video = document.getElementById('video');
           if (video) {
             video.srcObject = stream;
-          } else {
-            console.error('Video element not found');
-            state.error = 'Failed to initialize camera preview.';
-            render();
           }
         })
-        .catch((error) => {
-          console.error('Camera access error:', error);
+        .catch(() => {
           state.error = 'Failed to access camera. Please grant permission or check device.';
           state.scanMode = false;
           render();
@@ -605,10 +362,7 @@
 
     function captureImage() {
       const video = document.getElementById('video');
-      if (!video) {
-        console.error('Video element not found for capture');
-        return;
-      }
+      if (!video) return;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -621,10 +375,7 @@
 
     function drawCanvas() {
       const canvas = document.getElementById('canvas');
-      if (!canvas) {
-        console.error('Canvas element not found');
-        return;
-      }
+      if (!canvas) return;
       const ctx = canvas.getContext('2d');
       const img = new Image();
       img.src = state.imageData;
@@ -700,10 +451,6 @@
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
-      if (jobListener && screen !== 'pending') {
-        jobListener.off();
-        jobListener = null;
-      }
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       render();
@@ -718,8 +465,6 @@
       state.copies = 1;
       state.color = 'bw';
       state.error = '';
-      state.jobId = null;
-      state.jobStatus = null;
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       setScreen('options');
@@ -736,9 +481,7 @@
     }
 
     function triggerFileUpload() {
-      const fileInput = document.getElementById('fileInput');
-      if (fileInput) fileInput.click();
-      else console.error('File input element not found');
+      document.getElementById('fileInput').click();
     }
 
     function handleFileSelect(input) {
@@ -752,33 +495,32 @@
     }
 
     function calculateCost() {
-      const costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
+      let costPerPage = 0;
+      if (state.service === 'print') {
+        costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
+      } else if (state.service === 'copy') {
+        costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
+      } else if (state.service === 'scan') {
+        costPerPage = PRICING.scan;
+      }
       state.totalCost = (costPerPage * state.copies).toFixed(2);
     }
 
     function confirmTransaction() {
-      if (!state.fileUploaded) {
+      if (state.service === 'print' && !state.fileUploaded) {
         state.error = 'Please upload a file or scan a document before proceeding.';
         render();
         return;
       }
       calculateCost();
-      sendToAdmin();
-      setScreen('pending');
-    }
-
-    function checkJobStatus() {
-      if (state.jobId && db) {
-        db.ref(`jobs/${state.jobId}`).once('value', (snapshot) => {
-          const job = snapshot.val();
-          if (!job && state.jobStatus === 'pending') {
-            state.error = 'Job not found. It may have been processed.';
-            render();
-          }
-        }, (error) => {
-          console.error('Check job status error:', error);
+      if (state.service === 'print' && state.imageData) {
+        console.log('Printing:', {
+          image: state.imageData,
+          copies: state.copies,
+          color: state.color
         });
       }
+      setScreen('summary');
     }
 
     function clearError() {
@@ -800,17 +542,11 @@
         copies: 1,
         color: 'bw',
         totalCost: 0,
-        error: '',
-        jobId: null,
-        jobStatus: null
+        error: ''
       };
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
-      }
-      if (jobListener) {
-        jobListener.off();
-        jobListener = null;
       }
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
