@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Cafe Printing & Copying Machine</title>
+  <title>Internet Cafe Printing Machine</title>
   <style>
     body {
       background: linear-gradient(135deg, #e0e7ff, #f3f4f6);
@@ -228,9 +228,7 @@
 
     // Pricing constants in ZAR
     const PRICING = {
-      print: { bw: 2.00, color: 5.00 },
-      copy: { bw: 1.50, color: 4.00 },
-      scan: 3.00
+      print: { bw: 2.00, color: 5.00 }
     };
 
     // State
@@ -259,10 +257,8 @@
       app.innerHTML = '';
       if (state.screen === 'menu') {
         app.innerHTML = `
-          <h1>Internet Cafe Machine</h1>
+          <h1>Internet Cafe Printing Machine</h1>
           <button class="btn-blue" onclick="selectService('print')" aria-label="Select Print Service">Print</button>
-          <button class="btn-blue" onclick="selectService('copy')" aria-label="Select Copy Service">Copy</button>
-          <button class="btn-blue" onclick="selectService('scan')" aria-label="Select Scan Service">Scan</button>
           <button class="btn-gray" onclick="showAdminLogin()" aria-label="Admin Login">Admin Login</button>
         `;
       } else if (state.screen === 'admin_login') {
@@ -286,42 +282,40 @@
         loadAdminJobs();
       } else if (state.screen === 'options') {
         app.innerHTML = `
-          <h2 class="capitalize">${state.service} Options</h2>
-          ${state.service === 'print' ? `
-            ${state.scanMode ? `
-              <div class="form-group">
-                <label>Camera Preview:</label>
-                <video id="video" autoplay playsinline></video>
-                <div class="flex">
-                  <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
-                  <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
-                </div>
+          <h2>Print Options</h2>
+          ${state.scanMode ? `
+            <div class="form-group">
+              <label>Camera Preview:</label>
+              <video id="video" autoplay playsinline></video>
+              <div class="flex">
+                <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
+                <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
               </div>
-            ` : state.imageData ? `
-              <div class="form-group">
-                <label>Captured Image:</label>
-                <div class="crop-container">
-                  <canvas id="canvas"></canvas>
-                  <div class="crop-handle" id="top-left" style="top: ${state.crop.y}px; left: ${state.crop.x}px;"></div>
-                  <div class="crop-handle" id="bottom-right" style="top: ${state.crop.y + state.crop.height}px; left: ${state.crop.x + state.crop.width}px;"></div>
-                </div>
-                <div class="flex">
-                  <button class="btn-blue" onclick="confirmCrop()" aria-label="Confirm Crop">Confirm</button>
-                  <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
-                </div>
+            </div>
+          ` : state.imageData ? `
+            <div class="form-group">
+              <label>Captured Image:</label>
+              <div class="crop-container">
+                <canvas id="canvas"></canvas>
+                <div class="crop-handle" id="top-left" style="top: ${state.crop.y}px; left: ${state.crop.x}px;"></div>
+                <div class="crop-handle" id="bottom-right" style="top: ${state.crop.y + state.crop.height}px; left: ${state.crop.x + state.crop.width}px;"></div>
               </div>
-            ` : `
-              <div class="form-group">
-                <label>Choose Input Method:</label>
-                <div class="flex">
-                  <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
-                  <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
-                </div>
-                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
+              <div class="flex">
+                <button class="btn-blue" onclick="confirmCrop()" aria-label="Confirm Crop">Confirm</button>
+                <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
               </div>
-            `}
-          ` : ''}
-          ${state.service !== 'scan' && (state.service !== 'print' || state.fileUploaded) ? `
+            </div>
+          ` : `
+            <div class="form-group">
+              <label>Choose Input Method:</label>
+              <div class="flex">
+                <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
+                <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
+              </div>
+              <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
+            </div>
+          `}
+          ${state.fileUploaded ? `
             <div class="form-group">
               <label>Number of Copies:</label>
               <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
@@ -333,8 +327,6 @@
                 <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
               </select>
             </div>
-          ` : ''}
-          ${state.service !== 'print' || !state.scanMode && !state.imageData ? `
             <div class="flex">
               <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
               <button class="btn-green" onclick="confirmTransaction()" aria-label="Confirm Transaction">Confirm</button>
@@ -359,14 +351,10 @@
       } else if (state.screen === 'summary') {
         app.innerHTML = `
           <h2>Transaction Summary</h2>
-          <p><strong>Service:</strong> ${state.service}</p>
-          ${state.service !== 'scan' ? `
-            <p><strong>Copies:</strong> ${state.copies}</p>
-            <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
-          ` : ''}
-          ${state.service === 'print' ? `
-            <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
-          ` : ''}
+          <p><strong>Service:</strong> Print</p>
+          <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
+          <p><strong>Copies:</strong> ${state.copies}</p>
+          <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
           <p><strong>Total Cost:</strong> R${state.totalCost}</p>
           <button class="btn-blue" onclick="reset()" aria-label="Complete Transaction">Complete Transaction</button>
         `;
@@ -460,8 +448,8 @@
                     <td>${job.id.slice(0, 8)}</td>
                     <td>${job.service}</td>
                     <td>${job.file || 'Scanned Image'}</td>
-                    <td>${job.copies || '-'}</td>
-                    <td>${job.color ? (job.color === 'bw' ? 'B&W' : 'Color') : '-'}</td>
+                    <td>${job.copies}</td>
+                    <td>${job.color === 'bw' ? 'B&W' : 'Color'}</td>
                     <td>R${job.totalCost}</td>
                     <td>
                       <button class="btn-green" onclick="approveJob('${job.id}')" aria-label="Approve Job ${job.id}">Approve</button>
@@ -479,23 +467,23 @@
     function approveJob(jobId) {
       db.ref(`jobs/${jobId}`).once('value', (snapshot) => {
         const job = snapshot.val();
-        if (job && job.service === 'print') {
+        if (job) {
           console.log('Sending to printer:', {
             file: job.file,
             imageData: job.imageData,
             copies: job.copies,
             color: job.color
           });
-        }
-        db.ref(`jobs/${jobId}`).update({ status: 'approved' }).then(() => {
-          db.ref(`jobs/${jobId}`).remove().catch(() => {
-            state.error = 'Failed to remove job after approval.';
+          db.ref(`jobs/${jobId}`).update({ status: 'approved' }).then(() => {
+            db.ref(`jobs/${jobId}`).remove().catch(() => {
+              state.error = 'Failed to remove job after approval.';
+              render();
+            });
+          }).catch(() => {
+            state.error = 'Failed to approve job.';
             render();
           });
-        }).catch(() => {
-          state.error = 'Failed to approve job.';
-          render();
-        });
+        }
       });
     }
 
@@ -708,31 +696,19 @@
     }
 
     function calculateCost() {
-      let costPerPage = 0;
-      if (state.service === 'print') {
-        costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
-      } else if (state.service === 'copy') {
-        costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
-      } else if (state.service === 'scan') {
-        costPerPage = PRICING.scan;
-      }
+      const costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
       state.totalCost = (costPerPage * state.copies).toFixed(2);
     }
 
     function confirmTransaction() {
-      if (state.service === 'print' && !state.fileUploaded) {
+      if (!state.fileUploaded) {
         state.error = 'Please upload a file or scan a document before proceeding.';
         render();
         return;
       }
       calculateCost();
-      if (state.service === 'print') {
-        sendToAdmin();
-        setScreen('pending');
-      } else {
-        sendToAdmin();
-        setScreen('summary');
-      }
+      sendToAdmin();
+      setScreen('pending');
     }
 
     function checkJobStatus() {
