@@ -75,6 +75,13 @@
     .btn-green:hover {
       background-color: #059669;
     }
+    .btn-red {
+      background-color: #dc2626;
+      color: white;
+    }
+    .btn-red:hover {
+      background-color: #b91c1c;
+    }
     .form-group {
       margin-bottom: 1.25rem;
       text-align: left;
@@ -85,7 +92,7 @@
       font-weight: 500;
       color: #374151;
     }
-    input[type="number"], select, input[type="file"] {
+    input[type="number"], input[type="password"], select, input[type="file"] {
       width: 100%;
       padding: 0.75rem;
       border: 1px solid #d1d5db;
@@ -94,7 +101,7 @@
       background: #f9fafb;
       transition: border-color 0.3s ease;
     }
-    input[type="number"]:focus, select:focus, input[type="file"]:focus {
+    input[type="number"]:focus, input[type="password"]:focus, select:focus, input[type="file"]:focus {
       border-color: #2563eb;
       outline: none;
     }
@@ -177,6 +184,21 @@
       border-radius: 50%;
       cursor: pointer;
     }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -185,7 +207,25 @@
 </head>
 <body>
   <div id="app" class="container"></div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <script>
+    // Firebase configuration (replace with your project's config)
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DATABASE_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     // Pricing constants in ZAR
     const PRICING = {
       print: { bw: 2.00, color: 5.00 },
@@ -205,10 +245,13 @@
       copies: 1,
       color: 'bw',
       totalCost: 0,
-      error: ''
+      error: '',
+      jobId: null,
+      jobStatus: null
     };
 
     let videoStream = null;
+    let jobListener = null;
 
     // Render function
     function render() {
@@ -220,7 +263,27 @@
           <button class="btn-blue" onclick="selectService('print')" aria-label="Select Print Service">Print</button>
           <button class="btn-blue" onclick="selectService('copy')" aria-label="Select Copy Service">Copy</button>
           <button class="btn-blue" onclick="selectService('scan')" aria-label="Select Scan Service">Scan</button>
+          <button class="btn-gray" onclick="showAdminLogin()" aria-label="Admin Login">Admin Login</button>
         `;
+      } else if (state.screen === 'admin_login') {
+        app.innerHTML = `
+          <h2>Admin Login</h2>
+          <div class="form-group">
+            <label>Password:</label>
+            <input type="password" id="adminPassword" aria-label="Admin Password">
+          </div>
+          <div class="flex">
+            <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
+            <button class="btn-blue" onclick="attemptAdminLogin()" aria-label="Login">Login</button>
+          </div>
+        `;
+      } else if (state.screen === 'admin_panel') {
+        app.innerHTML = `
+          <h2>Admin Panel</h2>
+          <div id="adminJobs"></div>
+          <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Logout</button>
+        `;
+        loadAdminJobs();
       } else if (state.screen === 'options') {
         app.innerHTML = `
           <h2 class="capitalize">${state.service} Options</h2>
@@ -284,6 +347,15 @@
           drawCanvas();
           setupCropHandles();
         }
+      } else if (state.screen === 'pending') {
+        app.innerHTML = `
+          <h2>Transaction Submitted</h2>
+          <p><strong>Job ID:</strong> ${state.jobId}</p>
+          <p><strong>Status:</strong> Pending Admin Approval</p>
+          <p>Please wait for the admin to approve your request.</p>
+          <button class="btn-blue" onclick="checkJobStatus()" aria-label="Check Job Status">Check Status</button>
+          <button class="btn-gray" onclick="reset()" aria-label="Back to Menu">Back to Menu</button>
+        `;
       } else if (state.screen === 'summary') {
         app.innerHTML = `
           <h2>Transaction Summary</h2>
@@ -318,6 +390,141 @@
           `;
           document.body.appendChild(alertContainer);
         }
+      }
+    }
+
+    // Firebase functions
+    function sendToAdmin() {
+      const job = {
+        service: state.service,
+        file: state.file,
+        imageData: state.imageData,
+        copies: state.copies,
+        color: state.color,
+        totalCost: state.totalCost,
+        status: 'pending',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      const newJobRef = db.ref('jobs').push();
+      newJobRef.set(job).catch(() => {
+        state.error = 'Failed to submit job to server. Please try again.';
+        render();
+      });
+      state.jobId = newJobRef.key;
+      state.jobStatus = 'pending';
+      listenForJobStatus();
+      return state.jobId;
+    }
+
+    function listenForJobStatus() {
+      if (jobListener) jobListener.off();
+      jobListener = db.ref(`jobs/${state.jobId}`);
+      jobListener.on('value', (snapshot) => {
+        const job = snapshot.val();
+        if (job && job.status !== 'pending') {
+          state.jobStatus = job.status;
+          state.error = job.status === 'approved'
+            ? 'Your print job has been approved and sent to the printer.'
+            : 'Your print job was rejected by the admin.';
+          db.ref(`jobs/${state.jobId}`).remove();
+          jobListener.off();
+          render();
+        }
+      });
+    }
+
+    function loadAdminJobs() {
+      db.ref('jobs').orderByChild('status').equalTo('pending').on('value', (snapshot) => {
+        const jobs = [];
+        snapshot.forEach(child => {
+          jobs.push({ id: child.key, ...child.val() });
+        });
+        const adminJobs = document.getElementById('adminJobs');
+        if (adminJobs) {
+          adminJobs.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Service</th>
+                  <th>File</th>
+                  <th>Copies</th>
+                  <th>Color</th>
+                  <th>Cost</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${jobs.map(job => `
+                  <tr>
+                    <td>${job.id.slice(0, 8)}</td>
+                    <td>${job.service}</td>
+                    <td>${job.file || 'Scanned Image'}</td>
+                    <td>${job.copies || '-'}</td>
+                    <td>${job.color ? (job.color === 'bw' ? 'B&W' : 'Color') : '-'}</td>
+                    <td>R${job.totalCost}</td>
+                    <td>
+                      <button class="btn-green" onclick="approveJob('${job.id}')" aria-label="Approve Job ${job.id}">Approve</button>
+                      <button class="btn-red" onclick="rejectJob('${job.id}')" aria-label="Reject Job ${job.id}">Reject</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      });
+    }
+
+    function approveJob(jobId) {
+      db.ref(`jobs/${jobId}`).once('value', (snapshot) => {
+        const job = snapshot.val();
+        if (job && job.service === 'print') {
+          console.log('Sending to printer:', {
+            file: job.file,
+            imageData: job.imageData,
+            copies: job.copies,
+            color: job.color
+          });
+        }
+        db.ref(`jobs/${jobId}`).update({ status: 'approved' }).then(() => {
+          db.ref(`jobs/${jobId}`).remove().catch(() => {
+            state.error = 'Failed to remove job after approval.';
+            render();
+          });
+        }).catch(() => {
+          state.error = 'Failed to approve job.';
+          render();
+        });
+      });
+    }
+
+    function rejectJob(jobId) {
+      db.ref(`jobs/${jobId}`).update({ status: 'rejected' }).then(() => {
+        db.ref(`jobs/${jobId}`).remove().catch(() => {
+          state.error = 'Failed to remove job after rejection.';
+          render();
+        });
+      }).catch(() => {
+        state.error = 'Failed to reject job.';
+        render();
+      });
+    }
+
+    // Admin functions
+    function showAdminLogin() {
+      state.screen = 'admin_login';
+      render();
+    }
+
+    function attemptAdminLogin() {
+      const password = document.getElementById('adminPassword').value;
+      if (password === 'admin123') {
+        state.screen = 'admin_panel';
+        render();
+      } else {
+        state.error = 'Incorrect password. Please try again.';
+        render();
       }
     }
 
@@ -451,6 +658,10 @@
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
+      if (jobListener && screen !== 'pending') {
+        jobListener.off();
+        jobListener = null;
+      }
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       render();
@@ -465,6 +676,8 @@
       state.copies = 1;
       state.color = 'bw';
       state.error = '';
+      state.jobId = null;
+      state.jobStatus = null;
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       setScreen('options');
@@ -513,14 +726,25 @@
         return;
       }
       calculateCost();
-      if (state.service === 'print' && state.imageData) {
-        console.log('Printing:', {
-          image: state.imageData,
-          copies: state.copies,
-          color: state.color
+      if (state.service === 'print') {
+        sendToAdmin();
+        setScreen('pending');
+      } else {
+        sendToAdmin();
+        setScreen('summary');
+      }
+    }
+
+    function checkJobStatus() {
+      if (state.jobId) {
+        db.ref(`jobs/${state.jobId}`).once('value', (snapshot) => {
+          const job = snapshot.val();
+          if (!job && state.jobStatus === 'pending') {
+            state.error = 'Job not found. It may have been processed.';
+            render();
+          }
         });
       }
-      setScreen('summary');
     }
 
     function clearError() {
@@ -542,11 +766,17 @@
         copies: 1,
         color: 'bw',
         totalCost: 0,
-        error: ''
+        error: '',
+        jobId: null,
+        jobStatus: null
       };
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
+      }
+      if (jobListener) {
+        jobListener.off();
+        jobListener = null;
       }
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
