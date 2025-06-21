@@ -13,7 +13,6 @@
       min-height: 100vh;
       margin: 0;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      touch-action: manipulation; /* Prevent default touch behaviors */
     }
     .container {
       background: rgba(255, 255, 255, 0.95);
@@ -24,8 +23,6 @@
       max-width: 420px;
       text-align: center;
       transition: transform 0.3s ease;
-      position: relative;
-      overflow: hidden;
     }
     .container:hover {
       transform: translateY(-2px);
@@ -175,25 +172,6 @@
     #print-iframe {
       display: none;
     }
-    .idle-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==') no-repeat center center;
-      background-size: contain;
-      z-index: 10;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: #1f2937;
-      font-size: 1.5rem;
-      text-align: center;
-    }
-    .idle-screen.hidden {
-      display: none;
-    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -201,9 +179,7 @@
   </style>
 </head>
 <body>
-  <div id="app" class="container">
-    <div id="idle-screen" class="idle-screen">Welcome to Internet Cafe<br>Touch to Start</div>
-  </div>
+  <div id="app" class="container"></div>
   <iframe id="print-iframe"></iframe>
   <script>
     // Pricing constants in ZAR
@@ -215,7 +191,7 @@
 
     // State
     let state = {
-      screen: 'idle', // Initial state set to idle
+      screen: 'menu', // Reverted to initial menu state
       service: null,
       file: null,
       fileUploaded: false,
@@ -230,7 +206,6 @@
     };
 
     let videoStream = null;
-    let inactivityTimeout;
 
     // Render function
     function render() {
@@ -240,78 +215,42 @@
         console.error('App container not found');
         return;
       }
-      const idleScreen = document.getElementById('idle-screen');
-      if (state.screen === 'idle') {
-        app.innerHTML = '<div id="idle-screen" class="idle-screen">Welcome to Internet Cafe<br>Touch to Start</div>';
-        idleScreen.classList.remove('hidden');
-        resetInactivityTimeout();
-      } else {
-        idleScreen.classList.add('hidden');
-        app.innerHTML = '';
-        if (state.screen === 'menu') {
-          app.innerHTML = `
-            <h1>Internet Cafe Machine</h1>
-            <button class="btn-blue" onclick="selectService('print')" aria-label="Select Print Service">Print</button>
-            <button class="btn-blue" onclick="selectService('copy')" aria-label="Select Copy Service">Copy</button>
-            <button class="btn-blue" onclick="selectService('scan')" aria-label="Select Scan Service">Scan</button>
-          `;
-          console.log('Main menu rendered with Print, Copy, and Scan buttons');
-        } else if (state.screen === 'options') {
-          app.innerHTML = `
-            <h2 class="capitalize">${state.service} Options</h2>
-            ${state.service === 'print' ? `
-              ${state.scanMode ? `
-                <div class="form-group">
-                  <label>Camera Preview:</label>
-                  <video id="video" autoplay playsinline></video>
-                  <p>Please position the camera to capture only the document, avoiding screen reflection.</p>
-                  <div class="flex">
-                    <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
-                    <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
-                  </div>
-                </div>
-              ` : state.fileUploaded ? `
-                <div class="form-group">
-                  ${state.imageData ? `
-                    <label>Preview:</label>
-                    <canvas id="canvas"></canvas>
-                  ` : state.fileData?.startsWith('data:application/pdf') ? `
-                    <label>File:</label>
-                    <p>${state.file}</p>
-                  ` : `
-                    <label>File:</label>
-                    <p>${state.file}</p>
-                  `}
-                </div>
-                <div class="form-group">
-                  <label>Number of Copies:</label>
-                  <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
-                </div>
-                <div class="form-group">
-                  <label>Color:</label>
-                  <select id="color" onchange="updateColor(this.value)" aria-label="Color Option">
-                    <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
-                    <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
-                  </select>
-                </div>
+      app.innerHTML = '';
+      if (state.screen === 'menu') {
+        app.innerHTML = `
+          <h1>Internet Cafe Machine</h1>
+          <button class="btn-blue" onclick="selectService('print')" aria-label="Select Print Service">Print</button>
+          <button class="btn-blue" onclick="selectService('copy')" aria-label="Select Copy Service">Copy</button>
+          <button class="btn-blue" onclick="selectService('scan')" aria-label="Select Scan Service">Scan</button>
+        `;
+        console.log('Main menu rendered with Print, Copy, and Scan buttons');
+      } else if (state.screen === 'options') {
+        app.innerHTML = `
+          <h2 class="capitalize">${state.service} Options</h2>
+          ${state.service === 'print' ? `
+            ${state.scanMode ? `
+              <div class="form-group">
+                <label>Camera Preview:</label>
+                <video id="video" autoplay playsinline></video>
+                <p>Please position the camera to capture only the document, avoiding screen reflection.</p>
                 <div class="flex">
-                  <button class="btn-gray" onclick="resetFile()" aria-label="Select Another File">Back</button>
-                  <button class="btn-green" onclick="confirmTransaction()" aria-label="Print Document" ${state.isPrinting ? 'disabled' : ''}>
-                    ${state.isPrinting ? 'Printing...' : 'Print'}
-                  </button>
+                  <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
+                  <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
                 </div>
-              ` : `
-                <div class="form-group">
-                  <label>Choose Input Method:</label>
-                  <div class="flex">
-                    <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
-                    <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
-                  </div>
-                  <input type="file" id="fileInput" accept=".pdf,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
-                </div>
-              `}
-            ` : ''}
-            ${state.service !== 'scan' && (state.service !== 'print' || !state.fileUploaded) ? `
+              </div>
+            ` : state.fileUploaded ? `
+              <div class="form-group">
+                ${state.imageData ? `
+                  <label>Preview:</label>
+                  <canvas id="canvas"></canvas>
+                ` : state.fileData?.startsWith('data:application/pdf') ? `
+                  <label>File:</label>
+                  <p>${state.file}</p>
+                ` : `
+                  <label>File:</label>
+                  <p>${state.file}</p>
+                `}
+              </div>
               <div class="form-group">
                 <label>Number of Copies:</label>
                 <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
@@ -324,31 +263,59 @@
                 </select>
               </div>
               <div class="flex">
-                <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
-                <button class="btn-green" onclick="confirmTransaction()" aria-label="Confirm Transaction">Confirm</button>
+                <button class="btn-gray" onclick="resetFile()" aria-label="Select Another File">Back</button>
+                <button class="btn-green" onclick="confirmTransaction()" aria-label="Print Document" ${state.isPrinting ? 'disabled' : ''}>
+                  ${state.isPrinting ? 'Printing...' : 'Print'}
+                </button>
               </div>
-            ` : ''}
-          `;
-          if (state.service === 'print' && state.scanMode) {
-            startVideoStream();
-          } else if (state.service === 'print' && state.imageData) {
-            drawCanvas();
-          }
-        } else if (state.screen === 'summary') {
-          app.innerHTML = `
-            <h2>Transaction Summary</h2>
-            <p><strong>Service:</strong> ${state.service}</p>
-            ${state.service !== 'scan' ? `
-              <p><strong>Copies:</strong> ${state.copies}</p>
-              <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
-            ` : ''}
-            ${state.service === 'print' ? `
-              <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
-            ` : ''}
-            <p><strong>Total Cost:</strong> R${state.totalCost}</p>
-            <button class="btn-blue" onclick="reset()" aria-label="Complete Transaction">Complete Transaction</button>
-          `;
+            ` : `
+              <div class="form-group">
+                <label>Choose Input Method:</label>
+                <div class="flex">
+                  <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
+                  <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
+              </div>
+            `}
+          ` : ''}
+          ${state.service !== 'scan' && (state.service !== 'print' || !state.fileUploaded) ? `
+            <div class="form-group">
+              <label>Number of Copies:</label>
+              <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
+            </div>
+            <div class="form-group">
+              <label>Color:</label>
+              <select id="color" onchange="updateColor(this.value)" aria-label="Color Option">
+                <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
+                <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
+              </select>
+            </div>
+            <div class="flex">
+              <button class="btn-gray" onclick="setScreen('menu')" aria-label="Back to Menu">Back</button>
+              <button class="btn-green" onclick="confirmTransaction()" aria-label="Confirm Transaction">Confirm</button>
+            </div>
+          ` : ''}
+        `;
+        if (state.service === 'print' && state.scanMode) {
+          startVideoStream();
+        } else if (state.service === 'print' && state.imageData) {
+          drawCanvas();
         }
+      } else if (state.screen === 'summary') {
+        app.innerHTML = `
+          <h2>Transaction Summary</h2>
+          <p><strong>Service:</strong> ${state.service}</p>
+          ${state.service !== 'scan' ? `
+            <p><strong>Copies:</strong> ${state.copies}</p>
+            <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
+          ` : ''}
+          ${state.service === 'print' ? `
+            <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
+          ` : ''}
+          <p><strong>Total Cost:</strong> R${state.totalCost}</p>
+          <button class="btn-blue" onclick="reset()" aria-label="Complete Transaction">Complete Transaction</button>
+        `;
       }
 
       // Render alert box if there's an error
@@ -641,7 +608,7 @@
 
     function reset() {
       state = {
-        screen: 'menu', // Reset to menu instead of idle to allow immediate reuse
+        screen: 'menu',
         service: null,
         file: null,
         fileUploaded: false,
@@ -663,32 +630,6 @@
       document.getElementById('print-iframe').src = '';
       render();
     }
-
-    function resetInactivityTimeout() {
-      clearTimeout(inactivityTimeout);
-      inactivityTimeout = setTimeout(() => {
-        if (state.screen !== 'idle') {
-          setScreen('idle');
-        }
-      }, 30000); // 30 seconds of inactivity
-    }
-
-    // Touch event listener
-    document.getElementById('app').addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (state.screen === 'idle') {
-        setScreen('menu');
-      }
-      resetInactivityTimeout();
-    });
-
-    // Mouse click fallback for non-touch devices
-    document.getElementById('app').addEventListener('click', (e) => {
-      if (state.screen === 'idle') {
-        setScreen('menu');
-      }
-      resetInactivityTimeout();
-    });
 
     // Initial render
     render();
