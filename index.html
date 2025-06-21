@@ -243,6 +243,9 @@
                 ${state.imageData ? `
                   <label>Preview:</label>
                   <canvas id="canvas"></canvas>
+                ` : state.fileData?.startsWith('data:application/pdf') ? `
+                  <label>File:</label>
+                  <p>${state.file}</p>
                 ` : `
                   <label>File:</label>
                   <p>${state.file}</p>
@@ -438,7 +441,7 @@
         if (file.type.startsWith('image/')) {
           state.imageData = state.fileData;
         }
-        console.log('File loaded:', state.file);
+        console.log('File loaded:', state.file, 'Type:', file.type);
         render();
       };
       reader.onerror = () => {
@@ -525,6 +528,26 @@
       console.log('Print intent triggered with image data:', state.imageData.substring(0, 50) + '...');
     }
 
+    function printPDF() {
+      const iframe = document.getElementById('print-iframe');
+      iframe.srcdoc = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print PDF</title>
+          <style>
+            body { margin: 0; padding: 0; height: 100vh; }
+            embed { width: 100%; height: 100%; }
+          </style>
+        </head>
+        <body>
+          <embed src="${state.fileData}" type="application/pdf" onload="window.print();window.close();">
+        </body>
+        </html>
+      `;
+      console.log('Print intent triggered with PDF data:', state.fileData.substring(0, 50) + '...');
+    }
+
     async function confirmTransaction() {
       if (state.service === 'print' && !state.fileUploaded) {
         state.error = 'Please upload a file or scan a document before proceeding.';
@@ -541,17 +564,21 @@
             printImage();
             state.isPrinting = false;
             setScreen('summary');
+          } else if (state.fileData?.startsWith('data:application/pdf')) {
+            printPDF();
+            state.isPrinting = false;
+            setScreen('summary');
           } else if (state.fileData?.startsWith('data:image')) {
             state.imageData = state.fileData;
             printImage();
             state.isPrinting = false;
             setScreen('summary');
           } else {
-            throw new Error('No image data available for printing.');
+            throw new Error('Unsupported file type for printing.');
           }
         } catch (error) {
-          console.error('Error printing image:', error);
-          state.error = error.message || 'Failed to prepare image for printing. Please try again.';
+          console.error('Error printing file:', error);
+          state.error = error.message || 'Failed to prepare file for printing. Please try again.';
           state.isPrinting = false;
           render();
         }
