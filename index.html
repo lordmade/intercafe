@@ -182,27 +182,38 @@
     #print-iframe {
       display: none;
     }
+    .card {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      width: 100%; /* Full width within container */
+      max-width: calc(100% - 130px); /* Adjust to leave space for thumbnails (120px + padding) */
+      margin-right: 1rem; /* Space between card and thumbnails */
+    }
     .preview-container {
-      flex-grow: 1;
       display: flex;
       justify-content: center;
       align-items: center;
-      max-width: 60%; /* Limit preview width on desktop */
+      width: 100%;
     }
     .preview {
       max-width: 100%;
       max-height: 400px;
+      object-fit: contain; /* Ensure image fits within card */
     }
     .preview img {
       border: 1px solid #d1d5db;
       border-radius: 0.25rem;
+      max-width: 100%;
+      max-height: 100%;
     }
     .thumbnail-container {
       width: 120px;
-      overflow-y: auto; /* Enable scrolling for thumbnails */
-      max-height: 400px; /* Fixed height for scrolling */
+      overflow-y: auto;
+      max-height: 400px;
       padding-left: 0.5rem;
-      border-left: 1px solid #d1d5db; /* Moved border to left */
+      border-left: 1px solid #d1d5db;
     }
     .thumbnail {
       margin: 0.25rem 0;
@@ -245,15 +256,16 @@
       .alert-message {
         font-size: 1rem;
       }
-      .preview-container {
-        max-width: 65%; /* Slightly wider on desktop */
+      .card {
+        max-width: calc(100% - 160px); /* Adjust for desktop thumbnail width (150px + padding) */
+        margin-right: 1.5rem; /* Increased spacing on desktop */
       }
       .preview {
         max-height: 600px;
       }
       .thumbnail-container {
         width: 150px;
-        max-height: 600px; /* Adjust for desktop */
+        max-height: 600px;
       }
       .thumbnail img {
         max-height: 100px;
@@ -349,8 +361,10 @@
                   <canvas id="canvas"></canvas>
                 ` : state.fileData?.startsWith('data:application/pdf') ? `
                   <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div class="preview-container">
-                      <div class="preview" id="preview"></div>
+                    <div class="card">
+                      <div class="preview-container">
+                        <div class="preview" id="preview"></div>
+                      </div>
                     </div>
                     <div class="thumbnail-container" id="thumbnail-container"></div>
                   </div>
