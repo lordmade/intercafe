@@ -56,6 +56,10 @@
     button:hover {
       transform: scale(1.05);
     }
+    button:disabled {
+      background-color: #d1d5db;
+      cursor: not-allowed;
+    }
     .btn-blue {
       background-color: #2563eb;
       color: white;
@@ -179,6 +183,9 @@
       border-radius: 50%;
       cursor: pointer;
     }
+    #print-iframe {
+      display: none;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -187,6 +194,7 @@
 </head>
 <body>
   <div id="app" class="container"></div>
+  <iframe id="print-iframe"></iframe>
   <script>
     // Pricing constants in ZAR
     const PRICING = {
@@ -203,11 +211,13 @@
       fileUploaded: false,
       scanMode: false,
       imageData: null,
+      fileData: null, // Store uploaded file data URL
       crop: { x: 0, y: 0, width: 0, height: 0 },
       copies: 1,
       color: 'bw',
       totalCost: 0,
-      error: ''
+      error: '',
+      isPrinting: false
     };
 
     let videoStream = null;
@@ -255,18 +265,32 @@
                   <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
                 </div>
               </div>
-            ` : state.fileUploaded && state.imageData ? `
+            ` : state.fileUploaded ? `
               <div class="form-group">
-                <label>Preview:</label>
-                <canvas id="canvas"></canvas>
+                ${state.imageData ? `
+                  <label>Preview:</label>
+                  <canvas id="canvas"></canvas>
+                ` : `
+                  <label>File:</label>
+                  <p>${state.file}</p>
+                `}
               </div>
               <div class="form-group">
                 <label>Number of Copies:</label>
                 <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
               </div>
+              <div class="form-group">
+                <label>Color:</label>
+                <select id="color" onchange="updateColor(this.value)" aria-label="Color Option">
+                  <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
+                  <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
+                </select>
+              </div>
               <div class="flex">
-                <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
-                <button class="btn-green" onclick="confirmTransaction()" aria-label="Print Document">Print</button>
+                <button class="btn-gray" onclick="resetFile()" aria-label="Select Another File">Back</button>
+                <button class="btn-green" onclick="confirmTransaction()" aria-label="Print Document" ${state.isPrinting ? 'disabled' : ''}>
+                  ${state.isPrinting ? 'Printing...' : 'Print'}
+                </button>
               </div>
             ` : `
               <div class="form-group">
@@ -275,11 +299,11 @@
                   <button class="btn-blue" onclick="startCamera()" aria-label="Scan Document with Camera">Scan Document</button>
                   <button class="btn-blue" onclick="triggerFileUpload()" aria-label="Upload File">Upload File</button>
                 </div>
-                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
+                <input type="file" id="fileInput" accept=".pdf,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
               </div>
             `}
           ` : ''}
-          ${state.service !== 'scan' && (state.service !== 'print' || (state.fileUploaded && !state.imageData)) ? `
+          ${state.service !== 'scan' && (state.service !== 'print' || !state.fileUploaded) ? `
             <div class="form-group">
               <label>Number of Copies:</label>
               <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)" aria-label="Number of Copies">
@@ -351,6 +375,7 @@
       state.imageData = null;
       state.file = null;
       state.fileUploaded = false;
+      state.fileData = null;
       render();
     }
 
@@ -461,41 +486,9 @@
         ctx.drawImage(img, state.crop.x, state.crop.y, state.crop.width, state.crop.height, 0, 0, state.crop.width, state.crop.height);
         state.imageData = canvas.toDataURL('image/png');
         console.log('Cropped image generated:', state.imageData.substring(0, 50) + '...');
-
-        // Convert cropped image to PDF using jsPDF
-        const { jsPDF } = window.jspdf;
-        if (!jsPDF) {
-          console.error('jsPDF library not loaded');
-          state.error = 'Failed to convert image to PDF. Please try again.';
-          render();
-          return;
-        }
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = state.crop.width;
-        const imgHeight = state.crop.height;
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const scaledWidth = imgWidth * ratio;
-        const scaledHeight = imgHeight * ratio;
-        const x = (pdfWidth - scaledWidth) / 2;
-        const y = (pdfHeight - scaledHeight) / 2;
-
-        try {
-          pdf.addImage(state.imageData, 'PNG', x, y, scaledWidth, scaledHeight);
-          state.file = 'scanned_image.pdf';
-          state.fileUploaded = true;
-          console.log('PDF generated for file:', state.file);
-          render();
-        } catch (error) {
-          console.error('Error converting image to PDF:', error);
-          state.error = 'Failed to convert image to PDF. Please try again.';
-          render();
-        }
+        state.file = 'scanned_image.pdf';
+        state.fileUploaded = true;
+        render();
       };
     }
 
@@ -504,10 +497,51 @@
       state.crop = { x: 0, y: 0, width: 0, height: 0 };
       state.file = null;
       state.fileUploaded = false;
+      state.fileData = null;
       startCamera();
     }
 
-    // State update functions
+    function resetFile() {
+      state.imageData = null;
+      state.file = null;
+      state.fileUploaded = false;
+      state.fileData = null;
+      render();
+    }
+
+    // File handling
+    function triggerFileUpload() {
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput) fileInput.click();
+      else console.error('File input element not found');
+    }
+
+    function handleFileSelect(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      state.file = file.name;
+      state.fileUploaded = true;
+      state.imageData = null;
+      state.fileData = null;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.fileData = reader.result;
+        if (file.type.startsWith('image/')) {
+          state.imageData = state.fileData; // For preview
+        }
+        console.log('File loaded:', state.file);
+        render();
+      };
+      reader.onerror = () => {
+        state.error = 'Failed to read file. Please try again.';
+        render();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // State updates
     function setScreen(screen) {
       state.screen = screen;
       state.error = '';
@@ -515,6 +549,8 @@
       state.imageData = null;
       state.file = null;
       state.fileUploaded = false;
+      state.fileData = null;
+      state.isPrinting = false;
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
@@ -530,9 +566,11 @@
       state.fileUploaded = false;
       state.scanMode = false;
       state.imageData = null;
+      state.fileData = null;
       state.copies = 1;
       state.color = 'bw';
       state.error = '';
+      state.isPrinting = false;
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       setScreen('options');
@@ -548,22 +586,6 @@
       render();
     }
 
-    function triggerFileUpload() {
-      const fileInput = document.getElementById('fileInput');
-      if (fileInput) fileInput.click();
-      else console.error('File input element not found');
-    }
-
-    function handleFileSelect(input) {
-      state.file = input.files[0]?.name || 'sample.pdf';
-      state.fileUploaded = true;
-      state.imageData = null;
-      state.error = '';
-      const existingAlert = document.querySelector('.alert-overlay');
-      if (existingAlert) existingAlert.remove();
-      render();
-    }
-
     function calculateCost() {
       let costPerPage = 0;
       if (state.service === 'print') {
@@ -576,25 +598,76 @@
       state.totalCost = (costPerPage * state.copies).toFixed(2);
     }
 
-    function confirmTransaction() {
+    async function confirmTransaction() {
       if (state.service === 'print' && !state.fileUploaded) {
         state.error = 'Please upload a file or scan a document before proceeding.';
         render();
         return;
       }
       calculateCost();
+
       if (state.service === 'print' && state.file) {
-        console.log('Printing:', {
-          file: state.file,
-          copies: state.copies,
-          color: state.color
-        });
+        state.isPrinting = true;
+        render();
+        try {
+          let pdfDataUrl;
+          const { jsPDF } = window.jspdf;
+          if (!jsPDF && (state.imageData || state.fileData?.startsWith('data:image'))) {
+            throw new Error('jsPDF library not loaded');
+          }
+
+          if (state.imageData) {
+            // Scanned or uploaded image: convert to PDF
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: 'a4'
+            });
+            const img = new Image();
+            img.src = state.imageData;
+            await new Promise((resolve) => { img.onload = resolve; });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = img.width;
+            const imgHeight = img.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const scaledWidth = imgWidth * ratio;
+            const scaledHeight = imgHeight * ratio;
+            const x = (pdfWidth - scaledWidth) / 2;
+            const y = (pdfHeight - scaledHeight) / 2;
+            pdf.addImage(state.imageData, 'PNG', x, y, scaledWidth, scaledHeight);
+            pdfDataUrl = pdf.output('datauristring');
+          } else if (state.fileData?.startsWith('data:application/pdf')) {
+            // Uploaded PDF: use directly
+            pdfDataUrl = state.fileData;
+          } else {
+            throw new Error('Unsupported file type for printing');
+          }
+
+          // Load PDF in iframe and trigger print
+          const iframe = document.getElementById('print-iframe');
+          iframe.src = pdfDataUrl;
+          iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            console.log('Print dialog triggered for:', state.file);
+            state.isPrinting = false;
+            setScreen('summary');
+          };
+        } catch (error) {
+          console.error('Error preparing print:', error);
+          state.error = 'Failed to prepare document for printing. Please try again.';
+          state.isPrinting = false;
+          render();
+        }
+      } else {
+        setScreen('summary');
       }
-      setScreen('summary');
     }
 
     function clearError() {
       state.error = '';
+      state.isPrinting = false;
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       render();
@@ -608,11 +681,13 @@
         fileUploaded: false,
         scanMode: false,
         imageData: null,
+        fileData: null,
         crop: { x: 0, y: 0, width: 0, height: 0 },
         copies: 1,
         color: 'bw',
         totalCost: 0,
-        error: ''
+        error: '',
+        isPrinting: false
       };
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
@@ -620,6 +695,7 @@
       }
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
+      document.getElementById('print-iframe').src = '';
       render();
     }
 
