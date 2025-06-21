@@ -188,8 +188,6 @@
       border-radius: 0.75rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       width: 100%;
-      max-width: calc(100% - 130px); /* Adjust for thumbnail width + padding */
-      margin-right: 1rem;
     }
     .preview-container {
       display: flex;
@@ -210,21 +208,25 @@
       max-height: 100%;
     }
     .thumbnail-container {
-      width: 120px;
-      overflow-y: auto;
-      max-height: 400px;
-      padding-left: 0.5rem;
-      border-left: 1px solid #d1d5db;
-      flex-shrink: 0; /* Prevent shrinking */
+      width: 100%;
+      overflow-x: auto; /* Enable horizontal scrolling */
+      max-height: 120px; /* Fixed height for thumbnail row */
+      padding: 0.5rem 0;
+      display: flex;
+      flex-direction: row; /* Horizontal layout for thumbnails */
+      gap: 0.5rem;
+      -webkit-overflow-scrolling: touch; /* Smooth scrolling on mobile */
     }
     .thumbnail {
-      margin: 0.25rem 0;
+      flex: 0 0 auto; /* Prevent thumbnails from shrinking or growing */
+      margin: 0;
       text-align: center;
       cursor: pointer;
+      min-width: 100px; /* Ensure touch-friendly size */
     }
     .thumbnail img {
       max-width: 100%;
-      max-height: 80px;
+      max-height: 100px;
       border: 1px solid #d1d5db;
       border-radius: 0.25rem;
     }
@@ -236,8 +238,8 @@
     }
     .pdf-viewer {
       display: flex;
-      flex-direction: row;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: stretch;
       gap: 1rem;
     }
     @media (min-width: 601px) {
@@ -264,19 +266,17 @@
       .alert-message {
         font-size: 1rem;
       }
-      .card {
-        max-width: calc(100% - 160px); /* Adjust for desktop thumbnail width */
-        margin-right: 1.5rem;
-      }
       .preview {
         max-height: 600px;
       }
       .thumbnail-container {
-        width: 150px;
-        max-height: 600px;
+        max-height: 150px; /* Increased height for desktop */
+      }
+      .thumbnail {
+        min-width: 120px; /* Larger touch target on desktop */
       }
       .thumbnail img {
-        max-height: 100px;
+        max-height: 120px;
       }
       .flex {
         gap: 1rem;
@@ -284,28 +284,8 @@
       .form-group, p {
         margin-bottom: 1.25rem;
       }
-      .thumbnail {
-        margin: 0.5rem 0;
-      }
       .thumbnail input[type="checkbox"] {
         margin-right: 0.5rem;
-      }
-      .pdf-viewer {
-        flex-direction: row; /* Ensure horizontal alignment on desktop */
-      }
-    }
-    @media (max-width: 600px) {
-      .pdf-viewer {
-        flex-direction: column; /* Stack on mobile */
-      }
-      .card {
-        max-width: 100%; /* Full width on mobile */
-        margin-right: 0;
-        margin-bottom: 1rem;
-      }
-      .thumbnail-container {
-        width: 100%; /* Full width on mobile */
-        max-height: 300px; /* Reduced height for mobile */
       }
     }
     @keyframes fadeIn {
@@ -856,7 +836,7 @@
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
-      const existingAlert = document.queryselector('.alert-overlay');
+      const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       document.getElementById('print-iframe').src = '';
       render();
