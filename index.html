@@ -172,6 +172,18 @@
     #print-iframe {
       display: none;
     }
+    .pdf-page {
+      margin: 0.5rem 0;
+      text-align: center;
+    }
+    .pdf-page img {
+      max-width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+    }
+    .pdf-page input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -181,6 +193,7 @@
 <body>
   <div id="app" class="container"></div>
   <iframe id="print-iframe"></iframe>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
     // Pricing constants in ZAR
     const PRICING = {
@@ -191,13 +204,14 @@
 
     // State
     let state = {
-      screen: 'menu', // Reverted to initial menu state
+      screen: 'menu',
       service: null,
       file: null,
       fileUploaded: false,
       scanMode: false,
       imageData: null,
       fileData: null,
+      selectedPages: [], // Array to store selected page numbers (1-based index)
       copies: 1,
       color: 'bw',
       totalCost: 0,
@@ -244,8 +258,8 @@
                   <label>Preview:</label>
                   <canvas id="canvas"></canvas>
                 ` : state.fileData?.startsWith('data:application/pdf') ? `
-                  <label>File:</label>
-                  <p>${state.file}</p>
+                  <label>Select Pages to Print:</label>
+                  <div id="pdf-pages"></div>
                 ` : `
                   <label>File:</label>
                   <p>${state.file}</p>
@@ -301,6 +315,8 @@
           startVideoStream();
         } else if (state.service === 'print' && state.imageData) {
           drawCanvas();
+        } else if (state.service === 'print' && state.fileData?.startsWith('data:application/pdf') && !state.selectedPages.length) {
+          renderPDFPages();
         }
       } else if (state.screen === 'summary') {
         app.innerHTML = `
@@ -309,6 +325,7 @@
           ${state.service !== 'scan' ? `
             <p><strong>Copies:</strong> ${state.copies}</p>
             <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
+            ${state.service === 'print' && state.selectedPages.length ? `<p><strong>Pages Printed:</strong> ${state.selectedPages.join(', ')}</p>` : ''}
           ` : ''}
           ${state.service === 'print' ? `
             <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
@@ -351,6 +368,7 @@
       state.file = null;
       state.fileUploaded = false;
       state.fileData = null;
+      state.selectedPages = [];
       render();
     }
 
@@ -389,7 +407,6 @@
         console.error('Video element not found for capture');
         return;
       }
-      // Use off-screen canvas to isolate capture
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -426,7 +443,7 @@
       else console.error('File input element not found');
     }
 
-    function handleFileSelect(input) {
+    async function handleFileSelect(input) {
       const file = input.files[0];
       if (!file) return;
 
@@ -434,9 +451,10 @@
       state.fileUploaded = true;
       state.imageData = null;
       state.fileData = null;
+      state.selectedPages = [];
 
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         state.fileData = reader.result;
         if (file.type.startsWith('image/')) {
           state.imageData = state.fileData;
@@ -451,6 +469,51 @@
       reader.readAsDataURL(file);
     }
 
+    async function renderPDFPages() {
+      const loadingTask = pdfjsLib.getDocument({ data: atob(state.fileData.split(',')[1]) });
+      try {
+        const pdf = await loadingTask.promise;
+        const numPages = pdf.numPages;
+        const pdfPagesDiv = document.getElementById('pdf-pages');
+        pdfPagesDiv.innerHTML = '';
+
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 0.5 }); // Scale down for preview
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+          const imgData = canvas.toDataURL('image/png');
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'pdf-page';
+          pageDiv.innerHTML = `
+            <input type="checkbox" id="page-${pageNum}" name="page" value="${pageNum}" onchange="togglePage(${pageNum}, this.checked)">
+            <label for="page-${pageNum}">Page ${pageNum}</label><br>
+            <img src="${imgData}" alt="Page ${pageNum} Preview">
+          `;
+          pdfPagesDiv.appendChild(pageDiv);
+        }
+      } catch (error) {
+        console.error('Error rendering PDF pages:', error);
+        state.error = 'Failed to render PDF pages. Please try again with a valid PDF.';
+        render();
+      }
+    }
+
+    function togglePage(pageNum, checked) {
+      const index = state.selectedPages.indexOf(pageNum);
+      if (checked && index === -1) {
+        state.selectedPages.push(pageNum);
+      } else if (!checked && index !== -1) {
+        state.selectedPages.splice(index, 1);
+      }
+      state.selectedPages.sort((a, b) => a - b);
+      console.log('Selected pages:', state.selectedPages);
+    }
+
     // State updates
     function setScreen(screen) {
       state.screen = screen;
@@ -460,6 +523,7 @@
       state.file = null;
       state.fileUploaded = false;
       state.fileData = null;
+      state.selectedPages = [];
       state.isPrinting = false;
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
@@ -477,6 +541,7 @@
       state.scanMode = false;
       state.imageData = null;
       state.fileData = null;
+      state.selectedPages = [];
       state.copies = 1;
       state.color = 'bw';
       state.error = '';
@@ -500,12 +565,15 @@
       let costPerPage = 0;
       if (state.service === 'print') {
         costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
+        const pageCount = state.selectedPages.length || 1; // Default to 1 page if no selection
+        state.totalCost = (costPerPage * pageCount * state.copies).toFixed(2);
       } else if (state.service === 'copy') {
         costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
+        state.totalCost = (costPerPage * state.copies).toFixed(2);
       } else if (state.service === 'scan') {
         costPerPage = PRICING.scan;
+        state.totalCost = (costPerPage * state.copies).toFixed(2);
       }
-      state.totalCost = (costPerPage * state.copies).toFixed(2);
     }
 
     function printImage() {
@@ -530,7 +598,7 @@
 
     function printPDF() {
       const iframe = document.getElementById('print-iframe');
-      iframe.srcdoc = `
+      let htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -541,10 +609,17 @@
           </style>
         </head>
         <body>
-          <embed src="${state.fileData}" type="application/pdf">
+      `;
+      if (state.selectedPages.length > 0) {
+        htmlContent += '<embed src="' + state.fileData + '#page=' + state.selectedPages.join() + '" type="application/pdf">';
+      } else {
+        htmlContent += '<embed src="' + state.fileData + '" type="application/pdf">';
+      }
+      htmlContent += `
         </body>
         </html>
       `;
+      iframe.srcdoc = htmlContent;
       iframe.onload = () => {
         try {
           iframe.contentWindow.focus();
@@ -615,6 +690,7 @@
         scanMode: false,
         imageData: null,
         fileData: null,
+        selectedPages: [],
         copies: 1,
         color: 'bw',
         totalCost: 0,
