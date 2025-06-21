@@ -20,9 +20,12 @@
       border-radius: 1rem;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
       width: 100%;
-      max-width: 420px;
+      max-width: 900px; /* Increased to accommodate two-column layout */
       text-align: center;
       transition: transform 0.3s ease;
+      display: flex;
+      flex-direction: row;
+      gap: 1rem;
     }
     .container:hover {
       transform: translateY(-2px);
@@ -172,17 +175,42 @@
     #print-iframe {
       display: none;
     }
-    .pdf-page {
+    .thumbnail-container {
+      width: 150px; /* Fixed width for thumbnails */
+      overflow-y: auto; /* Allow vertical scroll if needed, though we'll fit pages */
+      padding-right: 1rem;
+      border-right: 1px solid #d1d5db;
+    }
+    .thumbnail {
       margin: 0.5rem 0;
       text-align: center;
+      cursor: pointer;
     }
-    .pdf-page img {
+    .thumbnail img {
       max-width: 100%;
+      max-height: 100px; /* Smaller thumbnails */
       border: 1px solid #d1d5db;
       border-radius: 0.25rem;
     }
-    .pdf-page input[type="checkbox"] {
+    .thumbnail input[type="checkbox"] {
       margin-right: 0.5rem;
+    }
+    .thumbnail.selected {
+      border: 2px solid #2563eb;
+    }
+    .preview-container {
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .preview {
+      max-width: 100%;
+      max-height: 600px; /* Larger centered preview */
+    }
+    .preview img {
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
     }
     @keyframes fadeIn {
       from { opacity: 0; }
@@ -212,6 +240,7 @@
       imageData: null,
       fileData: null,
       selectedPages: [], // Array to store selected page numbers (1-based index)
+      currentPreviewPage: 1, // Track the currently selected page for preview
       copies: 1,
       color: 'bw',
       totalCost: 0,
@@ -258,8 +287,12 @@
                   <label>Preview:</label>
                   <canvas id="canvas"></canvas>
                 ` : state.fileData?.startsWith('data:application/pdf') ? `
-                  <label>Select Pages to Print:</label>
-                  <div id="pdf-pages"></div>
+                  <div style="display: flex;">
+                    <div class="thumbnail-container" id="thumbnail-container"></div>
+                    <div class="preview-container">
+                      <div class="preview" id="preview"></div>
+                    </div>
+                  </div>
                 ` : `
                   <label>File:</label>
                   <p>${state.file}</p>
@@ -369,6 +402,7 @@
       state.fileUploaded = false;
       state.fileData = null;
       state.selectedPages = [];
+      state.currentPreviewPage = 1;
       render();
     }
 
@@ -452,6 +486,7 @@
       state.imageData = null;
       state.fileData = null;
       state.selectedPages = [];
+      state.currentPreviewPage = 1;
 
       const reader = new FileReader();
       reader.onload = async () => {
@@ -474,12 +509,14 @@
       try {
         const pdf = await loadingTask.promise;
         const numPages = pdf.numPages;
-        const pdfPagesDiv = document.getElementById('pdf-pages');
-        pdfPagesDiv.innerHTML = '';
+        const thumbnailContainer = document.getElementById('thumbnail-container');
+        const previewContainer = document.getElementById('preview');
+        thumbnailContainer.innerHTML = '';
+        previewContainer.innerHTML = '';
 
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 0.5 }); // Scale down for preview
+          const viewport = page.getViewport({ scale: 0.25 }); // Smaller scale for thumbnails
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
           canvas.height = viewport.height;
@@ -487,14 +524,24 @@
           await page.render({ canvasContext: context, viewport: viewport }).promise;
 
           const imgData = canvas.toDataURL('image/png');
-          const pageDiv = document.createElement('div');
-          pageDiv.className = 'pdf-page';
-          pageDiv.innerHTML = `
+          const thumbnailDiv = document.createElement('div');
+          thumbnailDiv.className = `thumbnail ${pageNum === state.currentPreviewPage ? 'selected' : ''}`;
+          thumbnailDiv.innerHTML = `
             <input type="checkbox" id="page-${pageNum}" name="page" value="${pageNum}" onchange="togglePage(${pageNum}, this.checked)">
             <label for="page-${pageNum}">Page ${pageNum}</label><br>
-            <img src="${imgData}" alt="Page ${pageNum} Preview">
+            <img src="${imgData}" alt="Page ${pageNum} Thumbnail" onclick="selectPreview(${pageNum})">
           `;
-          pdfPagesDiv.appendChild(pageDiv);
+          thumbnailContainer.appendChild(thumbnailDiv);
+
+          if (pageNum === state.currentPreviewPage) {
+            const previewViewport = page.getViewport({ scale: 1.0 }); // Full scale for preview
+            const previewCanvas = document.createElement('canvas');
+            const previewContext = previewCanvas.getContext('2d');
+            previewCanvas.height = previewViewport.height;
+            previewCanvas.width = previewViewport.width;
+            await page.render({ canvasContext: previewContext, viewport: previewViewport }).promise;
+            previewContainer.innerHTML = `<img src="${previewCanvas.toDataURL('image/png')}" alt="Page ${pageNum} Preview">`;
+          }
         }
       } catch (error) {
         console.error('Error rendering PDF pages:', error);
@@ -514,6 +561,11 @@
       console.log('Selected pages:', state.selectedPages);
     }
 
+    function selectPreview(pageNum) {
+      state.currentPreviewPage = pageNum;
+      renderPDFPages(); // Re-render to update the preview
+    }
+
     // State updates
     function setScreen(screen) {
       state.screen = screen;
@@ -524,6 +576,7 @@
       state.fileUploaded = false;
       state.fileData = null;
       state.selectedPages = [];
+      state.currentPreviewPage = 1;
       state.isPrinting = false;
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
@@ -542,6 +595,7 @@
       state.imageData = null;
       state.fileData = null;
       state.selectedPages = [];
+      state.currentPreviewPage = 1;
       state.copies = 1;
       state.color = 'bw';
       state.error = '';
@@ -691,6 +745,7 @@
         imageData: null,
         fileData: null,
         selectedPages: [],
+        currentPreviewPage: 1,
         copies: 1,
         color: 'bw',
         totalCost: 0,
