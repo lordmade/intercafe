@@ -53,6 +53,70 @@
       flex-direction: column;
       gap: 10px;
     }
+    .card {
+      background: #2d2d2d;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+      width: 100%;
+    }
+    .preview-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    .preview {
+      max-width: 100%;
+      max-height: 150px;
+      object-fit: contain;
+    }
+    .preview img {
+      border: 1px solid #4d4d4d;
+      border-radius: 3px;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .thumbnail-container {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-height: 80px;
+      padding: 5px 0;
+      display: flex;
+      flex-direction: row;
+      gap: 5px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .thumbnail {
+      flex: 0 0 auto;
+      margin: 0;
+      text-align: center;
+      cursor: pointer;
+      min-width: 70px;
+      position: relative;
+    }
+    .thumbnail img {
+      max-width: 100%;
+      max-height: 70px;
+      border: 1px solid #4d4d4d;
+      border-radius: 3px;
+    }
+    .thumbnail.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: #00ff00;
+      color: #000;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.9rem;
+    }
     .form-group {
       margin-bottom: 15px;
       text-align: left;
@@ -63,7 +127,7 @@
       font-weight: bold;
       color: #bbb;
     }
-    input[type="number"], select, input[type="file"] {
+    input[type="number"], select, input[type="text"], input[type="file"] {
       width: 100%;
       padding: 10px;
       border: 1px solid #4d4d4d;
@@ -72,7 +136,7 @@
       color: #fff;
       font-size: 1rem;
     }
-    input[type="number"]:focus, select:focus, input[type="file"]:focus {
+    input[type="number"]:focus, select:focus, input[type="text"]:focus, input[type="file"]:focus {
       border-color: #00ff00;
       outline: none;
     }
@@ -112,96 +176,6 @@
       margin: 5px 0;
       color: #bbb;
       font-size: 0.9rem;
-    }
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      animation: fadeIn 0.3s ease;
-    }
-    .modal {
-      background: #2d2d2d;
-      padding: 20px;
-      border-radius: 5px;
-      width: 90%;
-      max-width: 400px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      text-align: center;
-      position: relative;
-    }
-    .modal .card {
-      background: #1e1e1e;
-      padding: 10px;
-      border-radius: 5px;
-      margin-bottom: 10px;
-    }
-    .preview-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-    }
-    .preview {
-      max-width: 100%;
-      max-height: 200px;
-      object-fit: contain;
-    }
-    .preview img {
-      border: 1px solid #4d4d4d;
-      border-radius: 3px;
-      max-width: 100%;
-      max-height: 100%;
-    }
-    .thumbnail-container {
-      width: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      max-height: 80px;
-      padding: 5px 0;
-      display: flex;
-      flex-direction: row;
-      gap: 5px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .thumbnail {
-      flex: 0 0 auto;
-      margin: 0;
-      text-align: center;
-      cursor: pointer;
-      min-width: 70px;
-    }
-    .thumbnail img {
-      max-width: 100%;
-      max-height: 70px;
-      border: 1px solid #4d4d4d;
-      border-radius: 3px;
-    }
-    .thumbnail input[type="checkbox"] {
-      margin-right: 5px;
-    }
-    .thumbnail.selected {
-      border: 2px solid #00ff00;
-    }
-    .close-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 5px 10px;
-      background: #ff0000;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .close-btn:hover {
-      background: #cc0000;
     }
     .alert-overlay {
       position: fixed;
@@ -274,7 +248,7 @@
         min-height: 250px;
       }
       .preview {
-        max-height: 250px;
+        max-height: 200px;
       }
       .thumbnail-container {
         max-height: 100px;
@@ -288,7 +262,7 @@
       button {
         font-size: 1.2rem;
       }
-      label, p, input[type="number"], select {
+      label, p, input[type="number"], select, input[type="text"] {
         font-size: 1.1rem;
       }
       .alert-title {
@@ -331,8 +305,7 @@
       color: 'bw',
       totalCost: 0,
       error: '',
-      isPrinting: false,
-      showModal: false
+      isPrinting: false
     };
 
     let videoStream = null;
@@ -379,9 +352,22 @@
                 </div>
               ` : state.fileUploaded ? `
                 <div class="form-group">
-                  <label>File</label>
-                  <p>${state.file}</p>
-                  <button class="btn-green" onclick="showDocumentModal()">View Document</button>
+                  ${state.imageData ? `
+                    <label>Preview</label>
+                    <canvas id="canvas"></canvas>
+                  ` : state.fileData?.startsWith('data:application/pdf') ? `
+                    <div class="card">
+                      <div class="preview-container">
+                        <div class="preview" id="preview"></div>
+                      </div>
+                    </div>
+                    <div class="thumbnail-container" id="thumbnail-container"></div>
+                    <label>Page Range (e.g., 1-3, 5)</label>
+                    <input type="text" id="pageRange" placeholder="e.g., 1-3, 5" onchange="updatePageRange(this.value)">
+                  ` : `
+                    <label>File</label>
+                    <p>${state.file}</p>
+                  `}
                   <label>Copies</label>
                   <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)">
                   <label>Color</label>
@@ -424,32 +410,12 @@
             ` : ''}
           </div>
         `;
-        if (state.showModal) {
-          const modal = document.createElement('div');
-          modal.className = 'modal-overlay';
-          modal.innerHTML = `
-            <div class="modal">
-              <button class="close-btn" onclick="closeModal()">X</button>
-              ${state.imageData ? `
-                <div class="card">
-                  <div class="preview-container">
-                    <div class="preview"><img src="${state.imageData}" alt="Document Preview"></div>
-                  </div>
-                </div>
-              ` : state.fileData?.startsWith('data:application/pdf') ? `
-                <div class="card">
-                  <div class="preview-container">
-                    <div class="preview" id="preview"></div>
-                  </div>
-                </div>
-                <div class="thumbnail-container" id="thumbnail-container"></div>
-              ` : '<p>No document to display.</p>'}
-            </div>
-          `;
-          document.body.appendChild(modal);
-          if (state.fileData?.startsWith('data:application/pdf') && !state.selectedPages.length) {
-            renderPDFPages();
-          }
+        if (state.service === 'print' && state.scanMode) {
+          startVideoStream();
+        } else if (state.service === 'print' && state.imageData) {
+          drawCanvas();
+        } else if (state.service === 'print' && state.fileData?.startsWith('data:application/pdf') && !state.selectedPages.length) {
+          renderPDFPages();
         }
       } else if (state.screen === 'summary') {
         app.innerHTML = `
@@ -491,18 +457,6 @@
           document.body.appendChild(alertContainer);
         }
       }
-    }
-
-    // Modal control
-    function showDocumentModal() {
-      state.showModal = true;
-      render();
-    }
-
-    function closeModal() {
-      state.showModal = false;
-      document.querySelector('.modal-overlay')?.remove();
-      render();
     }
 
     // Camera functions
@@ -561,12 +515,11 @@
       state.imageData = canvas.toDataURL('image/png');
       state.file = 'scanned_image.png';
       state.fileUploaded = true;
-      stopCamera();
-      showDocumentModal();
+      render();
     }
 
     function drawCanvas() {
-      const canvas = document.querySelector('.modal .preview canvas');
+      const canvas = document.getElementById('canvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       const img = new Image();
@@ -596,7 +549,7 @@
       reader.onload = () => {
         state.fileData = reader.result;
         if (file.type.startsWith('image/')) state.imageData = state.fileData;
-        showDocumentModal();
+        render();
       };
       reader.onerror = () => {
         state.error = 'File read failed.';
@@ -610,8 +563,8 @@
       try {
         const pdf = await loadingTask.promise;
         const numPages = pdf.numPages;
-        const thumbnailContainer = document.querySelector('.modal .thumbnail-container');
-        const previewContainer = document.querySelector('.modal .preview');
+        const thumbnailContainer = document.getElementById('thumbnail-container');
+        const previewContainer = document.getElementById('preview');
         if (!thumbnailContainer || !previewContainer) return;
         thumbnailContainer.innerHTML = '';
         previewContainer.innerHTML = '';
@@ -625,12 +578,11 @@
           await page.render({ canvasContext: context, viewport }).promise;
           const imgData = canvas.toDataURL('image/png');
           const thumbnailDiv = document.createElement('div');
-          thumbnailDiv.className = `thumbnail ${pageNum === state.currentPreviewPage ? 'selected' : ''}`;
+          thumbnailDiv.className = `thumbnail ${state.selectedPages.includes(pageNum) ? 'selected' : ''}`;
           thumbnailDiv.innerHTML = `
-            <input type="checkbox" id="page-${pageNum}" name="page" value="${pageNum}" onchange="togglePage(${pageNum}, this.checked)">
-            <label for="page-${pageNum}">Page ${pageNum}</label><br>
-            <img src="${imgData}" alt="Page ${pageNum}" onclick="selectPreview(${pageNum})">
+            <img src="${imgData}" alt="Page ${pageNum}" onclick="togglePage(${pageNum})">
           `;
+          thumbnailDiv.addEventListener('click', () => togglePage(pageNum));
           thumbnailContainer.appendChild(thumbnailDiv);
           if (pageNum === state.currentPreviewPage) {
             const previewViewport = page.getViewport({ scale: 1.0 });
@@ -649,12 +601,51 @@
       }
     }
 
-    function togglePage(pageNum, checked) {
+    function togglePage(pageNum) {
       const index = state.selectedPages.indexOf(pageNum);
-      if (checked && index === -1) state.selectedPages.push(pageNum);
-      else if (!checked && index !== -1) state.selectedPages.splice(index, 1);
+      if (index === -1) state.selectedPages.push(pageNum);
+      else state.selectedPages.splice(index, 1);
       state.selectedPages.sort((a, b) => a - b);
       console.log('Selected pages:', state.selectedPages);
+      render();
+    }
+
+    function updatePageRange(rangeInput) {
+      const range = rangeInput.trim();
+      if (!range) {
+        state.selectedPages = [];
+        render();
+        return;
+      }
+      try {
+        const parts = range.split(',').map(part => part.trim());
+        const pages = [];
+        for (const part of parts) {
+          if (part.includes('-')) {
+            const [start, end] = part.split('-').map(Number);
+            if (start <= end) {
+              for (let i = start; i <= end; i++) pages.push(i);
+            }
+          } else {
+            const num = Number(part);
+            if (num) pages.push(num);
+          }
+        }
+        const pdfDoc = pdfjsLib.getDocument({ data: atob(state.fileData.split(',')[1]) }).promise;
+        pdfDoc.then(doc => {
+          const maxPages = doc.numPages;
+          state.selectedPages = [...new Set(pages.filter(p => p >= 1 && p <= maxPages))].sort((a, b) => a - b);
+          if (state.selectedPages.length === 0) {
+            state.error = 'Invalid page range. Use format like "1-3, 5".';
+          } else {
+            state.error = '';
+          }
+          render();
+        });
+      } catch (error) {
+        state.error = 'Invalid page range. Use format like "1-3, 5".';
+        render();
+      }
     }
 
     function selectPreview(pageNum) {
@@ -672,13 +663,11 @@
       state.fileData = null;
       state.selectedPages = [];
       state.currentPreviewPage = 1;
-      state.showModal = false;
       state.isPrinting = false;
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
-      document.querySelector('.modal-overlay')?.remove();
       document.querySelector('.alert-overlay')?.remove();
       render();
     }
@@ -696,7 +685,6 @@
       state.color = 'bw';
       state.error = '';
       state.isPrinting = false;
-      document.querySelector('.modal-overlay')?.remove();
       document.querySelector('.alert-overlay')?.remove();
       setScreen('options');
     }
@@ -796,8 +784,6 @@
       state.fileData = null;
       state.selectedPages = [];
       state.currentPreviewPage = 1;
-      state.showModal = false;
-      document.querySelector('.modal-overlay')?.remove();
       render();
     }
 
@@ -805,13 +791,12 @@
       state = {
         screen: 'menu', service: null, file: null, fileUploaded: false, scanMode: false,
         imageData: null, fileData: null, selectedPages: [], currentPreviewPage: 1,
-        copies: 1, color: 'bw', totalCost: 0, error: '', isPrinting: false, showModal: false
+        copies: 1, color: 'bw', totalCost: 0, error: '', isPrinting: false
       };
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
-      document.querySelector('.modal-overlay')?.remove();
       document.querySelector('.alert-overlay')?.remove();
       document.getElementById('print-iframe').src = '';
       render();
