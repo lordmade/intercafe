@@ -234,6 +234,7 @@
               <div class="form-group">
                 <label>Camera Preview:</label>
                 <video id="video" autoplay playsinline></video>
+                <p>Please position the camera to capture only the document, avoiding screen reflection.</p>
                 <div class="flex">
                   <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
                   <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
@@ -390,11 +391,12 @@
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       state.imageData = canvas.toDataURL('image/png');
+      console.log('Captured Image Data:', state.imageData.substring(0, 50) + '...'); // Verify raw image
       state.file = 'scanned_image.pdf';
       state.fileUploaded = true;
-      console.log('Image captured:', state.imageData.substring(0, 50) + '...');
       stopCamera();
       render();
     }
@@ -411,7 +413,7 @@
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx.drawImage(img, 0, 0); // Preview only, does not affect PDF
+        ctx.drawImage(img, 0, 0); // Preview only
       };
     }
 
@@ -523,14 +525,14 @@
           }
 
           if (state.imageData && state.file === 'scanned_image.pdf') {
-            // Captured image: use full size
+            // Captured image: use full size, only the captured image
             const img = new Image();
-            img.src = state.imageData; // Raw captured image, no UI
+            img.src = state.imageData; // Raw capture, no UI
             await new Promise((resolve) => { img.onload = resolve; });
             const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: [img.height / 3.78, img.width / 3.78] // Convert pixels to mm (96 DPI)
+              format: [img.height / 3.78, img.width / 3.78] // 96 DPI conversion
             });
             pdf.addImage(state.imageData, 'PNG', 0, 0, img.width / 3.78, img.height / 3.78); // Full size
             pdfDataUrl = pdf.output('datauristring');
