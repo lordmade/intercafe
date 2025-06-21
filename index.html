@@ -187,20 +187,21 @@
       padding: 1rem;
       border-radius: 0.75rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      width: 100%; /* Full width within container */
-      max-width: calc(100% - 130px); /* Adjust to leave space for thumbnails (120px + padding) */
-      margin-right: 1rem; /* Space between card and thumbnails */
+      width: 100%;
+      max-width: calc(100% - 130px); /* Adjust for thumbnail width + padding */
+      margin-right: 1rem;
     }
     .preview-container {
       display: flex;
       justify-content: center;
       align-items: center;
       width: 100%;
+      height: 100%;
     }
     .preview {
       max-width: 100%;
       max-height: 400px;
-      object-fit: contain; /* Ensure image fits within card */
+      object-fit: contain;
     }
     .preview img {
       border: 1px solid #d1d5db;
@@ -214,6 +215,7 @@
       max-height: 400px;
       padding-left: 0.5rem;
       border-left: 1px solid #d1d5db;
+      flex-shrink: 0; /* Prevent shrinking */
     }
     .thumbnail {
       margin: 0.25rem 0;
@@ -232,9 +234,15 @@
     .thumbnail.selected {
       border: 2px solid #2563eb;
     }
+    .pdf-viewer {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 1rem;
+    }
     @media (min-width: 601px) {
       .container {
-        flex-direction: row;
+        flex-direction: column;
         padding: 2.5rem;
       }
       h1 {
@@ -257,8 +265,8 @@
         font-size: 1rem;
       }
       .card {
-        max-width: calc(100% - 160px); /* Adjust for desktop thumbnail width (150px + padding) */
-        margin-right: 1.5rem; /* Increased spacing on desktop */
+        max-width: calc(100% - 160px); /* Adjust for desktop thumbnail width */
+        margin-right: 1.5rem;
       }
       .preview {
         max-height: 600px;
@@ -281,6 +289,23 @@
       }
       .thumbnail input[type="checkbox"] {
         margin-right: 0.5rem;
+      }
+      .pdf-viewer {
+        flex-direction: row; /* Ensure horizontal alignment on desktop */
+      }
+    }
+    @media (max-width: 600px) {
+      .pdf-viewer {
+        flex-direction: column; /* Stack on mobile */
+      }
+      .card {
+        max-width: 100%; /* Full width on mobile */
+        margin-right: 0;
+        margin-bottom: 1rem;
+      }
+      .thumbnail-container {
+        width: 100%; /* Full width on mobile */
+        max-height: 300px; /* Reduced height for mobile */
       }
     }
     @keyframes fadeIn {
@@ -360,7 +385,7 @@
                   <label>Preview:</label>
                   <canvas id="canvas"></canvas>
                 ` : state.fileData?.startsWith('data:application/pdf') ? `
-                  <div style="display: flex; flex-direction: column; gap: 1rem;">
+                  <div class="pdf-viewer">
                     <div class="card">
                       <div class="preview-container">
                         <div class="preview" id="preview"></div>
@@ -831,7 +856,7 @@
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
-      const existingAlert = document.querySelector('.alert-overlay');
+      const existingAlert = document.queryselector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       document.getElementById('print-iframe').src = '';
       render();
