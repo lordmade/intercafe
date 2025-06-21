@@ -171,18 +171,6 @@
       border-radius: 0.5rem;
       margin-bottom: 1rem;
     }
-    .crop-container {
-      position: relative;
-      display: inline-block;
-    }
-    .crop-handle {
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      background: #2563eb;
-      border-radius: 50%;
-      cursor: pointer;
-    }
     #print-iframe {
       display: none;
     }
@@ -211,8 +199,7 @@
       fileUploaded: false,
       scanMode: false,
       imageData: null,
-      fileData: null, // Store uploaded file data URL
-      crop: { x: 0, y: 0, width: 0, height: 0 },
+      fileData: null,
       copies: 1,
       color: 'bw',
       totalCost: 0,
@@ -250,19 +237,6 @@
                 <div class="flex">
                   <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
                   <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
-                </div>
-              </div>
-            ` : state.imageData && !state.fileUploaded ? `
-              <div class="form-group">
-                <label>Captured Image:</label>
-                <div class="crop-container">
-                  <canvas id="canvas"></canvas>
-                  <div class="crop-handle" id="top-left" style="top: ${state.crop.y}px; left: ${state.crop.x}px;"></div>
-                  <div class="crop-handle" id="bottom-right" style="top: ${state.crop.y + state.crop.height}px; left: ${state.crop.x + state.crop.width}px;"></div>
-                </div>
-                <div class="flex">
-                  <button class="btn-blue" onclick="confirmCrop()" aria-label="Confirm Crop">Confirm</button>
-                  <button class="btn-gray" onclick="retakeImage()" aria-label="Retake Image">Retake</button>
                 </div>
               </div>
             ` : state.fileUploaded ? `
@@ -325,7 +299,6 @@
           startVideoStream();
         } else if (state.service === 'print' && state.imageData) {
           drawCanvas();
-          if (!state.fileUploaded) setupCropHandles();
         }
       } else if (state.screen === 'summary') {
         app.innerHTML = `
@@ -419,7 +392,9 @@
       canvas.height = video.videoHeight;
       canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
       state.imageData = canvas.toDataURL('image/png');
-      state.crop = { x: 50, y: 50, width: canvas.width - 100, height: canvas.height - 100 };
+      state.file = 'scanned_image.pdf';
+      state.fileUploaded = true;
+      console.log('Image captured:', state.imageData.substring(0, 50) + '...');
       stopCamera();
       render();
     }
@@ -437,76 +412,7 @@
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
-        if (!state.fileUploaded) {
-          ctx.strokeStyle = '#2563eb';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(state.crop.x, state.crop.y, state.crop.width, state.crop.height);
-        }
       };
-    }
-
-    function setupCropHandles() {
-      const handles = ['top-left', 'bottom-right'];
-      handles.forEach(handle => {
-        const element = document.getElementById(handle);
-        if (!element) return;
-        let isDragging = false;
-        element.addEventListener('mousedown', () => { isDragging = true; });
-        document.addEventListener('mousemove', (e) => {
-          if (!isDragging) return;
-          const canvas = document.getElementById('canvas');
-          const rect = canvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          if (handle === 'top-left') {
-            state.crop.width += state.crop.x - x;
-            state.crop.height += state.crop.y - y;
-            state.crop.x = Math.max(0, x);
-            state.crop.y = Math.max(0, y);
-          } else if (handle === 'bottom-right') {
-            state.crop.width = Math.min(x - state.crop.x, canvas.width - state.crop.x);
-            state.crop.height = Math.min(y - state.crop.y, canvas.height - state.crop.y);
-          }
-          state.crop.width = Math.max(50, state.crop.width);
-          state.crop.height = Math.max(50, state.crop.height);
-          drawCanvas();
-        });
-        document.addEventListener('mouseup', () => { isDragging = false; });
-      });
-    }
-
-    function confirmCrop() {
-      const canvas = document.createElement('canvas');
-      canvas.width = state.crop.width;
-      canvas.height = state.crop.height;
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.src = state.imageData;
-      img.onload = () => {
-        ctx.drawImage(img, state.crop.x, state.crop.y, state.crop.width, state.crop.height, 0, 0, state.crop.width, state.crop.height);
-        state.imageData = canvas.toDataURL('image/png');
-        console.log('Cropped image generated:', state.imageData.substring(0, 50) + '...');
-        state.file = 'scanned_image.pdf';
-        state.fileUploaded = true;
-        render();
-      };
-    }
-
-    function retakeImage() {
-      state.imageData = null;
-      state.crop = { x: 0, y: 0, width: 0, height: 0 };
-      state.file = null;
-      state.fileUploaded = false;
-      state.fileData = null;
-      startCamera();
-    }
-
-    function resetFile() {
-      state.imageData = null;
-      state.file = null;
-      state.fileUploaded = false;
-      state.fileData = null;
-      render();
     }
 
     // File handling
@@ -644,19 +550,46 @@
             throw new Error('Unsupported file type for printing');
           }
 
+          // Check printer availability (simulated)
+          const testPrint = document.createElement('iframe');
+          testPrint.style.display = 'none';
+          document.body.appendChild(testPrint);
+          let hasPrinters = false;
+          try {
+            testPrint.contentWindow.document.write('<p>Test</p>');
+            testPrint.contentWindow.focus();
+            testPrint.contentWindow.print();
+            hasPrinters = true; // Assume success if no exception
+          } catch (e) {
+            console.warn('No printers detected:', e);
+          } finally {
+            testPrint.remove();
+          }
+
+          if (!hasPrinters) {
+            throw new Error('No printers found. Please connect a printer and try again.');
+          }
+
           // Load PDF in iframe and trigger print
           const iframe = document.getElementById('print-iframe');
           iframe.src = pdfDataUrl;
           iframe.onload = () => {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-            console.log('Print dialog triggered for:', state.file);
-            state.isPrinting = false;
-            setScreen('summary');
+            try {
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+              console.log('Print dialog triggered for:', state.file);
+              state.isPrinting = false;
+              setScreen('summary');
+            } catch (e) {
+              console.error('Print error:', e);
+              state.error = 'Failed to open print dialog. Please ensure a printer is connected.';
+              state.isPrinting = false;
+              render();
+            }
           };
         } catch (error) {
           console.error('Error preparing print:', error);
-          state.error = 'Failed to prepare document for printing. Please try again.';
+          state.error = error.message || 'Failed to prepare document for printing. Please try again.';
           state.isPrinting = false;
           render();
         }
@@ -682,7 +615,6 @@
         scanMode: false,
         imageData: null,
         fileData: null,
-        crop: { x: 0, y: 0, width: 0, height: 0 },
         copies: 1,
         color: 'bw',
         totalCost: 0,
