@@ -25,29 +25,9 @@
       max-width: 420px;
       text-align: center;
       transition: transform 0.3s ease;
-      display: none; /* Hidden during capture-preview */
     }
-    .container.active {
-      display: flex;
-    }
-    #capture-preview {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #fff;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    #capture-preview.active {
-      display: flex;
-    }
-    #capture-canvas {
-      max-width: 100%;
-      max-height: 100%;
+    .container:hover {
+      transform: translateY(-2px);
     }
     h1 {
       font-size: 1.75rem;
@@ -202,10 +182,6 @@
 </head>
 <body>
   <div id="app" class="container"></div>
-  <div id="capture-preview">
-    <canvas id="capture-canvas"></canvas>
-    <button class="btn-green" onclick="proceedToOptions()" aria-label="Proceed to Options">Proceed</button>
-  </div>
   <iframe id="print-iframe"></iframe>
   <script>
     // Pricing constants in ZAR
@@ -237,13 +213,10 @@
     function render() {
       console.log('Rendering screen:', state.screen);
       const app = document.getElementById('app');
-      const capturePreview = document.getElementById('capture-preview');
-      if (!app || !capturePreview) {
-        console.error('App or capture-preview container not found');
+      if (!app) {
+        console.error('App container not found');
         return;
       }
-      app.classList.toggle('active', state.screen !== 'capture-preview');
-      capturePreview.classList.toggle('active', state.screen === 'capture-preview');
       app.innerHTML = '';
       if (state.screen === 'menu') {
         app.innerHTML = `
@@ -261,7 +234,7 @@
               <div class="form-group">
                 <label>Camera Preview:</label>
                 <video id="video" autoplay playsinline></video>
-                <p>Please position the camera to capture only the document.</p>
+                <p>Please position the camera to capture only the document, avoiding screen reflection.</p>
                 <div class="flex">
                   <button class="btn-blue" onclick="captureImage()" aria-label="Capture Image">Capture</button>
                   <button class="btn-gray" onclick="stopCamera()" aria-label="Stop Camera">Cancel</button>
@@ -323,22 +296,9 @@
             </div>
           ` : ''}
         `;
-        if (state.screen === 'capture-preview') {
-          const canvas = document.getElementById('capture-canvas');
-          if (canvas && state.imageData) {
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.src = state.imageData;
-            img.onload = () => {
-              canvas.width = img.width;
-              canvas.height = img.height;
-              ctx.drawImage(img, 0, 0);
-            };
-          }
-        }
         if (state.service === 'print' && state.scanMode) {
           startVideoStream();
-        } else if (state.service === 'print' && state.imageData && state.screen === 'options') {
+        } else if (state.service === 'print' && state.imageData) {
           drawCanvas();
         }
       } else if (state.screen === 'summary') {
@@ -428,17 +388,16 @@
         console.error('Video element not found for capture');
         return;
       }
+      // Use off-screen canvas to isolate capture
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       state.imageData = canvas.toDataURL('image/png');
-      console.log('Captured Image Data:', state.imageData.substring(0, 50) + '...');
+      console.log('Captured Image Data (Dimensions: ' + canvas.width + 'x' + canvas.height + '): ' + state.imageData.substring(0, 50) + '...');
       state.file = 'scanned_image.pdf';
       state.fileUploaded = true;
-      state.scanMode = false;
-      state.screen = 'capture-preview'; // Switch to preview-only screen
       stopCamera();
       render();
     }
@@ -457,11 +416,6 @@
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
       };
-    }
-
-    function proceedToOptions() {
-      state.screen = 'options';
-      render();
     }
 
     // File handling
@@ -501,6 +455,10 @@
       state.screen = screen;
       state.error = '';
       state.scanMode = false;
+      state.imageData = null;
+      state.file = null;
+      state.fileUploaded = false;
+      state.fileData = null;
       state.isPrinting = false;
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
@@ -569,7 +527,7 @@
 
           if (state.imageData && state.file === 'scanned_image.pdf') {
             const img = new Image();
-            img.src = state.imageData; // Isolated capture
+            img.src = state.imageData;
             await new Promise((resolve) => { img.onload = resolve; });
             const pdf = new jsPDF({
               orientation: 'portrait',
@@ -604,29 +562,14 @@
             throw new Error('Unsupported file type for printing');
           }
 
-          const testPrint = document.createElement('iframe');
-          testPrint.style.display = 'none';
-          document.body.appendChild(testPrint);
-          let hasPrinters = false;
-          try {
-            testPrint.contentWindow.document.write('<p>Test</p>');
-            testPrint.contentWindow.focus();
-            testPrint.contentWindow.print();
-            hasPrinters = true;
-          } catch (e) {
-            console.warn('No printers detected:', e);
-          } finally {
-            testPrint.remove();
-          }
-
-          if (!hasPrinters) {
-            throw new Error('No printers found. Please connect a printer and try again.');
-          }
-
+          // Explicitly set iframe content to PDF
           const iframe = document.getElementById('print-iframe');
-          iframe.src = pdfDataUrl;
+          iframe.srcdoc = ''; // Clear previous content
+          const blob = new Blob([pdf.output()], { type: 'application/pdf' });
+          iframe.src = URL.createObjectURL(blob);
           iframe.onload = () => {
             try {
+              // Ensure focus and print from iframe content
               iframe.contentWindow.focus();
               iframe.contentWindow.print();
               console.log('Print dialog triggered for:', state.file);
@@ -680,14 +623,6 @@
       const existingAlert = document.querySelector('.alert-overlay');
       if (existingAlert) existingAlert.remove();
       document.getElementById('print-iframe').src = '';
-      render();
-    }
-
-    function resetFile() {
-      state.file = null;
-      state.fileUploaded = false;
-      state.imageData = null;
-      state.fileData = null;
       render();
     }
 
