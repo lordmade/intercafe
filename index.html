@@ -520,7 +520,7 @@
         render();
         try {
           let pdfDataUrl;
-          const { jsPDF } = window.jspdf; // Ensure jsPDF is accessed from global scope
+          const { jsPDF } = window.jspdf;
           if (!jsPDF) {
             throw new Error('jsPDF library failed to load. Please check your internet connection or try refreshing the page.');
           }
@@ -529,13 +529,22 @@
             const img = new Image();
             img.src = state.imageData;
             await new Promise((resolve) => { img.onload = resolve; });
+            console.log('Image dimensions:', img.width, 'x', img.height);
             const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: [img.height / 3.78, img.width / 3.78] // 96 DPI
+              format: 'a4' // Use standard A4 for compatibility
             });
-            pdf.addImage(state.imageData, 'PNG', 0, 0, img.width / 3.78, img.height / 3.78);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height);
+            const scaledWidth = img.width * ratio;
+            const scaledHeight = img.height * ratio;
+            const x = (pdfWidth - scaledWidth) / 2;
+            const y = (pdfHeight - scaledHeight) / 2;
+            pdf.addImage(state.imageData, 'PNG', x, y, scaledWidth, scaledHeight);
             pdfDataUrl = pdf.output('datauristring');
+            console.log('PDF generated, dataUrl length:', pdfDataUrl.length);
           } else if (state.imageData || state.fileData?.startsWith('data:image')) {
             const pdf = new jsPDF({
               orientation: 'portrait',
@@ -562,11 +571,18 @@
             throw new Error('Unsupported file type for printing');
           }
 
+          // Debug PDF content
+          if (!pdfDataUrl || pdfDataUrl.length < 100) {
+            throw new Error('Generated PDF is empty or invalid.');
+          }
+
           // Explicitly set iframe content to PDF
           const iframe = document.getElementById('print-iframe');
           iframe.srcdoc = ''; // Clear previous content
-          const blob = new Blob([new jsPDF().output()], { type: 'application/pdf' }); // Test blob creation
-          iframe.src = URL.createObjectURL(new Blob([atob(pdfDataUrl.split(',')[1])], { type: 'application/pdf' }));
+          const binaryData = atob(pdfDataUrl.split(',')[1]);
+          const blob = new Blob([new Uint8Array(binaryData.length).map((_, i) => binaryData.charCodeAt(i))], { type: 'application/pdf' });
+          iframe.src = URL.createObjectURL(blob);
+          console.log('Blob URL created:', iframe.src);
           iframe.onload = () => {
             try {
               iframe.contentWindow.focus();
