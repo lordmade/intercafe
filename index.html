@@ -541,11 +541,24 @@
           </style>
         </head>
         <body>
-          <embed src="${state.fileData}" type="application/pdf" onload="window.print();window.close();">
+          <embed src="${state.fileData}" type="application/pdf">
         </body>
         </html>
       `;
-      console.log('Print intent triggered with PDF data:', state.fileData.substring(0, 50) + '...');
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          console.log('Print intent triggered with PDF data:', state.fileData.substring(0, 50) + '...');
+          state.isPrinting = false;
+          setScreen('summary');
+        } catch (e) {
+          console.error('Print error:', e);
+          state.error = 'Failed to open print dialog. Please ensure a printer is connected.';
+          state.isPrinting = false;
+          render();
+        }
+      };
     }
 
     async function confirmTransaction() {
@@ -566,8 +579,6 @@
             setScreen('summary');
           } else if (state.fileData?.startsWith('data:application/pdf')) {
             printPDF();
-            state.isPrinting = false;
-            setScreen('summary');
           } else if (state.fileData?.startsWith('data:image')) {
             state.imageData = state.fileData;
             printImage();
