@@ -552,10 +552,11 @@
           const imgData = canvas.toDataURL('image/png');
           const thumbnailDiv = document.createElement('div');
           thumbnailDiv.className = `thumbnail ${state.selectedPages.includes(pageNum) ? 'selected' : ''}`;
-          thumbnailDiv.innerHTML = `
-            <img src="${imgData}" alt="Page ${pageNum}" onclick="togglePage(${pageNum})">
-          `;
-          thumbnailDiv.addEventListener('click', () => togglePage(pageNum));
+          thumbnailDiv.innerHTML = `<img src="${imgData}" alt="Page ${pageNum}">`;
+          thumbnailDiv.addEventListener('click', () => {
+            console.log(`Clicked page ${pageNum}`);
+            togglePage(pageNum);
+          });
           thumbnailContainer.appendChild(thumbnailDiv);
         }
       } catch (error) {
@@ -567,8 +568,11 @@
 
     function togglePage(pageNum) {
       const index = state.selectedPages.indexOf(pageNum);
-      if (index === -1) state.selectedPages.push(pageNum);
-      else state.selectedPages.splice(index, 1);
+      if (index === -1) {
+        state.selectedPages.push(pageNum);
+      } else {
+        state.selectedPages.splice(index, 1);
+      }
       state.selectedPages.sort((a, b) => a - b);
       console.log('Selected pages:', state.selectedPages);
       render();
