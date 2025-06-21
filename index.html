@@ -520,9 +520,9 @@
         render();
         try {
           let pdfDataUrl;
-          const { jsPDF } = window.jspdf;
-          if (!jsPDF && (state.imageData || state.fileData?.startsWith('data:image'))) {
-            throw new Error('jsPDF library not loaded');
+          const { jsPDF } = window.jspdf; // Ensure jsPDF is accessed from global scope
+          if (!jsPDF) {
+            throw new Error('jsPDF library failed to load. Please check your internet connection or try refreshing the page.');
           }
 
           if (state.imageData && state.file === 'scanned_image.pdf') {
@@ -565,11 +565,10 @@
           // Explicitly set iframe content to PDF
           const iframe = document.getElementById('print-iframe');
           iframe.srcdoc = ''; // Clear previous content
-          const blob = new Blob([pdf.output()], { type: 'application/pdf' });
-          iframe.src = URL.createObjectURL(blob);
+          const blob = new Blob([new jsPDF().output()], { type: 'application/pdf' }); // Test blob creation
+          iframe.src = URL.createObjectURL(new Blob([atob(pdfDataUrl.split(',')[1])], { type: 'application/pdf' }));
           iframe.onload = () => {
             try {
-              // Ensure focus and print from iframe content
               iframe.contentWindow.focus();
               iframe.contentWindow.print();
               console.log('Print dialog triggered for:', state.file);
