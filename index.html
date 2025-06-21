@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Internet Cafe Printing & Copying Machine</title>
-  <!-- jsPDF Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       background: linear-gradient(135deg, #e0e7ff, #f3f4f6);
@@ -396,7 +394,7 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       state.imageData = canvas.toDataURL('image/png');
       console.log('Captured Image Data (Dimensions: ' + canvas.width + 'x' + canvas.height + '): ' + state.imageData.substring(0, 50) + '...');
-      state.file = 'scanned_image.pdf';
+      state.file = 'scanned_image.png';
       state.fileUploaded = true;
       stopCamera();
       render();
@@ -507,6 +505,26 @@
       state.totalCost = (costPerPage * state.copies).toFixed(2);
     }
 
+    function printImage() {
+      const iframe = document.getElementById('print-iframe');
+      iframe.srcdoc = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print Image</title>
+          <style>
+            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+            img { max-width: 100%; max-height: 100%; }
+          </style>
+        </head>
+        <body>
+          <img src="${state.imageData}" onload="window.print();window.close();">
+        </body>
+        </html>
+      `;
+      console.log('Print intent triggered with image data:', state.imageData.substring(0, 50) + '...');
+    }
+
     async function confirmTransaction() {
       if (state.service === 'print' && !state.fileUploaded) {
         state.error = 'Please upload a file or scan a document before proceeding.';
@@ -519,87 +537,21 @@
         state.isPrinting = true;
         render();
         try {
-          let pdfDataUrl;
-          const { jsPDF } = window.jspdf;
-          if (!jsPDF) {
-            throw new Error('jsPDF library failed to load. Please check your internet connection or try refreshing the page.');
-          }
-
-          if (state.imageData && state.file === 'scanned_image.pdf') {
-            const img = new Image();
-            img.src = state.imageData;
-            await new Promise((resolve) => { img.onload = resolve; });
-            console.log('Image dimensions:', img.width, 'x', img.height);
-            const pdf = new jsPDF({
-              orientation: 'portrait',
-              unit: 'mm',
-              format: 'a4' // Use standard A4 for compatibility
-            });
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height);
-            const scaledWidth = img.width * ratio;
-            const scaledHeight = img.height * ratio;
-            const x = (pdfWidth - scaledWidth) / 2;
-            const y = (pdfHeight - scaledHeight) / 2;
-            pdf.addImage(state.imageData, 'PNG', x, y, scaledWidth, scaledHeight);
-            pdfDataUrl = pdf.output('datauristring');
-            console.log('PDF generated, dataUrl length:', pdfDataUrl.length);
-          } else if (state.imageData || state.fileData?.startsWith('data:image')) {
-            const pdf = new jsPDF({
-              orientation: 'portrait',
-              unit: 'mm',
-              format: 'a4'
-            });
-            const img = new Image();
-            img.src = state.imageData || state.fileData;
-            await new Promise((resolve) => { img.onload = resolve; });
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgWidth = img.width;
-            const imgHeight = img.height;
-            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-            const scaledWidth = imgWidth * ratio;
-            const scaledHeight = imgHeight * ratio;
-            const x = (pdfWidth - scaledWidth) / 2;
-            const y = (pdfHeight - scaledHeight) / 2;
-            pdf.addImage(state.imageData || state.fileData, 'PNG', x, y, scaledWidth, scaledHeight);
-            pdfDataUrl = pdf.output('datauristring');
-          } else if (state.fileData?.startsWith('data:application/pdf')) {
-            pdfDataUrl = state.fileData;
+          if (state.imageData) {
+            printImage();
+            state.isPrinting = false;
+            setScreen('summary');
+          } else if (state.fileData?.startsWith('data:image')) {
+            state.imageData = state.fileData;
+            printImage();
+            state.isPrinting = false;
+            setScreen('summary');
           } else {
-            throw new Error('Unsupported file type for printing');
+            throw new Error('No image data available for printing.');
           }
-
-          // Debug PDF content
-          if (!pdfDataUrl || pdfDataUrl.length < 100) {
-            throw new Error('Generated PDF is empty or invalid.');
-          }
-
-          // Explicitly set iframe content to PDF
-          const iframe = document.getElementById('print-iframe');
-          iframe.srcdoc = ''; // Clear previous content
-          const binaryData = atob(pdfDataUrl.split(',')[1]);
-          const blob = new Blob([new Uint8Array(binaryData.length).map((_, i) => binaryData.charCodeAt(i))], { type: 'application/pdf' });
-          iframe.src = URL.createObjectURL(blob);
-          console.log('Blob URL created:', iframe.src);
-          iframe.onload = () => {
-            try {
-              iframe.contentWindow.focus();
-              iframe.contentWindow.print();
-              console.log('Print dialog triggered for:', state.file);
-              state.isPrinting = false;
-              setScreen('summary');
-            } catch (e) {
-              console.error('Print error:', e);
-              state.error = 'Failed to open print dialog. Please ensure a printer is connected.';
-              state.isPrinting = false;
-              render();
-            }
-          };
         } catch (error) {
-          console.error('Error preparing print:', error);
-          state.error = error.message || 'Failed to prepare document for printing. Please try again.';
+          console.error('Error printing image:', error);
+          state.error = error.message || 'Failed to prepare image for printing. Please try again.';
           state.isPrinting = false;
           render();
         }
