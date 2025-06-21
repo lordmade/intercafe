@@ -110,7 +110,7 @@
       font-weight: bold;
       color: #bbb;
     }
-    input[type="number"], select, input[type="text"], input[type="file"] {
+    input[type="number"], select, input[type="file"] {
       width: 100%;
       padding: 10px;
       border: 1px solid #4d4d4d;
@@ -119,7 +119,7 @@
       color: #fff;
       font-size: 1rem;
     }
-    input[type="number"]:focus, select:focus, input[type="text"]:focus, input[type="file"]:focus {
+    input[type="number"]:focus, select:focus, input[type="file"]:focus {
       border-color: #00ff00;
       outline: none;
     }
@@ -242,7 +242,7 @@
       button {
         font-size: 1.2rem;
       }
-      label, p, input[type="number"], select, input[type="text"] {
+      label, p, input[type="number"], select {
         font-size: 1.1rem;
       }
       .alert-title {
@@ -339,8 +339,6 @@
                     <div class="card">
                       <div class="thumbnail-container" id="thumbnail-container"></div>
                     </div>
-                    <label>Page Range (e.g., 1-3, 5)</label>
-                    <input type="text" id="pageRange" placeholder="e.g., 1-3, 5" onchange="updatePageRange(this.value)">
                   ` : `
                     <label>File</label>
                     <p>${state.file}</p>
@@ -576,49 +574,6 @@
       render();
     }
 
-    function updatePageRange(rangeInput) {
-      const range = rangeInput.trim();
-      if (!range) {
-        state.selectedPages = [];
-        render();
-        return;
-      }
-      try {
-        const parts = range.split(',').map(part => part.trim());
-        const pages = [];
-        for (const part of parts) {
-          if (part.includes('-')) {
-            const [start, end] = part.split('-').map(Number);
-            if (start <= end) {
-              for (let i = start; i <= end; i++) pages.push(i);
-            }
-          } else {
-            const num = Number(part);
-            if (num) pages.push(num);
-          }
-        }
-        const pdfDoc = pdfjsLib.getDocument({ data: atob(state.fileData.split(',')[1]) }).promise;
-        pdfDoc.then(doc => {
-          const maxPages = doc.numPages;
-          state.selectedPages = [...new Set(pages.filter(p => p >= 1 && p <= maxPages))].sort((a, b) => a - b);
-          if (state.selectedPages.length === 0) {
-            state.error = 'Invalid page range. Use format like "1-3, 5".';
-          } else {
-            state.error = '';
-          }
-          render();
-        });
-      } catch (error) {
-        state.error = 'Invalid page range. Use format like "1-3, 5".';
-        render();
-      }
-    }
-
-    function selectPreview(pageNum) {
-      state.currentPreviewPage = pageNum;
-      renderPDFPages();
-    }
-
     function setScreen(screen) {
       state.screen = screen;
       state.error = '';
@@ -669,7 +624,7 @@
       let costPerPage = 0;
       if (state.service === 'print') {
         costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
-        const pageCount = state.selectedPages.length || 1;
+        const pageCount = state.selectedPages.length || 1; // Use selected pages or default to 1 if none selected
         state.totalCost = (costPerPage * pageCount * state.copies).toFixed(2);
       } else if (state.service === 'copy') {
         costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
@@ -720,6 +675,12 @@
             state.isPrinting = false;
             setScreen('summary');
           } else if (state.fileData?.startsWith('data:application/pdf')) {
+            if (state.selectedPages.length === 0) {
+              state.error = 'Please select at least one page to print.';
+              state.isPrinting = false;
+              render();
+              return;
+            }
             printPDF();
           } else if (state.fileData?.startsWith('data:image')) {
             state.imageData = state.fileData;
