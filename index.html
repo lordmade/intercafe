@@ -32,8 +32,13 @@
 
         <!-- File Input -->
         <div class="mb-4">
-            <label for="pdf-upload" class="block text-sm font-medium text-gray-700">Upload PDF</label>
+            <label for="pdf-upload" class="block text-sm font-medium text-gray-700">Choose PDF File</label>
             <input type="file" id="pdf-upload" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
+
+        <!-- Scan File Button -->
+        <div class="mb-4">
+            <button id="scan-btn" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Scan File</button>
         </div>
 
         <!-- Page Count Display -->
@@ -50,7 +55,7 @@
 
         <!-- Action Buttons -->
         <div class="flex justify-between">
-            <button id="combine-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Combine Selected Pages</button>
+            <button id="download-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed hidden">Download Combined PDF</button>
             <button id="clear-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 hidden">Clear</button>
         </div>
 
@@ -63,28 +68,41 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
         const pdfUpload = document.getElementById('pdf-upload');
+        const scanBtn = document.getElementById('scan-btn');
         const pageCountEl = document.getElementById('page-count');
         const totalPagesEl = document.getElementById('total-pages');
         const pageSelectionEl = document.getElementById('page-selection');
         const pagesListEl = document.getElementById('pages-list');
         const pdfPreviewEl = document.getElementById('pdf-preview');
-        const combineBtn = document.getElementById('combine-btn');
+        const downloadBtn = document.getElementById('download-btn');
         const clearBtn = document.getElementById('clear-btn');
         const messageEl = document.getElementById('message');
         let pdfDoc = null;
+        let pdfArrayBuffer = null;
 
-        // Handle PDF upload
-        pdfUpload.addEventListener('input', async () => {
+        // Enable Scan File button when a file is selected
+        pdfUpload.addEventListener('change', () => {
+            if (pdfUpload.files.length > 0 && pdfUpload.files[0].type.includes('pdf')) {
+                scanBtn.disabled = false;
+                showMessage('', '');
+            } else {
+                scanBtn.disabled = true;
+                showMessage('Please select a valid PDF file.', 'text-red-600');
+            }
+        });
+
+        // Handle Scan File button click
+        scanBtn.addEventListener('click', async () => {
             const file = pdfUpload.files[0];
             if (!file || !file.type.includes('pdf')) {
-                showMessage('Please upload a valid PDF file.', 'text-red-600');
+                showMessage('Please select a valid PDF file.', 'text-red-600');
                 return;
             }
 
             try {
                 // Read the PDF file
-                const arrayBuffer = await file.arrayBuffer();
-                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                pdfArrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(pdfArrayBuffer).promise;
                 const numPages = pdfDoc.numPages;
 
                 // Update UI
@@ -93,7 +111,8 @@
                 pageSelectionEl.classList.remove('hidden');
                 pdfPreviewEl.classList.remove('hidden');
                 clearBtn.classList.remove('hidden');
-                combineBtn.disabled = false;
+                downloadBtn.classList.remove('hidden');
+                scanBtn.disabled = true;
 
                 // Clear previous content
                 pagesListEl.innerHTML = '';
@@ -121,16 +140,16 @@
                     pdfPreviewEl.appendChild(canvas);
                 }
 
-                showMessage('PDF loaded successfully!', 'text-green-600');
+                showMessage('PDF scanned successfully!', 'text-green-600');
             } catch (error) {
-                showMessage('Error loading PDF: ' + error.message, 'text-red-600');
+                showMessage('Error scanning PDF: ' + error.message, 'text-red-600');
             }
         });
 
-        // Combine selected pages
-        combineBtn.addEventListener('click', async () => {
-            if (!pdfDoc) {
-                showMessage('No PDF loaded.', 'text-red-600');
+        // Download combined pages
+        downloadBtn.addEventListener('click', async () => {
+            if (!pdfDoc || !pdfArrayBuffer) {
+                showMessage('No PDF scanned.', 'text-red-600');
                 return;
             }
 
@@ -144,8 +163,7 @@
 
             try {
                 // Load the original PDF into pdf-lib
-                const arrayBuffer = await pdfUpload.files[0].arrayBuffer();
-                const pdfDocLib = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pdfDocLib = await PDFLib.PDFDocument.load(pdfArrayBuffer);
                 const newPdf = await PDFLib.PDFDocument.create();
 
                 // Copy selected pages to new PDF
@@ -171,14 +189,16 @@
         // Clear the form
         clearBtn.addEventListener('click', () => {
             pdfUpload.value = '';
+            scanBtn.disabled = true;
             pageCountEl.classList.add('hidden');
             pageSelectionEl.classList.add('hidden');
             pdfPreviewEl.classList.add('hidden');
             clearBtn.classList.add('hidden');
-            combineBtn.disabled = true;
+            downloadBtn.classList.add('hidden');
             pagesListEl.innerHTML = '';
             pdfPreviewEl.innerHTML = '';
             pdfDoc = null;
+            pdfArrayBuffer = null;
             showMessage('', '');
         });
 
