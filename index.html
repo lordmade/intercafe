@@ -48,7 +48,7 @@
 
         <!-- Scan File Button -->
         <div class="mb-4">
-            <button id="scan-btn" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">Scan File</button>
+            <button id="scan-btn" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Scan File</button>
         </div>
 
         <!-- Camera Preview (hidden by default) -->
@@ -100,6 +100,7 @@
         let pdfDoc = null;
         let pdfArrayBuffer = null;
         let stream = null;
+        let isScannedPDF = false;
 
         // Enable Choose Pages button when a file is selected
         pdfUpload.addEventListener('change', () => {
@@ -112,7 +113,7 @@
             }
         });
 
-        // Handle Choose Pages button click
+        // Handle Choose Pages button click (Uploaded PDF)
         choosePagesBtn.addEventListener('click', async () => {
             const file = pdfUpload.files[0];
             if (!file || !file.type.includes('pdf')) {
@@ -122,16 +123,17 @@
 
             try {
                 pdfArrayBuffer = await file.arrayBuffer();
-                await processPDF(pdfArrayBuffer, 'PDF processed successfully!');
+                isScannedPDF = false;
+                await processUploadedPDF(pdfArrayBuffer);
+                downloadBtn.textContent = 'Download Combined PDF';
             } catch (error) {
                 showMessage('Error processing PDF: ' + error.message, 'text-red-600');
             }
         });
 
-        // Handle Scan File button click (trigger camera)
+        // Handle Scan File button click (Trigger camera)
         scanBtn.addEventListener('click', async () => {
             try {
-                // Request camera access
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
                 cameraPreview.srcObject = stream;
                 cameraContainer.classList.remove('hidden');
@@ -166,8 +168,15 @@
                 page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
                 pdfArrayBuffer = await pdf.save();
 
-                // Process the generated PDF
-                await processPDF(pdfArrayBuffer, 'Image captured, cropped, and converted to PDF successfully!');
+                // Update UI for scanned PDF
+                isScannedPDF = true;
+                downloadBtn.textContent = 'Download PDF';
+                downloadBtn.classList.remove('hidden');
+                clearBtn.classList.remove('hidden');
+                pageCountEl.classList.add('hidden');
+                pageSelectionEl.classList.add('hidden');
+                pdfPreviewEl.classList.add('hidden');
+                showMessage('Image captured, cropped, and converted to PDF successfully!', 'text-green-600');
 
             } catch (error) {
                 showMessage('Error capturing or processing image: ' + error.message, 'text-red-600');
@@ -258,8 +267,8 @@
             return croppedCanvas;
         }
 
-        // Process PDF (shared for uploaded and scanned PDFs)
-        async function processPDF(arrayBuffer, successMessage) {
+        // Process Uploaded PDF
+        async function processUploadedPDF(arrayBuffer) {
             try {
                 pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
                 const numPages = pdfDoc.numPages;
@@ -272,7 +281,6 @@
                 clearBtn.classList.remove('hidden');
                 downloadBtn.classList.remove('hidden');
                 choosePagesBtn.disabled = true;
-                scanBtn.disabled = false; // Re-enable for additional scans
 
                 // Clear previous content
                 pagesListEl.innerHTML = '';
@@ -298,46 +306,59 @@
                     pdfPreviewEl.appendChild(canvas);
                 }
 
-                showMessage(successMessage, 'text-green-600');
+                showMessage('PDF processed successfully!', 'text-green-600');
             } catch (error) {
                 showMessage('Error processing PDF: ' + error.message, 'text-red-600');
                 throw error;
             }
         }
 
-        // Download combined pages
+        // Download PDF
         downloadBtn.addEventListener('click', async () => {
-            if (!pdfDoc || !pdfArrayBuffer) {
-                showMessage('No PDF processed.', 'text-red-600');
-                return;
-            }
-
-            const selectedPages = Array.from(document.querySelectorAll('.page-checkbox:checked'))
-                .map(input => parseInt(input.id.split('-')[1]) - 1); // 0-based index
-
-            if (selectedPages.length === 0) {
-                showMessage('Please select at least one page.', 'text-red-600');
+            if (!pdfArrayBuffer) {
+                showMessage('No PDF available.', 'text-red-600');
                 return;
             }
 
             try {
-                const pdfDocLib = await PDFLib.PDFDocument.load(pdfArrayBuffer);
-                const newPdf = await PDFLib.PDFDocument.create();
-                const copiedPages = await newPdf.copyPages(pdfDocLib, selectedPages);
-                copiedPages.forEach(page => newPdf.addPage(page));
+                if (isScannedPDF) {
+                    // Direct download for scanned PDF
+                    const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'scanned.pdf';
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    showMessage('PDF downloaded successfully!', 'text-green-600');
+                } else {
+                    // Combine selected pages for uploaded PDF
+                    const selectedPages = Array.from(document.querySelectorAll('.page-checkbox:checked'))
+                        .map(input => parseInt(input.id.split('-')[1]) - 1); // 0-based index
 
-                const pdfBytes = await newPdf.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'combined.pdf';
-                link.click();
-                URL.revokeObjectURL(url);
+                    if (selectedPages.length === 0) {
+                        showMessage('Please select at least one page.', 'text-red-600');
+                        return;
+                    }
 
-                showMessage('PDF combined and downloaded successfully!', 'text-green-600');
+                    const pdfDocLib = await PDFLib.PDFDocument.load(pdfArrayBuffer);
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const copiedPages = await newPdf.copyPages(pdfDocLib, selectedPages);
+                    copiedPages.forEach(page => newPdf.addPage(page));
+
+                    const pdfBytes = await newPdf.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'combined.pdf';
+                    link.click();
+                    URL.revokeObjectURL(url);
+
+                    showMessage('PDF combined and downloaded successfully!', 'text-green-600');
+                }
             } catch (error) {
-                showMessage('Error combining PDF: ' + error.message, 'text-red-600');
+                showMessage('Error downloading PDF: ' + error.message, 'text-red-600');
             }
         });
 
@@ -345,12 +366,12 @@
         clearBtn.addEventListener('click', () => {
             pdfUpload.value = '';
             choosePagesBtn.disabled = true;
-            scanBtn.disabled = false;
             pageCountEl.classList.add('hidden');
             pageSelectionEl.classList.add('hidden');
             pdfPreviewEl.classList.add('hidden');
             clearBtn.classList.add('hidden');
             downloadBtn.classList.add('hidden');
+            downloadBtn.textContent = 'Download Combined PDF';
             cameraContainer.classList.add('hidden');
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -360,6 +381,7 @@
             pdfPreviewEl.innerHTML = '';
             pdfDoc = null;
             pdfArrayBuffer = null;
+            isScannedPDF = false;
             showMessage('', '');
         });
 
