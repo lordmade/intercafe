@@ -1,740 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Cafe ATM Machine</title>
-  <style>
-    body {
-      background: #1a1a1a;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      font-family: 'Arial', sans-serif;
-      color: #fff;
-    }
-    .atm-container {
-      background: #2d2d2d;
-      border: 2px solid #3d3d3d;
-      border-radius: 10px;
-      width: 100%;
-      max-width: 400px;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      text-align: center;
-    }
-    .header {
-      background: #3d3d3d;
-      padding: 15px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-    }
-    h1 {
-      font-size: 1.5rem;
-      font-weight: bold;
-      color: #fff;
-      margin: 0;
-    }
-    h2 {
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: #ccc;
-      margin: 10px 0;
-    }
-    .display {
-      background: #1e1e1e;
-      padding: 15px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-      min-height: 200px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .card {
-      background: #2d2d2d;
-      padding: 10px;
-      border-radius: 5px;
-      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-      width: 100%;
-    }
-    .thumbnail-container {
-      width: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      max-height: 80px;
-      padding: 5px 0;
-      display: flex;
-      flex-direction: row;
-      gap: 5px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .thumbnail {
-      flex: 0 0 auto;
-      margin: 0;
-      text-align: center;
-      cursor: pointer;
-      min-width: 70px;
-      position: relative;
-    }
-    .thumbnail img {
-      max-width: 100%;
-      max-height: 70px;
-      border: 1px solid #4d4d4d;
-      border-radius: 3px;
-    }
-    .thumbnail.selected::after {
-      content: '✓';
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      background: #00ff00;
-      color: #000;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 0.9rem;
-    }
-    .form-group {
-      margin-bottom: 15px;
-      text-align: left;
-    }
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #bbb;
-    }
-    input[type="number"], select, input[type="file"] {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #4d4d4d;
-      border-radius: 5px;
-      background: #1e1e1e;
-      color: #fff;
-      font-size: 1rem;
-    }
-    input[type="number"]:focus, select:focus, input[type="file"]:focus {
-      border-color: #00ff00;
-      outline: none;
-    }
-    button {
-      padding: 15px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1.1rem;
-      font-weight: bold;
-      width: 100%;
-      margin: 5px 0;
-      background: #4d4d4d;
-      color: #fff;
-      transition: background 0.3s;
-    }
-    button:hover {
-      background: #666;
-    }
-    button:disabled {
-      background: #333;
-      cursor: not-allowed;
-    }
-    .btn-green {
-      background: #00ff00;
-      color: #000;
-    }
-    .btn-green:hover {
-      background: #00cc00;
-    }
-    .flex {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    p {
-      margin: 5px 0;
-      color: #bbb;
-      font-size: 0.9rem;
-    }
-    .alert-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      animation: fadeIn 0.3s ease;
-    }
-    .alert-box {
-      background: #2d2d2d;
-      padding: 15px;
-      border-radius: 5px;
-      width: 90%;
-      max-width: 300px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      text-align: center;
-    }
-    .alert-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .alert-icon {
-      width: 20px;
-      height: 20px;
-      background: #ff0000;
-      color: #fff;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-right: 10px;
-      font-weight: bold;
-    }
-    .alert-title {
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: #fff;
-    }
-    .alert-message {
-      color: #bbb;
-      margin-bottom: 10px;
-      font-size: 0.9rem;
-    }
-    video, canvas {
-      width: 100%;
-      border-radius: 3px;
-      margin-bottom: 10px;
-    }
-    #print-iframe {
-      display: none;
-    }
-    @media (min-width: 601px) {
-      .atm-container {
-        max-width: 500px;
-      }
-      h1 {
-        font-size: 1.8rem;
-      }
-      h2 {
-        font-size: 1.4rem;
-      }
-      .display {
-        min-height: 250px;
-      }
-      .thumbnail-container {
-        max-height: 100px;
-      }
-      .thumbnail {
-        min-width: 90px;
-      }
-      .thumbnail img {
-        max-height: 90px;
-      }
-      button {
-        font-size: 1.2rem;
-      }
-      label, p, input[type="number"], select {
-        font-size: 1.1rem;
-      }
-      .alert-title {
-        font-size: 1.2rem;
-      }
-      .alert-message {
-        font-size: 1rem;
-      }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page Selector & Combiner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf-lib.js CDN -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- pdfjs-dist CDN for PDF parsing -->
+    <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .page-checkbox {
+            margin-right: 8px;
+        }
+        #pdf-preview {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+        }
+        canvas {
+            border: 1px solid #d1d5db;
+            margin: 10px 0;
+        }
+    </style>
 </head>
-<body>
-  <div id="app" class="atm-container"></div>
-  <iframe id="print-iframe"></iframe>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script>
-    // Pricing constants in ZAR
-    const PRICING = {
-      print: { bw: 2.00, color: 5.00 },
-      copy: { bw: 1.50, color: 4.00 },
-      scan: 3.00
-    };
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">PDF Page Selector & Combiner</h1>
 
-    // State
-    let state = {
-      screen: 'menu',
-      service: null,
-      file: null,
-      fileUploaded: false,
-      scanMode: false,
-      imageData: null,
-      fileData: null,
-      selectedPages: [],
-      currentPreviewPage: 1,
-      copies: 1,
-      color: 'bw',
-      totalCost: 0,
-      error: '',
-      isPrinting: false
-    };
+        <!-- File Input -->
+        <div class="mb-4">
+            <label for="pdf-upload" class="block text-sm font-medium text-gray-700">Upload PDF</label>
+            <input type="file" id="pdf-upload" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
 
-    let videoStream = null;
+        <!-- Page Count Display -->
+        <div id="page-count" class="text-gray-600 mb-4 hidden">Total Pages: <span id="total-pages">0</span></div>
 
-    // Render function
-    function render() {
-      console.log('Rendering screen:', state.screen);
-      const app = document.getElementById('app');
-      if (!app) {
-        console.error('App container not found');
-        return;
-      }
-      app.innerHTML = '';
-      if (state.screen === 'menu') {
-        app.innerHTML = `
-          <div class="header">
-            <h1>Internet Cafe ATM</h1>
-          </div>
-          <div class="display">
-            <div class="flex">
-              <button class="btn-green" onclick="selectService('print')">Print</button>
-              <button class="btn-green" onclick="selectService('copy')">Copy</button>
-              <button class="btn-green" onclick="selectService('scan')">Scan</button>
-            </div>
-          </div>
-        `;
-      } else if (state.screen === 'options') {
-        app.innerHTML = `
-          <div class="header">
-            <h1>Internet Cafe ATM</h1>
-            <h2>${state.service.charAt(0).toUpperCase() + state.service.slice(1)} Options</h2>
-          </div>
-          <div class="display">
-            ${state.service === 'print' ? `
-              ${state.scanMode ? `
-                <div class="form-group">
-                  <label>Camera Preview</label>
-                  <video id="video" autoplay playsinline></video>
-                  <p>Position camera to capture document.</p>
-                  <div class="flex">
-                    <button class="btn-green" onclick="captureImage()">Capture</button>
-                    <button onclick="stopCamera()">Cancel</button>
-                  </div>
-                </div>
-              ` : state.fileUploaded ? `
-                <div class="form-group">
-                  ${state.imageData ? `
-                    <label>Preview</label>
-                    <canvas id="canvas"></canvas>
-                  ` : state.fileData?.startsWith('data:application/pdf') ? `
-                    <div class="card">
-                      <div class="thumbnail-container" id="thumbnail-container"></div>
-                    </div>
-                  ` : `
-                    <label>File</label>
-                    <p>${state.file}</p>
-                  `}
-                  <label>Copies</label>
-                  <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)">
-                  <label>Color</label>
-                  <select id="color" onchange="updateColor(this.value)">
-                    <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
-                    <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
-                  </select>
-                  <div class="flex">
-                    <button onclick="resetFile()">Back</button>
-                    <button class="btn-green" onclick="confirmTransaction()" ${state.isPrinting ? 'disabled' : ''}>
-                      ${state.isPrinting ? 'Printing...' : 'Print'}
-                    </button>
-                  </div>
-                </div>
-              ` : `
-                <div class="form-group">
-                  <label>Input Method</label>
-                  <div class="flex">
-                    <button class="btn-green" onclick="startCamera()">Scan</button>
-                    <button class="btn-green" onclick="triggerFileUpload()">Upload</button>
-                  </div>
-                  <input type="file" id="fileInput" accept=".pdf,.jpg,.png" style="display: none;" onchange="handleFileSelect(this)">
-                </div>
-              `}
-            ` : ''}
-            ${state.service !== 'scan' && (state.service !== 'print' || !state.fileUploaded) ? `
-              <div class="form-group">
-                <label>Copies</label>
-                <input type="number" id="copies" value="${state.copies}" min="1" onchange="updateCopies(this.value)">
-                <label>Color</label>
-                <select id="color" onchange="updateColor(this.value)">
-                  <option value="bw" ${state.color === 'bw' ? 'selected' : ''}>Black & White</option>
-                  <option value="color" ${state.color === 'color' ? 'selected' : ''}>Color</option>
-                </select>
-                <div class="flex">
-                  <button onclick="setScreen('menu')">Back</button>
-                  <button class="btn-green" onclick="confirmTransaction()">Confirm</button>
-                </div>
-              </div>
-            ` : ''}
-          </div>
-        `;
-        if (state.service === 'print' && state.scanMode) {
-          startVideoStream();
-        } else if (state.service === 'print' && state.imageData) {
-          drawCanvas();
-        } else if (state.service === 'print' && state.fileData?.startsWith('data:application/pdf') && !state.selectedPages.length) {
-          renderPDFPages();
-        }
-      } else if (state.screen === 'summary') {
-        app.innerHTML = `
-          <div class="header">
-            <h1>Internet Cafe ATM</h1>
-            <h2>Transaction Summary</h2>
-          </div>
-          <div class="display">
-            <p><strong>Service:</strong> ${state.service}</p>
-            ${state.service !== 'scan' ? `
-              <p><strong>Copies:</strong> ${state.copies}</p>
-              <p><strong>Color:</strong> ${state.color === 'bw' ? 'Black & White' : 'Color'}</p>
-              ${state.service === 'print' && state.selectedPages.length ? `<p><strong>Pages:</strong> ${state.selectedPages.join(', ')}</p>` : ''}
-            ` : ''}
-            ${state.service === 'print' ? `
-              <p><strong>File:</strong> ${state.file || 'Scanned Image'}</p>
-            ` : ''}
-            <p><strong>Total:</strong> R${state.totalCost}</p>
-            <button class="btn-green" onclick="reset()">Finish</button>
-          </div>
-        `;
-      }
+        <!-- Page Selection -->
+        <div id="page-selection" class="mb-4 hidden">
+            <h2 class="text-lg font-semibold text-gray-800">Select Pages to Combine</h2>
+            <div id="pages-list" class="mt-2"></div>
+        </div>
 
-      if (state.error) {
-        const existingAlert = document.querySelector('.alert-overlay');
-        if (!existingAlert) {
-          const alertContainer = document.createElement('div');
-          alertContainer.className = 'alert-overlay';
-          alertContainer.innerHTML = `
-            <div class="alert-box">
-              <div class="alert-header">
-                <span class="alert-icon">!</span>
-                <span class="alert-title">Error</span>
-              </div>
-              <p class="alert-message">${state.error}</p>
-              <button class="btn-green" onclick="clearError()">OK</button>
-            </div>
-          `;
-          document.body.appendChild(alertContainer);
-        }
-      }
-    }
+        <!-- PDF Preview -->
+        <div id="pdf-preview" class="mb-4 hidden"></div>
 
-    // Camera functions
-    function startCamera() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        state.error = 'Camera not supported.';
-        render();
-        return;
-      }
-      state.scanMode = true;
-      state.imageData = null;
-      state.file = null;
-      state.fileUploaded = false;
-      state.fileData = null;
-      state.selectedPages = [];
-      state.currentPreviewPage = 1;
-      render();
-    }
+        <!-- Action Buttons -->
+        <div class="flex justify-between">
+            <button id="combine-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Combine Selected Pages</button>
+            <button id="clear-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 hidden">Clear</button>
+        </div>
 
-    function startVideoStream() {
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(stream => {
-          videoStream = stream;
-          const video = document.getElementById('video');
-          if (video) video.srcObject = stream;
-          else {
-            console.error('Video element not found');
-            state.error = 'Camera preview failed.';
-            render();
-          }
-        })
-        .catch(() => {
-          state.error = 'Camera access denied.';
-          state.scanMode = false;
-          render();
-        });
-    }
+        <!-- Error/Success Messages -->
+        <div id="message" class="mt-4 text-center text-sm"></div>
+    </div>
 
-    function stopCamera() {
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-      }
-      state.scanMode = false;
-      render();
-    }
+    <script>
+        // Initialize PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
-    function captureImage() {
-      const video = document.getElementById('video');
-      if (!video) return;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-      state.imageData = canvas.toDataURL('image/png');
-      state.file = 'scanned_image.png';
-      state.fileUploaded = true;
-      render();
-    }
+        const pdfUpload = document.getElementById('pdf-upload');
+        const pageCountEl = document.getElementById('page-count');
+        const totalPagesEl = document.getElementById('total-pages');
+        const pageSelectionEl = document.getElementById('page-selection');
+        const pagesListEl = document.getElementById('pages-list');
+        const pdfPreviewEl = document.getElementById('pdf-preview');
+        const combineBtn = document.getElementById('combine-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const messageEl = document.getElementById('message');
+        let pdfDoc = null;
 
-    function drawCanvas() {
-      const canvas = document.getElementById('canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.src = state.imageData;
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-      };
-    }
-
-    // File handling
-    function triggerFileUpload() {
-      document.getElementById('fileInput')?.click();
-    }
-
-    async function handleFileSelect(input) {
-      const file = input.files[0];
-      if (!file) return;
-      state.file = file.name;
-      state.fileUploaded = true;
-      state.imageData = null;
-      state.fileData = null;
-      state.selectedPages = [];
-      state.currentPreviewPage = 1;
-      const reader = new FileReader();
-      reader.onload = () => {
-        state.fileData = reader.result;
-        if (file.type.startsWith('image/')) state.imageData = state.fileData;
-        render();
-      };
-      reader.onerror = () => {
-        state.error = 'File read failed.';
-        render();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    async function renderPDFPages() {
-      const loadingTask = pdfjsLib.getDocument({ data: atob(state.fileData.split(',')[1]) });
-      try {
-        const pdf = await loadingTask.promise;
-        const numPages = pdf.numPages;
-        const thumbnailContainer = document.getElementById('thumbnail-container');
-        if (!thumbnailContainer) return;
-        thumbnailContainer.innerHTML = '';
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 0.25 });
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-          await page.render({ canvasContext: context, viewport }).promise;
-          const imgData = canvas.toDataURL('image/png');
-          const thumbnailDiv = document.createElement('div');
-          thumbnailDiv.className = `thumbnail ${state.selectedPages.includes(pageNum) ? 'selected' : ''}`;
-          thumbnailDiv.innerHTML = `<img src="${imgData}" alt="Page ${pageNum}">`;
-          thumbnailDiv.addEventListener('click', () => {
-            console.log(`Clicked page ${pageNum}`);
-            togglePage(pageNum);
-          });
-          thumbnailContainer.appendChild(thumbnailDiv);
-        }
-      } catch (error) {
-        console.error('PDF render error:', error);
-        state.error = 'PDF render failed.';
-        render();
-      }
-    }
-
-    function togglePage(pageNum) {
-      const index = state.selectedPages.indexOf(pageNum);
-      if (index === -1) {
-        state.selectedPages.push(pageNum);
-      } else {
-        state.selectedPages.splice(index, 1);
-      }
-      state.selectedPages.sort((a, b) => a - b);
-      console.log('Selected pages:', state.selectedPages);
-      render();
-    }
-
-    function setScreen(screen) {
-      state.screen = screen;
-      state.error = '';
-      state.scanMode = false;
-      state.imageData = null;
-      state.file = null;
-      state.fileUploaded = false;
-      state.fileData = null;
-      state.selectedPages = [];
-      state.currentPreviewPage = 1;
-      state.isPrinting = false;
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-      }
-      document.querySelector('.alert-overlay')?.remove();
-      render();
-    }
-
-    function selectService(service) {
-      state.service = service;
-      state.file = null;
-      state.fileUploaded = false;
-      state.scanMode = false;
-      state.imageData = null;
-      state.fileData = null;
-      state.selectedPages = [];
-      state.currentPreviewPage = 1;
-      state.copies = 1;
-      state.color = 'bw';
-      state.error = '';
-      state.isPrinting = false;
-      document.querySelector('.alert-overlay')?.remove();
-      setScreen('options');
-    }
-
-    function updateCopies(value) {
-      state.copies = Math.max(1, parseInt(value) || 1);
-      render();
-    }
-
-    function updateColor(value) {
-      state.color = value;
-      render();
-    }
-
-    function calculateCost() {
-      let costPerPage = 0;
-      if (state.service === 'print') {
-        costPerPage = state.color === 'bw' ? PRICING.print.bw : PRICING.print.color;
-        const pageCount = state.selectedPages.length || 1; // Use selected pages or default to 1 if none selected
-        state.totalCost = (costPerPage * pageCount * state.copies).toFixed(2);
-      } else if (state.service === 'copy') {
-        costPerPage = state.color === 'bw' ? PRICING.copy.bw : PRICING.copy.color;
-        state.totalCost = (costPerPage * state.copies).toFixed(2);
-      } else if (state.service === 'scan') {
-        costPerPage = PRICING.scan;
-        state.totalCost = (costPerPage * state.copies).toFixed(2);
-      }
-    }
-
-    function printImage() {
-      const iframe = document.getElementById('print-iframe');
-      iframe.srcdoc = `<html><body><img src="${state.imageData}" onload="window.print();window.close();"></body></html>`;
-      console.log('Print intent with image:', state.imageData.substring(0, 50) + '...');
-    }
-
-    function printPDF() {
-      const iframe = document.getElementById('print-iframe');
-      let htmlContent = `<html><body><embed src="${state.fileData}${state.selectedPages.length > 0 ? '#page=' + state.selectedPages.join() : ''}" type="application/pdf" style="width: 100%; height: 100%;"></body></html>`;
-      iframe.srcdoc = htmlContent;
-      iframe.onload = () => {
-        try {
-          iframe.contentWindow.print();
-          state.isPrinting = false;
-          setScreen('summary');
-        } catch (e) {
-          console.error('Print error:', e);
-          state.error = 'Print failed. Check printer.';
-          state.isPrinting = false;
-          render();
-        }
-      };
-    }
-
-    async function confirmTransaction() {
-      if (state.service === 'print' && !state.fileUploaded) {
-        state.error = 'Upload or scan a file first.';
-        render();
-        return;
-      }
-      calculateCost();
-      if (state.service === 'print' && state.file) {
-        state.isPrinting = true;
-        render();
-        try {
-          if (state.imageData) {
-            printImage();
-            state.isPrinting = false;
-            setScreen('summary');
-          } else if (state.fileData?.startsWith('data:application/pdf')) {
-            if (state.selectedPages.length === 0) {
-              state.error = 'Please select at least one page to print.';
-              state.isPrinting = false;
-              render();
-              return;
+        // Handle PDF upload
+        pdfUpload.addEventListener('input', async () => {
+            const file = pdfUpload.files[0];
+            if (!file || !file.type.includes('pdf')) {
+                showMessage('Please upload a valid PDF file.', 'text-red-600');
+                return;
             }
-            printPDF();
-          } else if (state.fileData?.startsWith('data:image')) {
-            state.imageData = state.fileData;
-            printImage();
-            state.isPrinting = false;
-            setScreen('summary');
-          } else throw new Error('Unsupported file.');
-        } catch (error) {
-          console.error('Print error:', error);
-          state.error = error.message || 'Print preparation failed.';
-          state.isPrinting = false;
-          render();
+
+            try {
+                // Read the PDF file
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const numPages = pdfDoc.numPages;
+
+                // Update UI
+                totalPagesEl.textContent = numPages;
+                pageCountEl.classList.remove('hidden');
+                pageSelectionEl.classList.remove('hidden');
+                pdfPreviewEl.classList.remove('hidden');
+                clearBtn.classList.remove('hidden');
+                combineBtn.disabled = false;
+
+                // Clear previous content
+                pagesListEl.innerHTML = '';
+                pdfPreviewEl.innerHTML = '';
+
+                // Render page selection checkboxes and previews
+                for (let i = 1; i <= numPages; i++) {
+                    // Create checkbox for page selection
+                    const pageItem = document.createElement('div');
+                    pageItem.className = 'flex items-center mb-2';
+                    pageItem.innerHTML = `
+                        <input type="checkbox" id="page-${i}" class="page-checkbox" checked>
+                        <label for="page-${i}" class="text-gray-700">Page ${i}</label>
+                    `;
+                    pagesListEl.appendChild(pageItem);
+
+                    // Render page preview
+                    const page = await pdfDoc.getPage(i);
+                    const viewport = page.getViewport({ scale: 0.5 }); // Scale down for preview
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    const context = canvas.getContext('2d');
+                    await page.render({ canvasContext: context, viewport }).promise;
+                    pdfPreviewEl.appendChild(canvas);
+                }
+
+                showMessage('PDF loaded successfully!', 'text-green-600');
+            } catch (error) {
+                showMessage('Error loading PDF: ' + error.message, 'text-red-600');
+            }
+        });
+
+        // Combine selected pages
+        combineBtn.addEventListener('click', async () => {
+            if (!pdfDoc) {
+                showMessage('No PDF loaded.', 'text-red-600');
+                return;
+            }
+
+            const selectedPages = Array.from(document.querySelectorAll('.page-checkbox:checked'))
+                .map(input => parseInt(input.id.split('-')[1]) - 1); // 0-based index
+
+            if (selectedPages.length === 0) {
+                showMessage('Please select at least one page.', 'text-red-600');
+                return;
+            }
+
+            try {
+                // Load the original PDF into pdf-lib
+                const arrayBuffer = await pdfUpload.files[0].arrayBuffer();
+                const pdfDocLib = await PDFLib.PDFDocument.load(arrayBuffer);
+                const newPdf = await PDFLib.PDFDocument.create();
+
+                // Copy selected pages to new PDF
+                const copiedPages = await newPdf.copyPages(pdfDocLib, selectedPages);
+                copiedPages.forEach(page => newPdf.addPage(page));
+
+                // Save the new PDF
+                const pdfBytes = await newPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'combined.pdf';
+                link.click();
+                URL.revokeObjectURL(url);
+
+                showMessage('PDF combined and downloaded successfully!', 'text-green-600');
+            } catch (error) {
+                showMessage('Error combining PDF: ' + error.message, 'text-red-600');
+            }
+        });
+
+        // Clear the form
+        clearBtn.addEventListener('click', () => {
+            pdfUpload.value = '';
+            pageCountEl.classList.add('hidden');
+            pageSelectionEl.classList.add('hidden');
+            pdfPreviewEl.classList.add('hidden');
+            clearBtn.classList.add('hidden');
+            combineBtn.disabled = true;
+            pagesListEl.innerHTML = '';
+            pdfPreviewEl.innerHTML = '';
+            pdfDoc = null;
+            showMessage('', '');
+        });
+
+        // Display messages
+        function showMessage(text, className) {
+            messageEl.textContent = text;
+            messageEl.className = `mt-4 text-center text-sm ${className}`;
         }
-      } else setScreen('summary');
-    }
-
-    function clearError() {
-      state.error = '';
-      state.isPrinting = false;
-      document.querySelector('.alert-overlay')?.remove();
-      render();
-    }
-
-    function resetFile() {
-      state.file = null;
-      state.fileUploaded = false;
-      state.imageData = null;
-      state.fileData = null;
-      state.selectedPages = [];
-      state.currentPreviewPage = 1;
-      render();
-    }
-
-    function reset() {
-      state = {
-        screen: 'menu', service: null, file: null, fileUploaded: false, scanMode: false,
-        imageData: null, fileData: null, selectedPages: [], currentPreviewPage: 1,
-        copies: 1, color: 'bw', totalCost: 0, error: '', isPrinting: false
-      };
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-      }
-      document.querySelector('.alert-overlay')?.remove();
-      document.getElementById('print-iframe').src = '';
-      render();
-    }
-
-    // Initial render
-    render();
-  </script>
+    </script>
 </body>
 </html>
