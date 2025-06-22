@@ -160,9 +160,12 @@
                 // Auto-crop the image
                 const croppedCanvas = autoCropImage(canvas);
 
-                // Convert cropped image to PDF
+                // Apply photocopy effect
+                const filteredCanvas = applyPhotocopyEffect(croppedCanvas);
+
+                // Convert filtered image to PDF
                 const pdf = await PDFLib.PDFDocument.create();
-                const imageBytes = croppedCanvas.toDataURL('image/jpeg').split(',')[1];
+                const imageBytes = filteredCanvas.toDataURL('image/jpeg').split(',')[1];
                 const image = await pdf.embedJpg(imageBytes);
                 const page = pdf.addPage([image.width, image.height]);
                 page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
@@ -176,7 +179,7 @@
                 pageCountEl.classList.add('hidden');
                 pageSelectionEl.classList.add('hidden');
                 pdfPreviewEl.classList.add('hidden');
-                showMessage('Image captured, cropped, and converted to PDF successfully!', 'text-green-600');
+                showMessage('Image captured, filtered, and converted to PDF successfully!', 'text-green-600');
 
             } catch (error) {
                 showMessage('Error capturing or processing image: ' + error.message, 'text-red-600');
@@ -265,6 +268,74 @@
             croppedCanvas.height = croppedHeight;
             croppedCanvas.getContext('2d').drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
             return croppedCanvas;
+        }
+
+        // Apply photocopy effect (black-and-white with filters)
+        function applyPhotocopyEffect(canvas) {
+            const context = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            let imageData = context.getImageData(0, 0, width, height);
+            let data = imageData.data;
+
+            // Step 1: Convert to grayscale
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const gray = 0.299 * r + 0.587 * g + 0.114 * b; // ITU-R BT.601 formula
+                data[i] = data[i + 1] = data[i + 2] = gray;
+            }
+
+            // Step 2: Apply binary threshold for high contrast
+            const threshold = 128; // Adjust for darker/lighter output
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = data[i];
+                const value = gray < threshold ? 0 : 255;
+                data[i] = data[i + 1] = data[i + 2] = value;
+            }
+
+            // Step 3: Noise reduction (despeckle)
+            const tempData = new Uint8ClampedArray(data);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const i = (y * width + x) * 4;
+                    let count = 0;
+                    // Check 3x3 neighborhood
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const ni = ((y + dy) * width + (x + dx)) * 4;
+                            if (tempData[ni] === 0) count++;
+                        }
+                    }
+                    // If a white pixel has many black neighbors, make it black (remove speckles)
+                    if (tempData[i] === 255 && count >= 6) {
+                        data[i] = data[i + 1] = data[i + 2] = 0;
+                    }
+                }
+            }
+
+            // Step 4: Sharpening (unsharp mask approximation)
+            const sharpenedData = new Uint8ClampedArray(data);
+            const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0]; // Sharpening kernel
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const i = (y * width + x) * 4;
+                    let sum = 0;
+                    for (let ky = -1; ky <= 1; ky++) {
+                        for (let kx = -1; kx <= 1; kx++) {
+                            const ni = ((y + ky) * width + (x + kx)) * 4;
+                            sum += tempData[ni] * kernel[(ky + 1) * 3 + (kx + 1)];
+                        }
+                    }
+                    const value = Math.min(255, Math.max(0, sum));
+                    sharpenedData[i] = sharpenedData[i + 1] = sharpenedData[i + 2] = value;
+                }
+            }
+            imageData.data.set(sharpenedData);
+
+            context.putImageData(imageData, 0, 0);
+            return canvas;
         }
 
         // Process Uploaded PDF
