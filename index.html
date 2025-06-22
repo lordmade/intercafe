@@ -14,9 +14,6 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        .page-checkbox {
-            margin-right: 8px;
-        }
         #pdf-preview {
             max-height: 500px;
             overflow-y: auto;
@@ -45,7 +42,7 @@
         <!-- Page Selection -->
         <div id="page-selection" class="mb-4 hidden">
             <h2 class="text-lg font-semibold text-gray-800">Select Pages to Combine</h2>
-            <div id="pages-list" class="mt-2"></div>
+            <div id="pages-list" class="mt-2 flex flex-wrap gap-4"></div>
         </div>
 
         <!-- PDF Preview -->
@@ -106,16 +103,16 @@
                 for (let i = 1; i <= numPages; i++) {
                     // Create checkbox for page selection
                     const pageItem = document.createElement('div');
-                    pageItem.className = 'flex items-center mb-2';
+                    pageItem.className = 'flex items-center';
                     pageItem.innerHTML = `
-                        <input type="checkbox" id="page-${i}" class="page-checkbox" checked>
-                        <label for="page-${i}" class="text-gray-700">Page ${i}</label>
+                        <input type="checkbox" id="page-${i}" class="page-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded" checked>
+                        <label for="page-${i}" class="ml-2 text-gray-700">Page ${i}</label>
                     `;
                     pagesListEl.appendChild(pageItem);
 
                     // Render page preview
                     const page = await pdfDoc.getPage(i);
-                    const viewport = page.getViewport({ scale: 0.5 }); // Scale down for preview
+                    const viewport = page.getViewport({ scale: 0.5 });
                     const canvas = document.createElement('canvas');
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
