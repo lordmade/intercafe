@@ -24,6 +24,11 @@
             border: 1px solid #d1d5db;
             margin: 10px 0;
         }
+        #camera-preview {
+            max-width: 100%;
+            border: 1px solid #d1d5db;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
@@ -43,7 +48,13 @@
 
         <!-- Scan File Button -->
         <div class="mb-4">
-            <button id="scan-btn" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Scan File</button>
+            <button id="scan-btn" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">Scan File</button>
+        </div>
+
+        <!-- Camera Preview (hidden by default) -->
+        <div id="camera-container" class="mb-4 hidden">
+            <video id="camera-preview" autoplay class="max-w-full"></video>
+            <button id="capture-btn" class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2">Capture Image</button>
         </div>
 
         <!-- Page Count Display -->
@@ -75,6 +86,9 @@
         const pdfUpload = document.getElementById('pdf-upload');
         const choosePagesBtn = document.getElementById('choose-pages-btn');
         const scanBtn = document.getElementById('scan-btn');
+        const cameraContainer = document.getElementById('camera-container');
+        const cameraPreview = document.getElementById('camera-preview');
+        const captureBtn = document.getElementById('capture-btn');
         const pageCountEl = document.getElementById('page-count');
         const totalPagesEl = document.getElementById('total-pages');
         const pageSelectionEl = document.getElementById('page-selection');
@@ -85,22 +99,21 @@
         const messageEl = document.getElementById('message');
         let pdfDoc = null;
         let pdfArrayBuffer = null;
+        let stream = null;
 
-        // Enable buttons when a file is selected
+        // Enable Choose Pages button when a file is selected
         pdfUpload.addEventListener('change', () => {
             if (pdfUpload.files.length > 0 && pdfUpload.files[0].type.includes('pdf')) {
                 choosePagesBtn.disabled = false;
-                scanBtn.disabled = false;
                 showMessage('', '');
             } else {
                 choosePagesBtn.disabled = true;
-                scanBtn.disabled = true;
                 showMessage('Please select a valid PDF file.', 'text-red-600');
             }
         });
 
-        // Process PDF (shared function for both buttons)
-        async function processPDF() {
+        // Handle Choose Pages button click
+        choosePagesBtn.addEventListener('click', async () => {
             const file = pdfUpload.files[0];
             if (!file || !file.type.includes('pdf')) {
                 showMessage('Please select a valid PDF file.', 'text-red-600');
@@ -108,9 +121,147 @@
             }
 
             try {
-                // Read the PDF file
                 pdfArrayBuffer = await file.arrayBuffer();
-                pdfDoc = await pdfjsLib.getDocument(pdfArrayBuffer).promise;
+                await processPDF(pdfArrayBuffer, 'PDF processed successfully!');
+            } catch (error) {
+                showMessage('Error processing PDF: ' + error.message, 'text-red-600');
+            }
+        });
+
+        // Handle Scan File button click (trigger camera)
+        scanBtn.addEventListener('click', async () => {
+            try {
+                // Request camera access
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                cameraPreview.srcObject = stream;
+                cameraContainer.classList.remove('hidden');
+                showMessage('Camera opened. Click "Capture Image" to take a photo.', 'text-blue-600');
+            } catch (error) {
+                showMessage('Error accessing camera: ' + error.message, 'text-red-600');
+            }
+        });
+
+        // Handle Capture Image button click
+        captureBtn.addEventListener('click', async () => {
+            try {
+                // Capture image from video stream
+                const canvas = document.createElement('canvas');
+                canvas.width = cameraPreview.videoWidth;
+                canvas.height = cameraPreview.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+
+                // Stop camera stream
+                stream.getTracks().forEach(track => track.stop());
+                cameraContainer.classList.add('hidden');
+
+                // Auto-crop the image
+                const croppedCanvas = autoCropImage(canvas);
+
+                // Convert cropped image to PDF
+                const pdf = await PDFLib.PDFDocument.create();
+                const imageBytes = croppedCanvas.toDataURL('image/jpeg').split(',')[1];
+                const image = await pdf.embedJpg(imageBytes);
+                const page = pdf.addPage([image.width, image.height]);
+                page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                pdfArrayBuffer = await pdf.save();
+
+                // Process the generated PDF
+                await processPDF(pdfArrayBuffer, 'Image captured, cropped, and converted to PDF successfully!');
+
+            } catch (error) {
+                showMessage('Error capturing or processing image: ' + error.message, 'text-red-600');
+            }
+        });
+
+        // Auto-crop function
+        function autoCropImage(canvas) {
+            const context = canvas.getContext('2d');
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            let top = 0, bottom = canvas.height, left = 0, right = canvas.width;
+
+            // Threshold for considering a pixel as "background" (white or near-white)
+            const threshold = 240;
+
+            // Find top boundary
+            for (let y = 0; y < canvas.height; y++) {
+                let isBackground = true;
+                for (let x = 0; x < canvas.width; x++) {
+                    const index = (y * canvas.width + x) * 4;
+                    if (data[index] < threshold || data[index + 1] < threshold || data[index + 2] < threshold) {
+                        isBackground = false;
+                        break;
+                    }
+                }
+                if (!isBackground) {
+                    top = y;
+                    break;
+                }
+            }
+
+            // Find bottom boundary
+            for (let y = canvas.height - 1; y >= 0; y--) {
+                let isBackground = true;
+                for (let x = 0; x < canvas.width; x++) {
+                    const index = (y * canvas.width + x) * 4;
+                    if (data[index] < threshold || data[index + 1] < threshold || data[index + 2] < threshold) {
+                        isBackground = false;
+                        break;
+                    }
+                }
+                if (!isBackground) {
+                    bottom = y + 1;
+                    break;
+                }
+            }
+
+            // Find left boundary
+            for (let x = 0; x < canvas.width; x++) {
+                let isBackground = true;
+                for (let y = 0; y < canvas.height; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    if (data[index] < threshold || data[index + 1] < threshold || data[index + 2] < threshold) {
+                        isBackground = false;
+                        break;
+                    }
+                }
+                if (!isBackground) {
+                    left = x;
+                    break;
+                }
+            }
+
+            // Find right boundary
+            for (let x = canvas.width - 1; x >= 0; x--) {
+                let isBackground = true;
+                for (let y = 0; y < canvas.height; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    if (data[index] < threshold || data[index + 1] < threshold || data[index + 2] < threshold) {
+                        isBackground = false;
+                        break;
+                    }
+                }
+                if (!isBackground) {
+                    right = x + 1;
+                    break;
+                }
+            }
+
+            // Create cropped canvas
+            const croppedWidth = right - left;
+            const croppedHeight = bottom - top;
+            const croppedCanvas = document.createElement('canvas');
+            croppedCanvas.width = croppedWidth;
+            croppedCanvas.height = croppedHeight;
+            croppedCanvas.getContext('2d').drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+            return croppedCanvas;
+        }
+
+        // Process PDF (shared for uploaded and scanned PDFs)
+        async function processPDF(arrayBuffer, successMessage) {
+            try {
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
                 const numPages = pdfDoc.numPages;
 
                 // Update UI
@@ -121,7 +272,7 @@
                 clearBtn.classList.remove('hidden');
                 downloadBtn.classList.remove('hidden');
                 choosePagesBtn.disabled = true;
-                scanBtn.disabled = true;
+                scanBtn.disabled = false; // Re-enable for additional scans
 
                 // Clear previous content
                 pagesListEl.innerHTML = '';
@@ -129,7 +280,6 @@
 
                 // Render page selection checkboxes and previews
                 for (let i = 1; i <= numPages; i++) {
-                    // Create checkbox for page selection
                     const pageItem = document.createElement('div');
                     pageItem.className = 'flex items-center';
                     pageItem.innerHTML = `
@@ -138,7 +288,6 @@
                     `;
                     pagesListEl.appendChild(pageItem);
 
-                    // Render page preview
                     const page = await pdfDoc.getPage(i);
                     const viewport = page.getViewport({ scale: 0.5 });
                     const canvas = document.createElement('canvas');
@@ -149,17 +298,12 @@
                     pdfPreviewEl.appendChild(canvas);
                 }
 
-                showMessage('PDF processed successfully!', 'text-green-600');
+                showMessage(successMessage, 'text-green-600');
             } catch (error) {
                 showMessage('Error processing PDF: ' + error.message, 'text-red-600');
+                throw error;
             }
         }
-
-        // Handle Choose Pages button click
-        choosePagesBtn.addEventListener('click', processPDF);
-
-        // Handle Scan File button click
-        scanBtn.addEventListener('click', processPDF);
 
         // Download combined pages
         downloadBtn.addEventListener('click', async () => {
@@ -177,15 +321,11 @@
             }
 
             try {
-                // Load the original PDF into pdf-lib
                 const pdfDocLib = await PDFLib.PDFDocument.load(pdfArrayBuffer);
                 const newPdf = await PDFLib.PDFDocument.create();
-
-                // Copy selected pages to new PDF
                 const copiedPages = await newPdf.copyPages(pdfDocLib, selectedPages);
                 copiedPages.forEach(page => newPdf.addPage(page));
 
-                // Save the new PDF
                 const pdfBytes = await newPdf.save();
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
@@ -205,12 +345,17 @@
         clearBtn.addEventListener('click', () => {
             pdfUpload.value = '';
             choosePagesBtn.disabled = true;
-            scanBtn.disabled = true;
+            scanBtn.disabled = false;
             pageCountEl.classList.add('hidden');
             pageSelectionEl.classList.add('hidden');
             pdfPreviewEl.classList.add('hidden');
             clearBtn.classList.add('hidden');
             downloadBtn.classList.add('hidden');
+            cameraContainer.classList.add('hidden');
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
             pagesListEl.innerHTML = '';
             pdfPreviewEl.innerHTML = '';
             pdfDoc = null;
