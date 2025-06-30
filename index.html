@@ -1,263 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internet POS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <title>Image to URL</title>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div id="pos-screen" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-center">
-        <h1 id="title" class="text-xl font-semibold mb-4"></h1>
-        <p id="message" class="mb-4 text-sm"></p>
-        <div id="content" class="flex flex-col gap-4"></div>
-    </div>
-    <iframe id="print-frame" style="display: none;"></iframe>
+<body>
+  <input type="file" id="imageInput" accept="image/*">
+  <img id="preview" style="max-width: 300px; display: none;">
+  <p id="urlOutput"></p>
 
-    <script>
-        // State management
-        let state = {
-            currentScreen: 'welcome',
-            selectedService: null,
-            paymentAmount: 0,
-            scanData: null,
-            internetTime: 0,
-            uploadedFile: null,
-            selectedPages: []
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const urlOutput = document.getElementById('urlOutput');
+
+    imageInput.addEventListener('change', function (event) {
+      const file = event.target.files[0];
+      if (file) {
+        // Option 1: Convert to Data URL (base64)
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const dataUrl = e.target.result;
+          preview.src = dataUrl;
+          preview.style.display = 'block';
+          urlOutput.textContent = `Data URL: ${dataUrl.substring(0, 50)}...`; // Truncated for display
+          // Use dataUrl as needed (e.g., send to server, store, etc.)
         };
+        reader.readAsDataURL(file);
 
-        // Screen definitions
-        const screens = {
-            welcome: {
-                title: 'Welcome to Internet POS',
-                message: 'Please select a service.',
-                options: [
-                    { text: 'Printing', action: () => goToScreen('printing') },
-                    { text: 'Scanning', action: () => goToScreen('scanning') },
-                    { text: 'Internet Access', action: () => goToScreen('internet') }
-                ]
-            },
-            printing: {
-                title: 'Printing Service',
-                message: 'Upload a document to print (R10 per page).',
-                options: [
-                    { text: 'Upload Document', action: () => document.getElementById('file-input').click() },
-                    { text: 'Back', action: () => goToScreen('welcome') }
-                ]
-            },
-            printing_pages: {
-                title: 'Select Pages',
-                message: 'Enter pages to print (e.g., "1-3,5").',
-                options: [
-                    { text: 'Confirm', action: confirmPages },
-                    { text: 'Back', action: () => goToScreen('printing') }
-                ]
-            },
-            scanning: {
-                title: 'Scanning Service',
-                message: 'Click to start scanning (R20 per scan).',
-                options: [
-                    { text: 'Start Scan', action: startScanning },
-                    { text: 'Back', action: () => goToScreen('welcome') }
-                ]
-            },
-            internet: {
-                title: 'Internet Access',
-                message: 'Select duration (R50 per 30 minutes).',
-                options: [
-                    { text: '30 Minutes', action: () => selectInternet(30) },
-                    { text: '90 Minutes', action: () => selectInternet(90) },
-                    { text: 'Back', action: () => goToScreen('welcome') }
-                ]
-            },
-            payment: {
-                title: 'Payment',
-                message: '',
-                options: [
-                    { text: 'Pay Now', action: processPayment },
-                    { text: 'Cancel', action: cancelPayment },
-                ]
-            },
-            processing: {
-                title: 'Processing',
-                message: 'Please wait...',
-                options: []
-            },
-            success: {
-                title: 'Success',
-                message: 'Transaction completed!',
-                options: [
-                    { text: 'Finish', action: () => goToScreen('welcome') }
-                ]
-            },
-            error: {
-                title: 'Error',
-                message: 'Something went wrong.',
-                options: [
-                    { text: 'Try Again', action: () => goToScreen('welcome') }
-                ]
-            }
-        };
-
-        // Create file input
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = 'file-input';
-        fileInput.accept = '.pdf,.doc,.docx';
-        fileInput.style.display = 'none';
-        fileInput.onchange = handleFileUpload;
-        document.body.appendChild(fileInput);
-
-        // Create page input
-        const pageInput = document.createElement('input');
-        pageInput.type = 'text';
-        pageInput.id = 'page-input';
-        pageInput.placeholder = 'e.g., 1-3,5';
-        pageInput.className = 'border p-2 px-4 py-2 rounded w-full mb-4';
-
-        // Navigation
-        function goToScreen(screenId) {
-            state.currentScreen = screenId;
-            renderScreen();
-        }
-
-        // File upload
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                state.uploadedFile = file;
-                goToScreen('printing_pages');
-            } else {
-                screens.error.message = 'No file selected.';
-                goToScreen('error');
-            }
-        }
-
-        // Page selection
-        function confirmPages() {
-            const input = pageInput.value.trim();
-            if (!input) {
-                screens.error.message = 'Please enter pages.';
-                goToScreen('error');
-                return;
-            }
-
-            try {
-                // Parse pages (e.g., "1-3,5" -> [1,2,3,5])
-                const pages = [];
-                const segments = input.split(',');
-                for (const segment of segments) {
-                    if (segment.includes('-')) {
-                        const [start, end] = segment.split('-').map(num => parseInt(num.trim()));
-                        if (isNaN(start) || isNaN(end) || start < 1 || end < start) throw new Error();
-                        for (let i = start; i <= end; i++) pages.push(i);
-                    } else {
-                        const page = parseInt(segment.trim());
-                        if (isNaN(page) || page < 1) throw new Error();
-                        pages.push(page);
-                    }
-                }
-                state.selectedPages = [...new Set(pages)]; // Remove duplicates
-                state.selectedService = 'printing';
-                state.paymentAmount = state.selectedPages.length * 10; // R10 per page
-
-                // Simulate printing intent for uploaded document
-                if (state.uploadedFile) {
-                    const printFrame = document.getElementById('print-frame');
-                    const url = URL.createObjectURL(state.uploadedFile);
-                    printFrame.src = url;
-                    printFrame.onload = () => {
-                        printFrame.contentWindow.print();
-                        URL.revokeObjectURL(url);
-                    };
-                } else {
-                    window.print(); // Fallback
-                }
-
-                // Proceed to payment
-                screens.payment.message = `Please pay R${state.paymentAmount} for ${state.selectedPages.length} page(s).`;
-                goToScreen('payment');
-            } catch {
-                screens.error.message = 'Invalid page format. Use "1-3,5" format.';
-                goToScreen('error');
-            }
-        }
-
-        // Service selection
-        function startScanning() {
-            state.selectedService = 'scanning';
-            state.paymentAmount = 20; // R20 per scan
-            screens.payment.message = `Please pay R${state.paymentAmount} for scanning.`;
-            goToScreen('payment');
-        }
-
-        function selectInternet(minutes) {
-            state.selectedService = 'internet';
-            state.paymentAmount = (minutes / 30) * 50; // R50 per 30 minutes
-            state.internetTime = minutes;
-            screens.payment.message = `Please pay R${state.paymentAmount} for ${minutes} minutes of internet access.`;
-            goToScreen('payment');
-        }
-
-        // Payment processing
-        async function processPayment() {
-            goToScreen('processing');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            try {
-                if (state.selectedService === 'printing') {
-                    state.uploadedFile = null;
-                    state.selectedPages = [];
-                    goToScreen('success');
-                } else if (state.selectedService === 'scanning') {
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        stream.getTracks().forEach(track => track.stop());
-                        goToScreen('success');
-                    } catch (err) {
-                        screens.error.message = 'Camera access denied.';
-                        goToScreen('error');
-                    }
-                } else if (state.selectedService === 'internet') {
-                    const surfWindow = window.open('https://www.example.com', '_blank');
-                    setTimeout(() => surfWindow.close(), state.internetTime * 60 * 1000);
-                    goToScreen('success');
-                }
-            } catch (err) {
-                goToScreen('error');
-            }
-        }
-
-        function cancelPayment() {
-            state.uploadedFile = null;
-            state.selectedPages = [];
-            goToScreen('welcome');
-        }
-
-        // Render screen
-        function renderScreen() {
-            const screen = screens[state.currentScreen];
-            document.getElementById('title').textContent = screen.title;
-            document.getElementById('message').textContent = screen.message;
-            const optionsDiv = document.getElementById('content');
-            optionsDiv.innerHTML = '';
-
-            if (state.currentScreen === 'printing_pages') {
-                const inputDiv = document.createElement('div');
-                inputDiv.appendChild(pageInput);
-                optionsDiv.appendChild(inputDiv);
-            }
-
-            screen.options.forEach(option => {
-                const button = document.createElement('button');
-                button.textContent = option.text;
-                button.className = 'bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600';
-                button.onclick = option.action;
-                optionsDiv.appendChild(button);
-            });
-        }
-
-        // Initialize
-        renderScreen();
-    </script>
+        // Option 2: Create Object URL (lighter, temporary URL)
+        const objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        urlOutput.textContent += `\nObject URL: ${objectUrl}`;
+        // Use objectUrl as needed
+        // Note: Revoke object URL when done to free memory
+        // URL.revokeObjectURL(objectUrl);
+      }
+    });
+  </script>
 </body>
 </html>
