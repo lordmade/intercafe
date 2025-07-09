@@ -102,7 +102,6 @@
     }
     .post, .reel {
       position: relative;
-      aspect-ratio: 1;
       border-radius: 8px;
       overflow: hidden;
       border: 1px solid var(--border);
@@ -117,14 +116,45 @@
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    .post-header {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .post-header img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      cursor: pointer;
+    }
+    .post-header span {
+      font-size: clamp(0.75rem, 3vw, 0.8rem);
+      color: var(--white);
+      font-weight: 600;
+      cursor: pointer;
+    }
     .post img, .reel img {
       width: 100%;
-      height: 100%;
+      aspect-ratio: 1;
       object-fit: cover;
       transition: transform 0.2s ease;
     }
     .post:hover img, .reel:hover img {
       transform: scale(1.05);
+    }
+    .reel .username {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.5);
+      color: var(--white);
+      padding: 0.5rem;
+      font-size: clamp(0.75rem, 3vw, 0.8rem);
+      cursor: pointer;
     }
     .reel .song-overlay {
       position: absolute;
@@ -282,8 +312,12 @@
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 0.3rem;
       }
-      .reel .song-overlay, .post .song-display {
+      .reel .username, .reel .song-overlay, .post-header span, .post .song-display {
         font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+      }
+      .post-header img {
+        width: 28px;
+        height: 28px;
       }
       .media-player {
         padding: 0.5rem;
@@ -411,7 +445,7 @@
 
     function setupCardInteraction(container, audio, playPauseBtn, player, containerId) {
       container.addEventListener("click", (e) => {
-        if (e.target.closest('.song-overlay, .song-display, .play-pause-btn')) return;
+        if (e.target.closest('.song-overlay, .song-display, .play-pause-btn, .post-header img, .post-header span, .reel .username')) return;
         pauseAllMedia(containerId);
         if (audio && audio.paused) {
           audio.play().catch(() => {});
@@ -509,17 +543,16 @@
                 playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
                 playPauseBtn.setAttribute("aria-label", "Pause");
               }
-            }
-          } else if (audio && !audio.paused) {
-            audio.pause();
-            if (playPauseBtn) {
-              playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-              playPauseBtn.setAttribute("aria-label", "Play");
-              if (player) player.classList.remove("active");
+            } else if (audio && !audio.paused) {
+              audio.pause();
+              if (playPauseBtn) {
+                playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+                playPauseBtn.setAttribute("aria-label", "Play");
+                if (player) player.classList.remove("active");
+              }
             }
           }
-        });
-      }, { threshold: 0.5 });
+        }, { threshold: 0.5 });
       const contentGrid = document.getElementById("content-grid");
       for (const post of posts) {
         const postId = `post-${post.id}`;
@@ -542,6 +575,10 @@
           `;
         }
         postElement.innerHTML = `
+          <div class="post-header">
+            <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile" data-user-id="${post.userId}">
+            <span data-user-id="${post.userId}">${user.username || "Anonymous"}</span>
+          </div>
           <img src="${post.imageUrl}" alt="Post">
           ${songHtml}
           ${playerHtml}
@@ -563,6 +600,12 @@
           setupCardInteraction(postElement, audio, playPauseBtn, player, postId);
           observer.observe(postElement);
         }
+        postElement.querySelectorAll("[data-user-id]").forEach(el => {
+          el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            location.href = `profile.html?id=${post.userId}`;
+          });
+        });
         contentGrid.appendChild(postElement);
       }
       for (const reel of reels) {
@@ -589,10 +632,11 @@
         reelElement.innerHTML = `
           <img src="${thumbnailUrl}" alt="Reel thumbnail">
           ${songHtml}
+          <div class="username" data-user-id="${reel.userId}">${user.username || "Anonymous"}</div>
           ${playerHtml}
         `;
         reelElement.addEventListener("click", (e) => {
-          if (!e.target.closest('.song-overlay, .play-pause-btn')) {
+          if (!e.target.closest('.song-overlay, .play-pause-btn, .username')) {
             location.href = `reel.html?id=${reel.id}`;
           }
         });
@@ -613,6 +657,12 @@
           setupCardInteraction(reelElement, audio, playPauseBtn, player, reelId);
           observer.observe(reelElement);
         }
+        reelElement.querySelectorAll(".username").forEach(el => {
+          el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            location.href = `profile.html?id=${reel.userId}`;
+          });
+        });
         contentGrid.appendChild(reelElement);
       }
     }
