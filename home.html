@@ -106,11 +106,12 @@
       flex-shrink: 0;
       border: 1px solid var(--border);
       transition: transform 0.2s ease;
+      cursor: pointer;
     }
     .reel:hover {
       transform: scale(1.05);
     }
-    .reel video {
+    .reel img {
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -125,6 +126,21 @@
       padding: 0.5rem;
       font-size: 0.85rem;
     }
+    .reel .song-overlay {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      background: rgba(0, 0, 0, 0.5);
+      color: var(--white);
+      padding: 0.25rem 0.5rem;
+      font-size: clamp(0.75rem, 3vw, 0.8rem);
+      border-radius: 4px;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
     .post {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -132,6 +148,7 @@
       background: var(--white);
       opacity: 0;
       animation: slideUp 0.5s ease-out forwards;
+      cursor: pointer;
     }
     .post:nth-child(1) { animation-delay: 0.1s; }
     .post:nth-child(2) { animation-delay: 0.2s; }
@@ -151,6 +168,10 @@
       height: 32px;
       border-radius: 50%;
       object-fit: cover;
+      cursor: pointer;
+    }
+    .post-header span {
+      cursor: pointer;
     }
     .post-image {
       width: 100%;
@@ -191,6 +212,12 @@
     .post-caption strong {
       font-weight: 600;
     }
+    .post-caption .song-display {
+      font-size: clamp(0.8rem, 3.5vw, 0.85rem);
+      color: var(--text-light);
+      margin-top: 0.5rem;
+      cursor: pointer;
+    }
     .placeholder {
       padding: 2rem;
       text-align: center;
@@ -227,9 +254,113 @@
       width: 24px;
       height: 24px;
     }
+    .media-player {
+      display: none;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem;
+      margin: 0.5rem 0.75rem;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .media-player.active {
+      display: flex;
+    }
+    .play-pause-btn {
+      background: var(--primary-red);
+      color: var(--white);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .play-pause-btn:hover:not(:disabled) {
+      transform: scale(1.05);
+      background: #d43f4e;
+    }
+    .play-pause-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+    .seek-bar {
+      flex-grow: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    .seek-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      background: var(--primary-red);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .seek-bar::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      background: var(--primary-red);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .time-display {
+      font-size: clamp(0.75rem, 3.5vw, 0.8rem);
+      color: var(--text-dark);
+      width: 80px;
+      text-align: right;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
+    }
+    @media (max-width: 414px) {
+      .container {
+        padding: 0.5rem;
+      }
+      .reels-container {
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+      }
+      .reel {
+        width: 120px;
+        height: 200px;
+      }
+      .reel .username, .reel .song-overlay {
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+      }
+      .post-header img {
+        width: 28px;
+        height: 28px;
+      }
+      .post-caption {
+        font-size: 0.85rem;
+      }
+      .post-caption .song-display {
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+      }
+      .media-player {
+        padding: 0.5rem;
+        margin: 0.5rem;
+      }
+      .play-pause-btn {
+        width: 36px;
+        height: 36px;
+      }
+      .time-display {
+        width: 70px;
+        font-size: clamp(0.7rem, 3vw, 0.75rem);
+      }
     }
   </style>
 </head>
@@ -328,6 +459,93 @@
       });
     });
 
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    function pauseAllMedia(currentContainerId) {
+      const allMedia = document.querySelectorAll('audio');
+      allMedia.forEach(media => {
+        if (media.closest(`#${currentContainerId}`)) return;
+        if (!media.paused) {
+          media.pause();
+          const container = media.closest('.post, .reel');
+          if (container) {
+            const playPauseBtn = container.querySelector('.play-pause-btn');
+            if (playPauseBtn) {
+              playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+              playPauseBtn.setAttribute("aria-label", "Play");
+            }
+            const player = container.querySelector('.media-player');
+            if (player) player.classList.remove("active");
+          }
+        }
+      });
+    }
+
+    function initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, containerId) {
+      audio.addEventListener("loadedmetadata", () => {
+        seekBar.max = audio.duration;
+        timeDisplay.textContent = `0:00 / ${formatTime(audio.duration)}`;
+      });
+      audio.addEventListener("timeupdate", () => {
+        seekBar.value = audio.currentTime;
+        timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+      });
+      audio.addEventListener("ended", () => {
+        if (!audio.loop) {
+          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+          playPauseBtn.setAttribute("aria-label", "Play");
+          audio.currentTime = 0;
+          seekBar.value = 0;
+          player.classList.remove("active");
+        }
+      });
+      playPauseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        pauseAllMedia(containerId);
+        if (audio.paused) {
+          audio.play().catch(() => {});
+          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+          playPauseBtn.setAttribute("aria-label", "Pause");
+          player.classList.add("active");
+        } else {
+          audio.pause();
+          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+          playPauseBtn.setAttribute("aria-label", "Play");
+          player.classList.remove("active");
+        }
+      });
+      seekBar.addEventListener("input", () => {
+        audio.currentTime = seekBar.value;
+      });
+      return audio;
+    }
+
+    function setupCardInteraction(container, audio, playPauseBtn, player, containerId) {
+      container.addEventListener("click", (e) => {
+        if (e.target.closest('.post-actions button:not(.play-song-btn), .song-overlay, .song-display, .play-pause-btn, .post-header img, .post-header span')) return;
+        pauseAllMedia(containerId);
+        if (audio && audio.paused) {
+          audio.play().catch(() => {});
+          if (playPauseBtn) {
+            playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+            playPauseBtn.setAttribute("aria-label", "Pause");
+            if (player) player.classList.add("active");
+          }
+        } else if (audio) {
+          audio.pause();
+          if (playPauseBtn) {
+            playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+            playPauseBtn.setAttribute("aria-label", "Play");
+            if (player) player.classList.remove("active");
+          }
+        }
+      });
+    }
+
     function loadReels() {
       const reelsContainer = document.getElementById("reels-container");
       const reelsRef = query(ref(db, "reels"), orderByChild("timestamp"), limitToLast(10));
@@ -342,17 +560,85 @@
           reels.push({ id: child.key, ...child.val() });
         });
         reels.reverse();
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            const reel = entry.target;
+            const reelId = reel.id;
+            const audio = reel.querySelector("audio");
+            const playPauseBtn = reel.querySelector(".play-pause-btn");
+            const player = reel.querySelector(".media-player");
+            if (entry.isIntersecting && audio) {
+              pauseAllMedia(reelId);
+              if (audio.paused) {
+                audio.play().catch(() => {});
+                if (playPauseBtn) {
+                  playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+                  playPauseBtn.setAttribute("aria-label", "Pause");
+                }
+              }
+            } else if (audio && !audio.paused) {
+              audio.pause();
+              if (playPauseBtn) {
+                playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+                playPauseBtn.setAttribute("aria-label", "Play");
+                if (player) player.classList.remove("active");
+              }
+            }
+          });
+        }, { threshold: 0.5 });
         for (const reel of reels) {
           const userRef = ref(db, `users/${reel.userId}`);
           const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
           const user = userSnapshot.val() || {};
+          const reelId = `reel-${reel.id}`;
+          const audioId = `audio-${reel.id}`;
+          const thumbnailUrl = reel.videoUrl.replace('/upload/', '/upload/w_150,h_250,c_fill,so_0/');
           const reelElement = document.createElement("div");
           reelElement.className = "reel";
+          reelElement.id = reelId;
+          let songHtml = "";
+          let playerHtml = "";
+          if (reel.song) {
+            songHtml = `<div class="song-overlay">${reel.song.title} by ${reel.song.artist}</div>`;
+            playerHtml = `
+              <div class="media-player" data-audio-instance="${audioId}">
+                <button type="button" class="play-pause-btn" aria-label="Play">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <input type="range" class="seek-bar" min="0" max="100" value="0" aria-label="Seek audio"/>
+                <span class="time-display" aria-live="polite">0:00 / 0:00</span>
+              </div>
+            `;
+          }
           reelElement.innerHTML = `
-            <video src="${reel.videoUrl}" autoplay muted loop playsinline></video>
+            <img src="${thumbnailUrl}" alt="Reel thumbnail">
+            ${songHtml}
             <div class="username">${reel.username || user.username || "Anonymous"}</div>
+            ${playerHtml}
           `;
+          reelElement.addEventListener("click", (e) => {
+            if (!e.target.closest('.song-overlay, .play-pause-btn')) {
+              location.href = `reel.html?id=${reel.id}`;
+            }
+          });
+          if (reel.song) {
+            const audio = new Audio(reel.song.audioUrl);
+            audio.id = audioId;
+            audio.loop = true;
+            reelElement.appendChild(audio);
+            const player = reelElement.querySelector(".media-player");
+            const playPauseBtn = player.querySelector(".play-pause-btn");
+            const seekBar = player.querySelector(".seek-bar");
+            const timeDisplay = reelElement.querySelector(".time-display");
+            reelElement.querySelector(".song-overlay").addEventListener("click", (e) => {
+              e.stopPropagation();
+              playPauseBtn.click();
+            });
+            initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, reelId);
+            setupCardInteraction(reelElement, audio, playPauseBtn, player, reelId);
+          }
           reelsContainer.appendChild(reelElement);
+          observer.observe(reelElement);
         }
       }, {
         onlyOnce: false
@@ -373,16 +659,59 @@
           posts.push({ id: child.key, ...child.val() });
         });
         posts.reverse();
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            const post = entry.target;
+            const postId = post.id;
+            const audio = post.querySelector("audio");
+            const playPauseBtn = post.querySelector(".play-pause-btn");
+            const player = post.querySelector(".media-player");
+            if (entry.isIntersecting && audio) {
+              pauseAllMedia(postId);
+              if (audio.paused) {
+                audio.play().catch(() => {});
+                if (playPauseBtn) {
+                  playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+                  playPauseBtn.setAttribute("aria-label", "Pause");
+                }
+              }
+            } else if (audio && !audio.paused) {
+              audio.pause();
+              if (playPauseBtn) {
+                playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+                playPauseBtn.setAttribute("aria-label", "Play");
+                if (player) player.classList.remove("active");
+              }
+            }
+          });
+        }, { threshold: 0.5 });
         for (const post of posts) {
           const userRef = ref(db, `users/${post.userId}`);
           const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
           const user = userSnapshot.val() || {};
+          const postId = `post-${post.id}`;
+          const audioId = `audio-${post.id}`;
           const postElement = document.createElement("div");
           postElement.className = "post";
+          postElement.id = postId;
+          let songHtml = "";
+          let playerHtml = "";
+          if (post.song) {
+            songHtml = `<div class="song-display">🎵 ${post.song.title} by ${post.song.artist}</div>`;
+            playerHtml = `
+              <div class="media-player" data-audio-instance="${audioId}">
+                <button type="button" class="play-pause-btn" aria-label="Play">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <input type="range" class="seek-bar" min="0" max="100" value="0" aria-label="Seek audio"/>
+                <span class="time-display" aria-live="polite">0:00 / 0:00</span>
+              </div>
+            `;
+          }
           postElement.innerHTML = `
             <div class="post-header">
-              <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile">
-              <span class="font-semibold">${post.username || user.username || "Anonymous"}</span>
+              <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile" data-user-id="${post.userId}">
+              <span class="font-semibold" data-user-id="${post.userId}">${post.username || user.username || "Anonymous"}</span>
             </div>
             <img class="post-image" src="${post.imageUrl}" alt="Post">
             <div class="post-actions">
@@ -396,11 +725,49 @@
                   <path d="M21 8v9a2 2 0 01-2 2H7a2 2 0 01-2-2V8m0 0l7-4 7 4m-7 4h4"/>
                 </svg>
               </button>
+              ${post.song ? `
+                <button class="play-song-btn" aria-label="Play song">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                  </svg>
+                </button>
+              ` : ''}
             </div>
             <div class="post-caption">
               <strong>${post.username || user.username || "Anonymous"}</strong> ${post.caption || ""}
+              ${songHtml}
             </div>
+            ${playerHtml}
           `;
+          if (post.song) {
+            const audio = new Audio(post.song.audioUrl);
+            audio.id = audioId;
+            audio.loop = true;
+            postElement.appendChild(audio);
+            const player = postElement.querySelector(".media-player");
+            const playPauseBtn = player.querySelector(".play-pause-btn");
+            const seekBar = player.querySelector(".seek-bar");
+            const timeDisplay = postElement.querySelector(".time-display");
+            postElement.querySelector(".play-song-btn").addEventListener("click", (e) => {
+              e.stopPropagation();
+              playPauseBtn.click();
+            });
+            postElement.querySelector(".song-display").addEventListener("click", (e) => {
+              e.stopPropagation();
+              playPauseBtn.click();
+            });
+            initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, postId);
+            setupCardInteraction(postElement, audio, playPauseBtn, player, postId);
+            observer.observe(postElement);
+          }
+          postElement.querySelectorAll("[data-user-id]").forEach(el => {
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              location.href = `profile.html?id=${post.userId}`;
+            });
+          });
           postsContainer.appendChild(postElement);
         }
       }, {
