@@ -203,6 +203,30 @@
       color: var(--text-dark);
       font-size: 1rem;
     }
+    .fab {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--primary-red);
+      color: var(--white);
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(237, 73, 86, 0.3);
+      z-index: 20;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 16px rgba(237, 73, 86, 0.4);
+    }
+    .fab svg {
+      width: 24px;
+      height: 24px;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -253,6 +277,12 @@
       <div class="placeholder">Profile tab - Coming soon!</div>
     </div>
   </div>
+
+  <a href="upload.html" class="fab" aria-label="Upload new media">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 5v14m7-7H5"/>
+    </svg>
+  </a>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
@@ -311,7 +341,7 @@
         snapshot.forEach(child => {
           reels.push({ id: child.key, ...child.val() });
         });
-        reels.reverse(); // Newest first
+        reels.reverse();
         for (const reel of reels) {
           const userRef = ref(db, `users/${reel.userId}`);
           const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
@@ -342,7 +372,7 @@
         snapshot.forEach(child => {
           posts.push({ id: child.key, ...child.val() });
         });
-        posts.reverse(); // Newest first
+        posts.reverse();
         for (const post of posts) {
           const userRef = ref(db, `users/${post.userId}`);
           const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
