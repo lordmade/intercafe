@@ -125,6 +125,7 @@
       color: var(--white);
       padding: 0.5rem;
       font-size: 0.85rem;
+      cursor: pointer;
     }
     .reel .song-overlay {
       position: absolute;
@@ -613,11 +614,11 @@
           reelElement.innerHTML = `
             <img src="${thumbnailUrl}" alt="Reel thumbnail">
             ${songHtml}
-            <div class="username">${reel.username || user.username || "Anonymous"}</div>
+            <div class="username" data-user-id="${reel.userId}">${user.username || "Anonymous"}</div>
             ${playerHtml}
           `;
           reelElement.addEventListener("click", (e) => {
-            if (!e.target.closest('.song-overlay, .play-pause-btn')) {
+            if (!e.target.closest('.song-overlay, .play-pause-btn, .username')) {
               location.href = `reel.html?id=${reel.id}`;
             }
           });
@@ -637,6 +638,12 @@
             initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, reelId);
             setupCardInteraction(reelElement, audio, playPauseBtn, player, reelId);
           }
+          reelElement.querySelectorAll(".username").forEach(el => {
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              location.href = `profile.html?id=${reel.userId}`;
+            });
+          });
           reelsContainer.appendChild(reelElement);
           observer.observe(reelElement);
         }
@@ -711,7 +718,7 @@
           postElement.innerHTML = `
             <div class="post-header">
               <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile" data-user-id="${post.userId}">
-              <span class="font-semibold" data-user-id="${post.userId}">${post.username || user.username || "Anonymous"}</span>
+              <span class="font-semibold" data-user-id="${post.userId}">${user.username || "Anonymous"}</span>
             </div>
             <img class="post-image" src="${post.imageUrl}" alt="Post">
             <div class="post-actions">
@@ -736,7 +743,7 @@
               ` : ''}
             </div>
             <div class="post-caption">
-              <strong>${post.username || user.username || "Anonymous"}</strong> ${post.caption || ""}
+              <strong>${user.username || "Anonymous"}</strong> ${post.caption || ""}
               ${songHtml}
             </div>
             ${playerHtml}
