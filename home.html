@@ -110,7 +110,7 @@
     .reel:hover {
       transform: scale(1.05);
     }
-    .reel img {
+    .reel video {
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -135,6 +135,7 @@
     }
     .post:nth-child(1) { animation-delay: 0.1s; }
     .post:nth-child(2) { animation-delay: 0.2s; }
+    .post:nth-child(3) { animation-delay: 0.3s; }
     @keyframes slideUp {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
@@ -196,6 +197,12 @@
       color: var(--text-light);
       font-size: 1rem;
     }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-dark);
+      font-size: 1rem;
+    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -204,23 +211,23 @@
 </head>
 <body>
   <div class="tab-nav">
-    <button class="tab-btn active" data-tab="home">
+    <button class="tab-btn active" data-tab="home" aria-label="Home">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
       </svg>
     </button>
-    <button class="tab-btn" data-tab="friends">
+    <button class="tab-btn" data-tab="friends" aria-label="Friends">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2m11-10a2 2 0 11-4 0 2 2 0 014 0zm7 7v-2a4 4 0 00-3-3.87m-4-12a4 4 0 014 4"/>
       </svg>
     </button>
-    <button class="tab-btn" data-tab="search">
+    <button class="tab-btn" data-tab="search" aria-label="Search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/>
         <path d="M21 21l-4.35-4.35"/>
       </svg>
     </button>
-    <button class="tab-btn" data-tab="profile">
+    <button class="tab-btn" data-tab="profile" aria-label="Profile">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a6 6 0 110 12 6 6 0 010-12zm0 2a4 4 0 100 8 4 4 0 000-8z"/>
       </svg>
@@ -229,64 +236,11 @@
 
   <div class="container">
     <div id="home" class="tab-content active">
-      <div class="reels-container">
-        <div class="reel">
-          <img src="https://source.unsplash.com/random/150x250?sig=1" alt="Reel">
-          <div class="username">user1</div>
-        </div>
-        <div class="reel">
-          <img src="https://source.unsplash.com/random/150x250?sig=2" alt="Reel">
-          <div class="username">user2</div>
-        </div>
-        <div class="reel">
-          <img src="https://source.unsplash.com/random/150x250?sig=3" alt="Reel">
-          <div class="username">user3</div>
-        </div>
+      <div class="reels-container" id="reels-container">
+        <div class="loading">Loading reels...</div>
       </div>
-
-      <div class="post">
-        <div class="post-header">
-          <img src="https://source.unsplash.com/random/32x32?sig=1" alt="Profile">
-          <span class="font-semibold">user1</span>
-        </div>
-        <img class="post-image" src="https://source.unsplash.com/random/614x614?sig=1" alt="Post">
-        <div class="post-actions">
-          <button>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l8.94-8.94a5.5 5.5 0 000-7.78z"/>
-            </svg>
-          </button>
-          <button>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 8v9a2 2 0 01-2 2H7a2 2 0 01-2-2V8m0 0l7-4 7 4m-7 4h4"/>
-            </svg>
-          </button>
-        </div>
-        <div class="post-caption">
-          <strong>user1</strong> This is a sample caption for the post.
-        </div>
-      </div>
-      <div class="post">
-        <div class="post-header">
-          <img src="https://source.unsplash.com/random/32x32?sig=2" alt="Profile">
-          <span class="font-semibold">user2</span>
-        </div>
-        <img class="post-image" src="https://source.unsplash.com/random/614x614?sig=2" alt="Post">
-        <div class="post-actions">
-          <button>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l8.94-8.94a5.5 5.5 0 000-7.78z"/>
-            </svg>
-          </button>
-          <button>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 8v9a2 2 0 01-2 2H7a2 2 0 01-2-2V8m0 0l7-4 7 4m-7 4h4"/>
-            </svg>
-          </button>
-        </div>
-        <div class="post-caption">
-          <strong>user2</strong> Another sample post caption.
-        </div>
+      <div id="posts-container">
+        <div class="loading">Loading posts...</div>
       </div>
     </div>
     <div id="friends" class="tab-content">
@@ -303,6 +257,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
+    import { getDatabase, ref, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -316,10 +271,14 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth();
+    const db = getDatabase();
 
     onAuthStateChanged(auth, (user) => {
       if (!user) {
         location.href = "index.html";
+      } else {
+        loadReels();
+        loadPosts();
       }
     });
 
@@ -338,6 +297,86 @@
         document.getElementById(btn.dataset.tab).classList.add("active");
       });
     });
+
+    function loadReels() {
+      const reelsContainer = document.getElementById("reels-container");
+      const reelsRef = query(ref(db, "reels"), orderByChild("timestamp"), limitToLast(10));
+      onValue(reelsRef, async (snapshot) => {
+        reelsContainer.innerHTML = "";
+        if (!snapshot.exists()) {
+          reelsContainer.innerHTML = '<div class="placeholder">No reels available.</div>';
+          return;
+        }
+        const reels = [];
+        snapshot.forEach(child => {
+          reels.push({ id: child.key, ...child.val() });
+        });
+        reels.reverse(); // Newest first
+        for (const reel of reels) {
+          const userRef = ref(db, `users/${reel.userId}`);
+          const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
+          const user = userSnapshot.val() || {};
+          const reelElement = document.createElement("div");
+          reelElement.className = "reel";
+          reelElement.innerHTML = `
+            <video src="${reel.videoUrl}" autoplay muted loop playsinline></video>
+            <div class="username">${reel.username || user.username || "Anonymous"}</div>
+          `;
+          reelsContainer.appendChild(reelElement);
+        }
+      }, {
+        onlyOnce: false
+      });
+    }
+
+    function loadPosts() {
+      const postsContainer = document.getElementById("posts-container");
+      const postsRef = query(ref(db, "posts"), orderByChild("timestamp"), limitToLast(20));
+      onValue(postsRef, async (snapshot) => {
+        postsContainer.innerHTML = "";
+        if (!snapshot.exists()) {
+          postsContainer.innerHTML = '<div class="placeholder">No posts available.</div>';
+          return;
+        }
+        const posts = [];
+        snapshot.forEach(child => {
+          posts.push({ id: child.key, ...child.val() });
+        });
+        posts.reverse(); // Newest first
+        for (const post of posts) {
+          const userRef = ref(db, `users/${post.userId}`);
+          const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
+          const user = userSnapshot.val() || {};
+          const postElement = document.createElement("div");
+          postElement.className = "post";
+          postElement.innerHTML = `
+            <div class="post-header">
+              <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile">
+              <span class="font-semibold">${post.username || user.username || "Anonymous"}</span>
+            </div>
+            <img class="post-image" src="${post.imageUrl}" alt="Post">
+            <div class="post-actions">
+              <button aria-label="Like post">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l8.94-8.94a5.5 5.5 0 000-7.78z"/>
+                </svg>
+              </button>
+              <button aria-label="Comment on post">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 8v9a2 2 0 01-2 2H7a2 2 0 01-2-2V8m0 0l7-4 7 4m-7 4h4"/>
+                </svg>
+              </button>
+            </div>
+            <div class="post-caption">
+              <strong>${post.username || user.username || "Anonymous"}</strong> ${post.caption || ""}
+            </div>
+          `;
+          postsContainer.appendChild(postElement);
+        }
+      }, {
+        onlyOnce: false
+      });
+    }
   </script>
 </body>
 </html>
