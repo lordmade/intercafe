@@ -1,502 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Instagram - Auth</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BanterBox - Privacy Policy</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --primary-red: #ed4956;
-      --error-red: #ed4956;
-      --success-green: #00a400;
-      --background: #fafafa;
-      --border: #dbdbdb;
-      --text-dark: #262626;
-      --text-light: #8e8e8e;
-      --white: #ffffff;
-      --gradient: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
-    }
-    * {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      touch-action: manipulation; /* Improves touch responsiveness */
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: var(--background);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0;
-      overflow: hidden; /* Prevent scrolling */
-    }
-    .auth-container {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      width: 100%;
-      max-width: 350px;
-      padding: 2rem;
-      text-align: center;
-      animation: fadeIn 0.5s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .auth-logo {
-      font-size: 2rem;
-      font-weight: 700;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      margin-bottom: 1.5rem;
-      animation: gradientShift 5s ease infinite;
-    }
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    .form-group {
-      margin-bottom: 1rem;
-      opacity: 0;
-      animation: slideUp 0.3s ease-out forwards;
-    }
-    .form-group:nth-child(1) { animation-delay: 0.1s; }
-    .form-group:nth-child(2) { animation-delay: 0.2s; }
-    .form-group:nth-child(3) { animation-delay: 0.3s; }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .form-input {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 0.9rem;
-      background: var(--background);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .form-input:focus {
-      outline: none;
-      border-color: var(--text-light);
-      box-shadow: 0 0 0 2px rgba(38, 38, 38, 0.1);
-    }
-    .auth-btn {
-      width: 100%;
-      padding: 0.5rem;
-      background: var(--primary-red);
-      color: var(--white);
-      border-radius: 9999px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .auth-btn:hover:not(:disabled) {
-      transform: scale(1.05);
-      box-shadow: 0 2px 8px rgba(237, 73, 86, 0.3);
-      background: #d43f4e;
-    }
-    .auth-btn:disabled {
-      background: #f4a4b0;
-      cursor: not-allowed;
-    }
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin: 1.5rem 0;
-      color: var(--text-light);
-      font-size: 0.85rem;
-      opacity: 0;
-      animation: fadeIn 0.5s ease-out forwards;
-      animation-delay: 0.4s;
-    }
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex-grow: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .google-btn {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid var(--border);
-      border-radius: 9999px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--text-dark);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      background: var(--white);
-      cursor: pointer;
-      transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .google-btn:hover {
-      transform: scale(1.05);
-      background: var(--background);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    .auth-msg {
-      font-size: 0.85rem;
-      color: var(--error-red);
-      margin-top: 1rem;
-      min-height: 1.5rem;
-    }
-    .auth-msg.success {
-      color: var(--success-green);
-    }
-    .forgot-password {
-      font-size: 0.85rem;
-      color: #00376b;
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-    .forgot-password:hover {
-      color: var(--primary-red);
-    }
-    .switch-form {
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      color: var(--text-dark);
-      opacity: 0;
-      animation: fadeIn 0.5s ease-out forwards;
-      animation-delay: 0.5s;
-    }
-    .switch-form a {
-      color: var(--primary-red);
-      font-weight: 600;
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-    .switch-form a:hover {
-      color: #d43f4e;
-      text-decoration: underline;
-    }
-    .loading-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      transition: opacity 0.3s ease;
-    }
-    .loading-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .error {
-      border-color: var(--error-red);
-      animation: shake 0.3s ease;
-    }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-4px); }
-      75% { transform: translateX(4px); }
-    }
+    body { font-family: 'Inter', sans-serif; }
+    .gradient-bg { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+    .tab-active { border-bottom: 2px solid #dc2743; }
+    .fab { transition: transform 0.2s; }
+    .fab:hover { transform: scale(1.1); }
   </style>
 </head>
-<body>
-  <div class="auth-container">
-    <h1 class="auth-logo">Instagram</h1>
-
-    <form id="login-form" class="space-y-4" aria-label="Sign In Form">
-      <div class="form-group">
-        <input type="text" id="login-username" class="form-input" placeholder="Username or Email" required aria-label="Username or Email"/>
+<body class="bg-gray-100 text-gray-900">
+  <!-- Navigation Bar -->
+  <nav class="gradient-bg text-white fixed top-0 left-0 right-0 z-10 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <h1 class="text-xl font-bold">BanterBox</h1>
+        </div>
+        <div class="flex space-x-4 items-center">
+          <a href="/index.html" class="px-3 py-2 text-sm font-medium hover:bg-white hover:bg-opacity-20">Home</a>
+          <a href="/friends.html" class="px-3 py-2 text-sm font-medium hover:bg-white hover:bg-opacity-20">Friends</a>
+          <a href="/search.html" class="px-3 py-2 text-sm font-medium hover:bg-white hover:bg-opacity-20">Search</a>
+          <a href="/reels.html" class="px-3 py-2 text-sm font-medium hover:bg-white hover:bg-opacity-20">Reels</a>
+          <a href="/profile.html" class="px-3 py-2 text-sm font-medium hover:bg-white hover:bg-opacity-20">Profile</a>
+        </div>
       </div>
-      <div class="form-group">
-        <input type="password" id="login-password" class="form-input" placeholder="Password" required aria-label="Password"/>
-      </div>
-      <button type="submit" class="auth-btn">Log In</button>
-      <a href="#" id="forgot-password" class="forgot-password">Forgot password?</a>
-    </form>
-
-    <form id="signup-form" class="space-y-4 hidden" aria-label="Sign Up Form">
-      <div class="form-group">
-        <input type="email" id="signup-email" class="form-input" placeholder="Email" required aria-label="Email"/>
-      </div>
-      <div class="form-group">
-        <input type="text" id="signup-username" class="form-input" placeholder="Username" required aria-label="Username"/>
-      </div>
-      <div class="form-group">
-        <input type="password" id="signup-password" class="form-input" placeholder="Password" required aria-label="Password"/>
-      </div>
-      <button type="submit" class="auth-btn">Sign Up</button>
-    </form>
-
-    <div class="divider">
-      <span>OR</span>
     </div>
-    <button id="google-login" class="google-btn">
-      <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" class="w-5 h-5">
-      Continue with Google
-    </button>
+  </nav>
 
-    <p class="switch-form">
-      <span id="switch-text">Don't have an account? </span>
-      <a href="#" id="switch-to-signup">Sign up</a>
-    </p>
+  <!-- Main Content -->
+  <main class="max-w-3xl mx-auto mt-20 px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-6">Privacy Policy</h1>
+    <section class="bg-white p-6 rounded-lg shadow-md">
+      <p class="text-sm text-gray-600 mb-4"><strong>Last Updated: July 15, 2025</strong></p>
+      <p class="text-base text-gray-700 mb-4">
+        BanterBox ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our social media and messaging platform ("BanterBox" or the "Service"). By using BanterBox, you agree to the practices described in this policy. If you do not agree, please do not use the Service.
+      </p>
 
-    <p id="auth-msg" class="auth-msg" aria-live="polite"></p>
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">1. Information We Collect</h2>
+      <p class="text-base text-gray-700 mb-4">We collect information to provide and improve the Service. The types of information we collect include:</p>
 
-    <div id="loading-overlay" class="loading-overlay hidden">
-      <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
-      </svg>
-    </div>
-  </div>
+      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">a. Personal Information</h3>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Account Information</strong>: When you sign up, we collect your email address, username, and optional profile details (e.g., bio, profile picture) via Firebase Authentication.</li>
+        <li><strong>User Content</strong>: Posts, stories, messages, comments, and media (images, voice notes) you upload are stored via Firebase Realtime Database and Cloudinary.</li>
+        <li><strong>Presence Data</strong>: We track your online/offline status and "Last seen" timestamps to enable real-time interactions.</li>
+        <li><strong>Notifications</strong>: Data related to likes, comments, follows, and verification status is stored to provide real-time notifications.</li>
+      </ul>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
-    import {
-      getAuth,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
-      sendPasswordResetEmail,
-      sendEmailVerification,
-      signInWithPopup,
-      GoogleAuthProvider,
-      updateProfile
-    } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
-    import {
-      getDatabase,
-      ref,
-      set
-    } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-database.js";
+      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">b. Automatically Collected Information</h3>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Usage Data</strong>: We collect information about your interactions with BanterBox, such as pages visited, features used (e.g., likes, comments, searches), and timestamps.</li>
+        <li><strong>Device Information</strong>: We may collect device type, browser type, IP address, and operating system to optimize the Service for your device.</li>
+        <li><strong>WebRTC Data</strong>: For video calls, we process temporary connection data (e.g., ICE candidates) via WebRTC and STUN servers to establish peer-to-peer communication.</li>
+      </ul>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
-      authDomain: "fire-b-a8878.firebaseapp.com",
-      databaseURL: "https://fire-b-a8878.firebaseio.com",
-      projectId: "fire-b-a8878",
-      storageBucket: "fire-b-a8878.appspot.com",
-      messagingSenderId: "658673187627",
-      appId: "1:658673187627:web:6e4c29af661785f0afa36e"
-    };
+      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">c. Cookies and Similar Technologies</h3>
+      <p class="text-base text-gray-700 mb-4">
+        We use cookies to maintain your session and preferences (e.g., chat wallpaper settings). Essential cookies are required for the Service to function, and no optional tracking cookies are used.
+      </p>
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth();
-    const db = getDatabase();
-    const provider = new GoogleAuthProvider();
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">2. How We Use Your Information</h2>
+      <p class="text-base text-gray-700 mb-4">We use your information to:</p>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Provide the Service</strong>: Authenticate users, display posts and stories, enable messaging and video calls, and deliver notifications.</li>
+        <li><strong>Personalize Your Experience</strong>: Show relevant content (e.g., posts from followed users) and customize features like chat wallpapers.</li>
+        <li><strong>Improve the Service</strong>: Analyze usage patterns to enhance performance, fix bugs, and optimize responsiveness.</li>
+        <li><strong>Ensure Security</strong>: Detect and prevent unauthorized access or abuse (e.g., oversized uploads or invalid media formats).</li>
+        <li><strong>Communicate</strong>: Send service-related updates, such as verification badge awards or notification alerts.</li>
+      </ul>
 
-    const msgBox = document.getElementById("auth-msg");
-    const loginForm = document.getElementById("login-form");
-    const signupForm = document.getElementById("signup-form");
-    const loginUsername = document.getElementById("login-username");
-    const loginPassword = document.getElementById("login-password");
-    const signupEmail = document.getElementById("signup-email");
-    const signupUsername = document.getElementById("signup-username");
-    const signupPassword = document.getElementById("signup-password");
-    const forgotPassword = document.getElementById("forgot-password");
-    const googleLogin = document.getElementById("google-login");
-    const switchToSignup = document.getElementById("switch-to-signup");
-    const loadingOverlay = document.getElementById("loading-overlay");
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">3. How We Share Your Information</h2>
+      <p class="text-base text-gray-700 mb-4">We do not sell your personal information. We may share information as follows:</p>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>With Other Users</strong>: Your username, profile picture, posts, stories, and comments are visible to other users based on your actions (e.g., public posts or private messages to friends).</li>
+        <li><strong>Service Providers</strong>: We use third-party services to operate BanterBox:
+          <ul class="list-circle pl-6">
+            <li><strong>Firebase (Google)</strong>: Handles authentication, real-time database, and hosting.</li>
+            <li><strong>Cloudinary</strong>: Stores and serves media uploads (images, voice notes, profile pictures).</li>
+            <li><strong>WebRTC STUN Servers</strong>: Facilitate video call connectivity.</li>
+          </ul>
+          These providers process data under strict confidentiality agreements.
+        </li>
+        <li><strong>Legal Requirements</strong>: We may disclose information if required by law, such as in response to a court order or to protect the safety of users or the public.</li>
+      </ul>
 
-    function showLoading() { loadingOverlay.classList.remove("hidden"); }
-    function hideLoading() { loadingOverlay.classList.add("hidden"); }
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">4. Data Storage and Security</h2>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Storage</strong>: Personal information and user content are stored in Firebase Realtime Database (United States) and Cloudinary (global servers). Presence data and temporary WebRTC data are not persistently stored.</li>
+        <li><strong>Security Measures</strong>:
+          <ul class="list-circle pl-6">
+            <li>Firebase Authentication ensures secure access.</li>
+            <li>HTTPS encryption protects data in transit.</li>
+            <li>Media uploads are validated for size (max 10MB for chat media, 5MB for profile pictures) and format (JPEG, PNG, GIF).</li>
+            <li>Access to user data is restricted to authenticated users via Firebase security rules.</li>
+          </ul>
+        </li>
+        <li><strong>Retention</strong>: We retain your data as long as your account is active. Deleted posts, messages, or accounts are removed from our systems, though some data (e.g., "This message was deleted" placeholders) may persist for continuity.</li>
+      </ul>
 
-    function showError(input, message) {
-      input.classList.add("error");
-      msgBox.textContent = message;
-      msgBox.classList.remove("success");
-    }
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">5. Your Choices and Rights</h2>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Access and Update</strong>: You can view and edit your profile (username, bio, profile picture) via the Profile tab’s Edit Profile modal.</li>
+        <li><strong>Delete Content</strong>: You can delete your posts or messages, which are removed from Firebase and Cloudinary (where applicable).</li>
+        <li><strong>Account Deletion</strong>: Contact us at <a href="mailto:support@banterbox.app" class="text-blue-600 hover:underline">support@banterbox.app</a> to request account deletion. We will remove your personal information within 30 days, subject to legal obligations.</li>
+        <li><strong>Notifications</strong>: You can manage notification preferences in the Settings section.</li>
+        <li><strong>Cookies</strong>: You can disable cookies via your browser settings, but this may affect core functionality (e.g., session persistence).</li>
+      </ul>
 
-    function clearErrors() {
-      [loginUsername, loginPassword, signupEmail, signupUsername, signupPassword].forEach(input => {
-        input.classList.remove("error");
-      });
-    }
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">6. Accessibility and Children’s Privacy</h2>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Accessibility</strong>: BanterBox includes ARIA labels and semantic HTML to support screen readers, ensuring accessibility for all users.</li>
+        <li><strong>Children’s Privacy</strong>: BanterBox is not intended for users under 13. We do not knowingly collect data from children under 13. If we learn such data has been collected, we will delete it promptly.</li>
+      </ul>
 
-    switchToSignup.addEventListener("click", (e) => {
-      e.preventDefault();
-      loginForm.classList.toggle("hidden");
-      signupForm.classList.toggle("hidden");
-      document.getElementById("switch-text").textContent = signupForm.classList.contains("hidden") ? "Don't have an account? " : "Have an account? ";
-      switchToSignup.textContent = signupForm.classList.contains("hidden") ? "Sign up" : "Log in";
-      msgBox.textContent = "";
-      clearErrors();
-    });
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">7. Third-Party Services</h2>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Firebase</strong>: Authentication and database services are provided by Google Firebase. See their <a href="https://firebase.google.com/support/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</li>
+        <li><strong>Cloudinary</strong>: Media storage is handled by Cloudinary. See their <a href="https://cloudinary.com/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</li>
+        <li><strong>WebRTC</strong>: Video calls use open-source WebRTC with public STUN servers, which do not store personal data.</li>
+      </ul>
 
-    loginUsername.addEventListener("input", () => {
-      if (loginUsername.value.trim().length < 2) {
-        showError(loginUsername, "Username or email is required.");
-      } else {
-        loginUsername.classList.remove("error");
-        if (!msgBox.textContent.includes("Password")) msgBox.textContent = "";
-      }
-    });
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">8. International Data Transfers</h2>
+      <p class="text-base text-gray-700 mb-4">
+        BanterBox operates globally, and your data may be processed in the United States or other regions where Firebase and Cloudinary servers are located. We ensure compliance with applicable data protection laws for cross-border transfers.
+      </p>
 
-    signupEmail.addEventListener("input", () => {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail.value)) {
-        showError(signupEmail, "Please enter a valid email.");
-      } else {
-        signupEmail.classList.remove("error");
-        if (!msgBox.textContent.includes("Username") && !msgBox.textContent.includes("Password")) msgBox.textContent = "";
-      }
-    });
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">9. Changes to This Privacy Policy</h2>
+      <p class="text-base text-gray-700 mb-4">
+        We may update this policy to reflect changes in our practices or legal requirements. We will notify you via the Service or email (if provided) of significant changes. The updated policy will be effective as of the "Last Updated" date above.
+      </p>
 
-    signupUsername.addEventListener("input", () => {
-      if (signupUsername.value.trim().length < 2) {
-        showError(signupUsername, "Username must be at least 2 characters.");
-      } else {
-        signupUsername.classList.remove("error");
-        if (!msgBox.textContent.includes("Email") && !msgBox.textContent.includes("Password")) msgBox.textContent = "";
-      }
-    });
+      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">10. Contact Us</h2>
+      <p class="text-base text-gray-700 mb-4">
+        For questions, concerns, or requests regarding your privacy, contact us at:
+      </p>
+      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
+        <li><strong>Email</strong>: <a href="mailto:support@banterbox.app" class="text-blue-600 hover:underline">support@banterbox.app</a></li>
+        <li><strong>Address</strong>: BanterBox, 0601, Mokopane, SOUTH AFRICA</li>
+      </ul>
+      <p class="text-base text-gray-700">
+        By using BanterBox, you acknowledge that you have read and understood this Privacy Policy. Thank you for trusting us with your information.
+      </p>
+    </section>
+  </main>
 
-    signupPassword.addEventListener("input", () => {
-      if (signupPassword.value.length < 6) {
-        showError(signupPassword, "Password must be at least 6 characters.");
-      } else {
-        signupPassword.classList.remove("error");
-        if (!msgBox.textContent.includes("Email") && !msgBox.textContent.includes("Username")) msgBox.textContent = "";
-      }
-    });
+  <!-- Floating Action Button (FAB) -->
+  <a href="/upload.html" class="fab fixed bottom-6 right-6 bg-gradient-to-r from-[#f09433] to-[#bc1888] text-white p-4 rounded-full shadow-lg" aria-label="Upload new post or story">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+    </svg>
+  </a>
 
-    loginForm.onsubmit = async (e) => {
-      e.preventDefault();
-      showLoading();
-      const username = loginUsername.value.trim();
-      const password = loginPassword.value;
-
-      if (username.length < 2) {
-        showError(loginUsername, "Username or email is required.");
-        hideLoading();
-        return;
-      }
-      if (password.length < 6) {
-        showError(loginPassword, "Password must be at least 6 characters.");
-        hideLoading();
-        return;
-      }
-
-      try {
-        const email = username.includes('@') ? username : `${username}@example.com`;
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
-        if (!userCred.user.emailVerified) {
-          msgBox.textContent = "Please verify your email before logging in.";
-          msgBox.classList.remove("success");
-          hideLoading();
-          return;
+  <script>
+    // Basic navigation active state handling
+    document.addEventListener('DOMContentLoaded', () => {
+      const navLinks = document.querySelectorAll('nav a');
+      navLinks.forEach(link => {
+        if (link.href === window.location.href) {
+          link.classList.add('tab-active');
         }
-        location.href = "home.html";
-      } catch (err) {
-        msgBox.textContent = err.code === "auth/user-not-found" || err.code === "auth/wrong-password"
-          ? "Invalid username or password."
-          : err.message;
-        msgBox.classList.remove("success");
-        loginUsername.classList.add("error");
-        loginPassword.classList.add("error");
-      }
-      hideLoading();
-    };
-
-    signupForm.onsubmit = async (e) => {
-      e.preventDefault();
-      showLoading();
-      const email = signupEmail.value;
-      const username = signupUsername.value.trim();
-      const password = signupPassword.value;
-
-      if (username.length < 2) {
-        showError(signupUsername, "Username must be at least 2 characters.");
-        hideLoading();
-        return;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showError(signupEmail, "Please enter a valid email.");
-        hideLoading();
-        return;
-      }
-      if (password.length < 6) {
-        showError(signupPassword, "Password must be at least 6 characters.");
-        hideLoading();
-        return;
-      }
-
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: username });
-        await set(ref(db, `users/${cred.user.uid}`), {
-          username,
-          email,
-          uid: cred.user.uid,
-          photoURL: "",
-          followers: 0,
-          following: 0,
-          posts: 0
-        });
-        await sendEmailVerification(cred.user);
-        msgBox.textContent = "Signup successful! Check your email for verification.";
-        msgBox.classList.add("success");
-        signupForm.reset();
-      } catch (err) {
-        msgBox.textContent = err.code === "auth/email-already-in-use"
-          ? "This email is already registered."
-          : err.message;
-        msgBox.classList.remove("success");
-        signupEmail.classList.add("error");
-      }
-      hideLoading();
-    };
-
-    forgotPassword.onclick = async (e) => {
-      e.preventDefault();
-      const email = loginUsername.value.includes('@') ? loginUsername.value : `${loginUsername.value}@example.com`;
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showError(loginUsername, "Please enter a valid email to reset password.");
-        return;
-      }
-      showLoading();
-      try {
-        await sendPasswordResetEmail(auth, email);
-        msgBox.textContent = "Password reset email sent.";
-        msgBox.classList.add("success");
-      } catch (err) {
-        msgBox.textContent = err.code === "auth/user-not-found"
-          ? "No account found with this email."
-          : err.message;
-        msgBox.classList.remove("success");
-      }
-      hideLoading();
-    };
-
-    googleLogin.onclick = async () => {
-      showLoading();
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        await set(ref(db, `users/${user.uid}`), {
-          username: user.displayName?.replace(/\s/g, '') || "user",
-          email: user.email,
-          uid: user.uid,
-          photoURL: user.photoURL || "",
-          followers: 0,
-          following: 0,
-          posts: 0
-        });
-        location.href = "home.html";
-      } catch (err) {
-        msgBox.textContent = err.message;
-        msgBox.classList.remove("success");
-      }
-      hideLoading();
-    };
+      });
+    });
   </script>
 </body>
 </html>
