@@ -2,785 +2,533 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Instagram - Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAREPLAY - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://widget.cloudinary.com/v2.0/global/all.js" type="text/javascript"></script>
   <style>
     :root {
-      --primary-red: #ed4956;
-      --background: #fafafa;
-      --border: #dbdbdb;
-      --text-dark: #262626;
-      --text-light: #8e8e8e;
-      --white: #ffffff;
+      --netflix-red: #E50914;
+      --netflix-gold: #FFD700;
+      --background-dark: #141414;
+      --text-dark: #FFFFFF;
+      --text-light: #B3B3B3;
+      --border-dark: #2F2F2F;
+      --white-light: #F5F5F5;
+      --error-red: #FF0000;
     }
-    * {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      touch-action: manipulation;
-    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: var(--background);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background: var(--background-dark);
+      color: var(--text-dark);
       min-height: 100vh;
       margin: 0;
-      overflow-x: hidden;
-    }
-    .container {
-      max-width: 614px;
-      margin: 0 auto;
-      padding: 1rem;
-    }
-    .tab-nav {
-      position: sticky;
-      top: 0;
-      background: var(--white);
-      border-bottom: 1px solid var(--border);
+      padding: 0;
       display: flex;
-      justify-content: space-around;
-      padding: 0.5rem 0;
-      z-index: 10;
+      justify-content: center;
+      align-items: center;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
-    .tab-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-dark);
-      border-radius: 9999px;
-      padding: 0.5rem;
-      transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+
+    .navbar {
+      background: transparent;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 20;
+      padding: 1rem 2rem;
+    }
+
+    .dashboard-container {
+      background: rgba(20, 20, 20, 0.95);
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      margin-top: 6rem;
+    }
+
+    .dashboard-container h1 {
+      color: var(--netflix-gold);
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+      text-align: left;
       position: relative;
     }
-    .tab-btn:hover {
-      background: rgba(237, 73, 86, 0.1);
-      transform: scale(1.1);
+
+    .form-group label {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 0.5rem;
     }
-    .tab-btn.active {
-      color: var(--primary-red);
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--white-light);
+      border: 1px solid var(--border-dark);
+      border-radius: 0.5rem;
+      color: var(--text-dark);
+      font-size: 1rem;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
     }
-    .tab-btn.active::after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 24px;
-      height: 2px;
-      background: var(--primary-red);
-      transition: width 0.2s ease;
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
     }
-    .tab-btn svg {
-      width: 24px;
-      height: 24px;
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--netflix-gold);
+      box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2);
     }
-    .tab-content {
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: var(--text-light);
+      opacity: 0.7;
+    }
+
+    .form-group select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23B3B3B3' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      background-size: 12px;
+      cursor: pointer;
+    }
+
+    .form-group select:hover {
+      background-color: var(--netflix-gold);
+      color: var(--text-dark);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23000000' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
+    }
+
+    .form-group select:focus {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23FFD700' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
+    }
+
+    .form-group select:invalid {
+      color: var(--text-light);
+    }
+
+    .form-group select option {
+      color: var(--text-dark);
+      background: var(--white-light);
+    }
+
+    .form-group select option[disabled] {
+      color: var(--text-light);
+    }
+
+    .form-group select option:hover {
+      background: var(--netflix-gold);
+      color: var(--text-dark);
+    }
+
+    .form-group.error input,
+    .form-group.error select,
+    .form-group.error textarea {
+      border-color: var(--error-red);
+      box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.2);
+    }
+
+    .upload-btn {
+      background: var(--netflix-gold);
+      color: black;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+      margin: 0.5rem;
+      display: inline-block;
+    }
+
+    .upload-btn:hover {
+      background: #d4b000;
+      transform: translateY(-1px);
+    }
+
+    .upload-btn:active {
+      transform: translateY(0);
+    }
+
+    .submit-btn {
+      background: var(--netflix-gold);
+      color: black;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 1rem;
+      width: 100%;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .submit-btn:hover {
+      background: #d4b000;
+      transform: translateY(-1px);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .error-message {
+      color: var(--error-red);
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
       display: none;
-      animation: fadeIn 0.5s ease-out;
+      text-align: center;
     }
-    .tab-content.active {
+
+    .error-message.show {
       display: block;
     }
-    .reels-container {
-      overflow-x: auto;
-      display: flex;
-      gap: 1rem;
-      padding: 1rem 0;
-      margin-bottom: 1rem;
-      white-space: nowrap;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      opacity: 0;
-      animation: fadeIn 0.5s ease-out forwards;
-    }
-    .reels-container::-webkit-scrollbar {
-      display: none;
-    }
-    .reel {
-      width: 150px;
-      height: 250px;
-      border-radius: 8px;
-      overflow: hidden;
-      position: relative;
-      flex-shrink: 0;
-      border: 1px solid var(--border);
-      transition: transform 0.2s ease;
-      cursor: pointer;
-    }
-    .reel:hover {
-      transform: scale(1.05);
-    }
-    .reel img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .reel .username {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.5);
-      color: var(--white);
-      padding: 0.5rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-    .reel .song-overlay {
-      position: absolute;
-      top: 0.5rem;
-      left: 0.5rem;
-      background: rgba(0, 0, 0, 0.5);
-      color: var(--white);
-      padding: 0.25rem 0.5rem;
-      font-size: clamp(0.75rem, 3vw, 0.8rem);
-      border-radius: 4px;
-      max-width: 90%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      cursor: pointer;
-    }
-    .post {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      background: var(--white);
-      opacity: 0;
-      animation: slideUp 0.5s ease-out forwards;
-      cursor: pointer;
-    }
-    .post:nth-child(1) { animation-delay: 0.1s; }
-    .post:nth-child(2) { animation-delay: 0.2s; }
-    .post:nth-child(3) { animation-delay: 0.3s; }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .post-header {
-      display: flex;
-      align-items: center;
-      padding: 0.75rem;
-      gap: 0.5rem;
-    }
-    .post-header img {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-      cursor: pointer;
-    }
-    .post-header span {
-      cursor: pointer;
-    }
-    .post-image {
-      width: 100%;
-      aspect-ratio: 1;
-      object-fit: cover;
-      transition: transform 0.2s ease;
-    }
-    .post-image:hover {
-      transform: scale(1.02);
-    }
-    .post-actions {
-      display: flex;
-      gap: 1rem;
-      padding: 0.75rem;
-    }
-    .post-actions button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-dark);
-      border-radius: 9999px;
-      padding: 0.5rem;
-      transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
-    }
-    .post-actions button:hover {
-      color: var(--primary-red);
-      background: rgba(237, 73, 86, 0.1);
-      transform: scale(1.1);
-    }
-    .post-actions svg {
-      width: 24px;
-      height: 24px;
-    }
-    .post-caption {
-      padding: 0.75rem;
+
+    .success-message {
+      color: var(--netflix-gold);
       font-size: 0.9rem;
-    }
-    .post-caption strong {
-      font-weight: 600;
-    }
-    .post-caption .song-display {
-      font-size: clamp(0.8rem, 3.5vw, 0.85rem);
-      color: var(--text-light);
       margin-top: 0.5rem;
-      cursor: pointer;
-    }
-    .placeholder {
-      padding: 2rem;
+      display: none;
       text-align: center;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .noscript-message {
       color: var(--text-light);
       font-size: 1rem;
-    }
-    .loading {
       text-align: center;
-      padding: 2rem;
-      color: var(--text-dark);
-      font-size: 1rem;
+      padding: 1rem;
     }
-    .fab {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      background: var(--primary-red);
-      color: var(--white);
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(237, 73, 86, 0.3);
-      z-index: 20;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .fab:hover {
-      transform: scale(1.1);
-      box-shadow: 0 6px 16px rgba(237, 73, 86, 0.4);
-    }
-    .fab svg {
-      width: 24px;
-      height: 24px;
-    }
-    .media-player {
-      display: none;
-      background: var(--background);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 0.75rem;
-      margin: 0.5rem 0.75rem;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .media-player.active {
-      display: flex;
-    }
-    .play-pause-btn {
-      background: var(--primary-red);
-      color: var(--white);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.2s ease, background 0.2s ease;
-    }
-    .play-pause-btn:hover:not(:disabled) {
-      transform: scale(1.05);
-      background: #d43f4e;
-    }
-    .play-pause-btn svg {
-      width: 20px;
-      height: 20px;
-    }
-    .seek-bar {
-      flex-grow: 1;
-      -webkit-appearance: none;
-      appearance: none;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      outline: none;
-      cursor: pointer;
-    }
-    .seek-bar::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 12px;
-      height: 12px;
-      background: var(--primary-red);
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    .seek-bar::-moz-range-thumb {
-      width: 12px;
-      height: 12px;
-      background: var(--primary-red);
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    .time-display {
-      font-size: clamp(0.75rem, 3.5vw, 0.8rem);
-      color: var(--text-dark);
-      width: 80px;
-      text-align: right;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @media (max-width: 414px) {
-      .container {
-        padding: 0.5rem;
+
+    @media (max-width: 640px) {
+      .dashboard-container {
+        padding: 1.5rem;
+        margin: 1rem;
       }
-      .reels-container {
-        gap: 0.5rem;
-        padding: 0.5rem 0;
+
+      .dashboard-container h1 {
+        font-size: 1.5rem;
       }
-      .reel {
-        width: 120px;
-        height: 200px;
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        padding: 0.6rem;
+        font-size: 0.9rem;
       }
-      .reel .username, .reel .song-overlay {
-        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+
+      .upload-btn,
+      .submit-btn {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
       }
-      .post-header img {
-        width: 28px;
-        height: 28px;
+
+      .error-message,
+      .success-message {
+        font-size: 0.8rem;
       }
-      .post-caption {
-        font-size: 0.85rem;
-      }
-      .post-caption .song-display {
-        font-size: clamp(0.75rem, 3vw, 0.8rem);
-      }
-      .media-player {
-        padding: 0.5rem;
-        margin: 0.5rem;
-      }
-      .play-pause-btn {
-        width: 36px;
-        height: 36px;
-      }
-      .time-display {
-        width: 70px;
-        font-size: clamp(0.7rem, 3vw, 0.75rem);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body, .upload-btn, .submit-btn, .form-group input, .form-group select, .form-group textarea {
+        transition: none;
       }
     }
   </style>
 </head>
 <body>
-  <div class="tab-nav">
-    <button class="tab-btn active" data-tab="home" aria-label="Home">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-      </svg>
-    </button>
-    <button class="tab-btn" data-tab="friends" aria-label="Friends">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2m11-10a2 2 0 11-4 0 2 2 0 014 0zm7 7v-2a4 4 0 00-3-3.87m-4-12a4 4 0 014 4"/>
-      </svg>
-    </button>
-    <button class="tab-btn" data-tab="search" aria-label="Search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/>
-        <path d="M21 21l-4.35-4.35"/>
-      </svg>
-    </button>
-    <button class="tab-btn" data-tab="profile" aria-label="Profile">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a6 6 0 110 12 6 6 0 010-12zm0 2a4 4 0 100 8 4 4 0 000-8z"/>
-      </svg>
-    </button>
-  </div>
-
-  <div class="container">
-    <div id="home" class="tab-content active">
-      <div class="reels-container" id="reels-container">
-        <div class="loading">Loading reels...</div>
-      </div>
-      <div id="posts-container">
-        <div class="loading">Loading posts...</div>
+  <noscript>
+    <div class="noscript-message">
+      JavaScript is disabled. Please enable JavaScript to use the RAREPLAY Admin Dashboard or visit our <a href="https://help.rareplay.com" class="underline">help page</a> for more information.
+    </div>
+  </noscript>
+  <nav class="navbar">
+    <div class="container mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-[var(--netflix-gold)]">RAREPLAY Admin</h1>
+      <div class="flex items-center space-x-4">
+        <a href="#" id="logout" class="text-[var(--text-light)] hover:text-[var(--netflix-gold)] font-medium">Logout</a>
       </div>
     </div>
-    <div id="friends" class="tab-content">
-      <div class="placeholder">Friends tab - Coming soon!</div>
+  </nav>
+  <div class="dashboard-container" role="form" aria-labelledby="dashboard-title">
+    <h1 id="dashboard-title">Upload New Movie</h1>
+    <div class="form-group" id="title-group">
+      <label for="title">Movie Title</label>
+      <input type="text" id="title" placeholder="Enter movie title" required aria-required="true" aria-describedby="title-error" />
+      <p class="error-message" id="title-error" aria-live="assertive"></p>
     </div>
-    <div id="search" class="tab-content">
-      <div class="placeholder">Search tab - Coming soon!</div>
+    <div class="form-group" id="description-group">
+      <label for="description">Description</label>
+      <textarea id="description" placeholder="Enter movie description" required aria-required="true" aria-describedby="description-error"></textarea>
+      <p class="error-message" id="description-error" aria-live="assertive"></p>
     </div>
-    <div id="profile" class="tab-content">
-      <div class="placeholder">Profile tab - Coming soon!</div>
+    <div class="form-group" id="genre-group">
+      <label for="genre">Genre</label>
+      <select id="genre" required aria-required="true" aria-describedby="genre-error">
+        <option value="" disabled selected>Select genre</option>
+        <option value="action">Action</option>
+        <option value="comedy">Comedy</option>
+        <option value="drama">Drama</option>
+        <option value="horror">Horror</option>
+        <option value="sci-fi">Sci-Fi</option>
+        <option value="romance">Romance</option>
+        <option value="documentary">Documentary</option>
+      </select>
+      <p class="error-message" id="genre-error" aria-live="assertive"></p>
     </div>
+    <div class="form-group" id="cover-group">
+      <label for="cover-upload">Cover Image</label>
+      <button type="button" id="cover-upload" class="upload-btn" aria-label="Upload cover image">Upload Cover Image</button>
+      <p id="cover-url" class="text-[var(--text-light)] text-sm mt-1" aria-live="polite"></p>
+      <p class="error-message" id="cover-error" aria-live="assertive"></p>
+    </div>
+    <div class="form-group" id="video-group">
+      <label for="video-upload">Movie Video</label>
+      <button type="button" id="video-upload" class="upload-btn" aria-label="Upload movie video">Upload Movie Video</button>
+      <p id="video-url" class="text-[var(--text-light)] text-sm mt-1" aria-live="polite"></p>
+      <p class="error-message" id="video-error" aria-live="assertive"></p>
+    </div>
+    <button class="submit-btn" type="button" aria-label="Upload movie">Upload Movie</button>
+    <p class="error-message" id="error-message" aria-live="assertive"></p>
+    <p class="success-message" id="success-message" aria-live="assertive"></p>
   </div>
-
-  <a href="upload.html" class="fab" aria-label="Upload new media">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 5v14m7-7H5"/>
-    </svg>
-  </a>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
-    import { getDatabase, ref, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
       authDomain: "fire-b-a8878.firebaseapp.com",
       databaseURL: "https://fire-b-a8878.firebaseio.com",
       projectId: "fire-b-a8878",
-      storageBucket: "fire-b-a8878.appspot.com",
+      storageBucket: "fire-b-a8878.firebasestorage.app",
       messagingSenderId: "658673187627",
-      appId: "1:658673187627:web:6e4c29af661785f0afa36e"
+      appId: "1:658673187627:web:6e4c29af661785f0afa36e",
+      measurementId: "G-V4W97VMSKL"
     };
 
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth();
-    const db = getDatabase();
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        location.href = "index.html";
-      } else {
-        loadReels();
-        loadPosts();
+    const titleInput = document.getElementById("title");
+    const descriptionInput = document.getElementById("description");
+    const genreSelect = document.getElementById("genre");
+    const coverUploadBtn = document.getElementById("cover-upload");
+    const videoUploadBtn = document.getElementById("video-upload");
+    const coverUrlDisplay = document.getElementById("cover-url");
+    const videoUrlDisplay = document.getElementById("video-url");
+    const submitBtn = document.querySelector(".submit-btn");
+    const errorMessage = document.getElementById("error-message");
+    const successMessage = document.getElementById("success-message");
+    const titleGroup = document.getElementById("title-group");
+    const descriptionGroup = document.getElementById("description-group");
+    const genreGroup = document.getElementById("genre-group");
+    const coverGroup = document.getElementById("cover-group");
+    const videoGroup = document.getElementById("video-group");
+
+    let coverUrl = "";
+    let videoUrl = "";
+
+    function showError(element, message, group) {
+      if (element) {
+        element.textContent = message;
+        element.classList.add("show");
+        if (group) {
+          group.classList.add("error");
+        }
       }
-    });
+    }
 
-    const tabBtns = document.querySelectorAll(".tab-btn");
-    const tabs = document.querySelectorAll(".tab-content");
+    function showSuccess(message) {
+      if (successMessage) {
+        successMessage.textContent = message;
+        successMessage.classList.add("show");
+        setTimeout(() => {
+          successMessage.classList.remove("show");
+          successMessage.textContent = "";
+        }, 3000);
+      }
+    }
 
-    tabBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        tabBtns.forEach(b => {
-          b.classList.remove("active");
-          b.setAttribute("aria-selected", "false");
+    function clearError() {
+      [errorMessage, document.getElementById("title-error"), document.getElementById("description-error"), 
+       document.getElementById("genre-error"), document.getElementById("cover-error"), document.getElementById("video-error")]
+        .forEach(element => {
+          if (element) {
+            element.textContent = "";
+            element.classList.remove("show");
+          }
         });
-        tabs.forEach(t => t.classList.remove("active"));
-        btn.classList.add("active");
-        btn.setAttribute("aria-selected", "true");
-        document.getElementById(btn.dataset.tab).classList.add("active");
+      [titleGroup, descriptionGroup, genreGroup, coverGroup, videoGroup].forEach(group => {
+        if (group) {
+          group.classList.remove("error");
+        }
       });
-    });
-
-    function formatTime(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = Math.floor(seconds % 60);
-      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
     }
 
-    function pauseAllMedia(currentContainerId) {
-      const allMedia = document.querySelectorAll('audio');
-      allMedia.forEach(media => {
-        if (media.closest(`#${currentContainerId}`)) return;
-        if (!media.paused) {
-          media.pause();
-          const container = media.closest('.post, .reel');
-          if (container) {
-            const playPauseBtn = container.querySelector('.play-pause-btn');
-            if (playPauseBtn) {
-              playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-              playPauseBtn.setAttribute("aria-label", "Play");
-            }
-            const player = container.querySelector('.media-player');
-            if (player) player.classList.remove("active");
+    // Cloudinary Upload Widget
+    const cloudinaryWidget = cloudinary.createUploadWidget(
+      {
+        cloudName: "your-cloud-name", // Replace with your Cloudinary cloud name
+        uploadPreset: "your-upload-preset", // Replace with your Cloudinary upload preset
+        sources: ["local"],
+        multiple: false,
+        resourceType: "auto",
+        clientAllowedFormats: ["jpg", "png", "mp4", "mov"],
+      },
+      (error, result) => {
+        if (!error && result && result.event === "success") {
+          if (result.info.resource_type === "image") {
+            coverUrl = result.info.secure_url;
+            coverUrlDisplay.textContent = "Cover image uploaded successfully!";
+            clearError();
+          } else if (result.info.resource_type === "video") {
+            videoUrl = result.info.secure_url;
+            videoUrlDisplay.textContent = "Video uploaded successfully!";
+            clearError();
           }
+        } else if (error) {
+          console.error("Cloudinary upload error:", error);
+          showError(errorMessage, "Failed to upload file. Please try again.");
         }
-      });
+      }
+    );
+
+    async function handleMovieUpload() {
+      const title = titleInput?.value.trim();
+      const description = descriptionInput?.value.trim();
+      const genre = genreSelect?.value;
+
+      clearError();
+
+      if (!title || !description || !genre || !coverUrl || !videoUrl) {
+        if (!title) showError(document.getElementById("title-error"), "Please enter a movie title.", titleGroup);
+        if (!description) showError(document.getElementById("description-error"), "Please enter a description.", descriptionGroup);
+        if (!genre) showError(document.getElementById("genre-error"), "Please select a genre.", genreGroup);
+        if (!coverUrl) showError(document.getElementById("cover-error"), "Please upload a cover image.", coverGroup);
+        if (!videoUrl) showError(document.getElementById("video-error"), "Please upload a movie video.", videoGroup);
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Uploading...";
+        await push(ref(db, "movies"), {
+          title,
+          description,
+          genre,
+          poster: coverUrl,
+          videoUrl,
+          createdAt: new Date().toISOString()
+        });
+        showSuccess("Movie uploaded successfully!");
+        // Reset form
+        titleInput.value = "";
+        descriptionInput.value = "";
+        genreSelect.value = "";
+        coverUrl = "";
+        videoUrl = "";
+        coverUrlDisplay.textContent = "";
+        videoUrlDisplay.textContent = "";
+      } catch (error) {
+        console.error("Error uploading movie:", error);
+        showError(errorMessage, "Failed to upload movie. Please try again.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Upload Movie";
+      }
     }
 
-    function initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, containerId) {
-      audio.addEventListener("loadedmetadata", () => {
-        seekBar.max = audio.duration;
-        timeDisplay.textContent = `0:00 / ${formatTime(audio.duration)}`;
-      });
-      audio.addEventListener("timeupdate", () => {
-        seekBar.value = audio.currentTime;
-        timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
-      });
-      audio.addEventListener("ended", () => {
-        if (!audio.loop) {
-          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-          playPauseBtn.setAttribute("aria-label", "Play");
-          audio.currentTime = 0;
-          seekBar.value = 0;
-          player.classList.remove("active");
-        }
-      });
-      playPauseBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        pauseAllMedia(containerId);
-        if (audio.paused) {
-          audio.play().catch(() => {});
-          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
-          playPauseBtn.setAttribute("aria-label", "Pause");
-          player.classList.add("active");
-        } else {
-          audio.pause();
-          playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-          playPauseBtn.setAttribute("aria-label", "Play");
-          player.classList.remove("active");
-        }
-      });
-      seekBar.addEventListener("input", () => {
-        audio.currentTime = seekBar.value;
-      });
-      return audio;
-    }
-
-    function setupCardInteraction(container, audio, playPauseBtn, player, containerId) {
-      container.addEventListener("click", (e) => {
-        if (e.target.closest('.post-actions button:not(.play-song-btn), .song-overlay, .song-display, .play-pause-btn, .post-header img, .post-header span')) return;
-        pauseAllMedia(containerId);
-        if (audio && audio.paused) {
-          audio.play().catch(() => {});
-          if (playPauseBtn) {
-            playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
-            playPauseBtn.setAttribute("aria-label", "Pause");
-            if (player) player.classList.add("active");
-          }
-        } else if (audio) {
-          audio.pause();
-          if (playPauseBtn) {
-            playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-            playPauseBtn.setAttribute("aria-label", "Play");
-            if (player) player.classList.remove("active");
-          }
-        }
-      });
-    }
-
-    function loadReels() {
-      const reelsContainer = document.getElementById("reels-container");
-      const reelsRef = query(ref(db, "reels"), orderByChild("timestamp"), limitToLast(10));
-      onValue(reelsRef, async (snapshot) => {
-        reelsContainer.innerHTML = "";
-        if (!snapshot.exists()) {
-          reelsContainer.innerHTML = '<div class="placeholder">No reels available.</div>';
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check authentication state and admin role
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "signup.html";
           return;
         }
-        const reels = [];
-        snapshot.forEach(child => {
-          reels.push({ id: child.key, ...child.val() });
-        });
-        reels.reverse();
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            const reel = entry.target;
-            const reelId = reel.id;
-            const audio = reel.querySelector("audio");
-            const playPauseBtn = reel.querySelector(".play-pause-btn");
-            const player = reel.querySelector(".media-player");
-            if (entry.isIntersecting && audio) {
-              pauseAllMedia(reelId);
-              if (audio.paused) {
-                audio.play().catch(() => {});
-                if (playPauseBtn) {
-                  playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
-                  playPauseBtn.setAttribute("aria-label", "Pause");
-                }
-              }
-            } else if (audio && !audio.paused) {
-              audio.pause();
-              if (playPauseBtn) {
-                playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-                playPauseBtn.setAttribute("aria-label", "Play");
-                if (player) player.classList.remove("active");
-              }
-            }
-          });
-        }, { threshold: 0.5 });
-        for (const reel of reels) {
-          const userRef = ref(db, `users/${reel.userId}`);
-          const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
-          const user = userSnapshot.val() || {};
-          const reelId = `reel-${reel.id}`;
-          const audioId = `audio-${reel.id}`;
-          const thumbnailUrl = reel.videoUrl.replace('/upload/', '/upload/w_150,h_250,c_fill,so_0/');
-          const reelElement = document.createElement("div");
-          reelElement.className = "reel";
-          reelElement.id = reelId;
-          let songHtml = "";
-          let playerHtml = "";
-          if (reel.song) {
-            songHtml = `<div class="song-overlay">${reel.song.title} by ${reel.song.artist}</div>`;
-            playerHtml = `
-              <div class="media-player" data-audio-instance="${audioId}">
-                <button type="button" class="play-pause-btn" aria-label="Play">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-                <input type="range" class="seek-bar" min="0" max="100" value="0" aria-label="Seek audio"/>
-                <span class="time-display" aria-live="polite">0:00 / 0:00</span>
-              </div>
-            `;
+        // Check if user is admin (assuming admin role is stored in Firebase database)
+        try {
+          const userRef = ref(db, `users/${user.uid}`);
+          const snapshot = await get(userRef);
+          const userData = snapshot.val();
+          if (!userData || userData.role !== "admin") {
+            window.location.href = "signup.html";
+            return;
           }
-          reelElement.innerHTML = `
-            <img src="${thumbnailUrl}" alt="Reel thumbnail">
-            ${songHtml}
-            <div class="username" data-user-id="${reel.userId}">${user.username || "Anonymous"}</div>
-            ${playerHtml}
-          `;
-          reelElement.addEventListener("click", (e) => {
-            if (!e.target.closest('.song-overlay, .play-pause-btn, .username')) {
-              location.href = `reel.html?id=${reel.id}`;
-            }
-          });
-          if (reel.song) {
-            const audio = new Audio(reel.song.audioUrl);
-            audio.id = audioId;
-            audio.loop = true;
-            reelElement.appendChild(audio);
-            const player = reelElement.querySelector(".media-player");
-            const playPauseBtn = player.querySelector(".play-pause-btn");
-            const seekBar = player.querySelector(".seek-bar");
-            const timeDisplay = reelElement.querySelector(".time-display");
-            reelElement.querySelector(".song-overlay").addEventListener("click", (e) => {
-              e.stopPropagation();
-              playPauseBtn.click();
-            });
-            initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, reelId);
-            setupCardInteraction(reelElement, audio, playPauseBtn, player, reelId);
-          }
-          reelElement.querySelectorAll(".username").forEach(el => {
-            el.addEventListener("click", (e) => {
-              e.stopPropagation();
-              location.href = `profile.html?id=${reel.userId}`;
-            });
-          });
-          reelsContainer.appendChild(reelElement);
-          observer.observe(reelElement);
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          window.location.href = "signup.html";
         }
-      }, {
-        onlyOnce: false
       });
-    }
 
-    function loadPosts() {
-      const postsContainer = document.getElementById("posts-container");
-      const postsRef = query(ref(db, "posts"), orderByChild("timestamp"), limitToLast(20));
-      onValue(postsRef, async (snapshot) => {
-        postsContainer.innerHTML = "";
-        if (!snapshot.exists()) {
-          postsContainer.innerHTML = '<div class="placeholder">No posts available.</div>';
-          return;
-        }
-        const posts = [];
-        snapshot.forEach(child => {
-          posts.push({ id: child.key, ...child.val() });
+      // Logout functionality
+      const logoutButton = document.getElementById("logout");
+      if (logoutButton) {
+        logoutButton.addEventListener("click", async e => {
+          e.preventDefault();
+          try {
+            await signOut(auth);
+            window.location.href = "signup.html";
+          } catch (error) {
+            console.error("Error signing out:", error);
+          }
         });
-        posts.reverse();
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            const post = entry.target;
-            const postId = post.id;
-            const audio = post.querySelector("audio");
-            const playPauseBtn = post.querySelector(".play-pause-btn");
-            const player = post.querySelector(".media-player");
-            if (entry.isIntersecting && audio) {
-              pauseAllMedia(postId);
-              if (audio.paused) {
-                audio.play().catch(() => {});
-                if (playPauseBtn) {
-                  playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
-                  playPauseBtn.setAttribute("aria-label", "Pause");
-                }
-              }
-            } else if (audio && !audio.paused) {
-              audio.pause();
-              if (playPauseBtn) {
-                playPauseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-                playPauseBtn.setAttribute("aria-label", "Play");
-                if (player) player.classList.remove("active");
-              }
-            }
-          });
-        }, { threshold: 0.5 });
-        for (const post of posts) {
-          const userRef = ref(db, `users/${post.userId}`);
-          const userSnapshot = await new Promise(resolve => onValue(userRef, resolve, { onlyOnce: true }));
-          const user = userSnapshot.val() || {};
-          const postId = `post-${post.id}`;
-          const audioId = `audio-${post.id}`;
-          const postElement = document.createElement("div");
-          postElement.className = "post";
-          postElement.id = postId;
-          let songHtml = "";
-          let playerHtml = "";
-          if (post.song) {
-            songHtml = `<div class="song-display">🎵 ${post.song.title} by ${post.song.artist}</div>`;
-            playerHtml = `
-              <div class="media-player" data-audio-instance="${audioId}">
-                <button type="button" class="play-pause-btn" aria-label="Play">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-                <input type="range" class="seek-bar" min="0" max="100" value="0" aria-label="Seek audio"/>
-                <span class="time-display" aria-live="polite">0:00 / 0:00</span>
-              </div>
-            `;
-          }
-          postElement.innerHTML = `
-            <div class="post-header">
-              <img src="${user.photoURL || 'https://via.placeholder.com/32'}" alt="Profile" data-user-id="${post.userId}">
-              <span class="font-semibold" data-user-id="${post.userId}">${user.username || "Anonymous"}</span>
-            </div>
-            <img class="post-image" src="${post.imageUrl}" alt="Post">
-            <div class="post-actions">
-              <button aria-label="Like post">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l8.94-8.94a5.5 5.5 0 000-7.78z"/>
-                </svg>
-              </button>
-              <button aria-label="Comment on post">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 8v9a2 2 0 01-2 2H7a2 2 0 01-2-2V8m0 0l7-4 7 4m-7 4h4"/>
-                </svg>
-              </button>
-              ${post.song ? `
-                <button class="play-song-btn" aria-label="Play song">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18V5l12-2v13"></path>
-                    <circle cx="6" cy="18" r="3"></circle>
-                    <circle cx="18" cy="16" r="3"></circle>
-                  </svg>
-                </button>
-              ` : ''}
-            </div>
-            <div class="post-caption">
-              <strong>${user.username || "Anonymous"}</strong> ${post.caption || ""}
-              ${songHtml}
-            </div>
-            ${playerHtml}
-          `;
-          if (post.song) {
-            const audio = new Audio(post.song.audioUrl);
-            audio.id = audioId;
-            audio.loop = true;
-            postElement.appendChild(audio);
-            const player = postElement.querySelector(".media-player");
-            const playPauseBtn = player.querySelector(".play-pause-btn");
-            const seekBar = player.querySelector(".seek-bar");
-            const timeDisplay = postElement.querySelector(".time-display");
-            postElement.querySelector(".play-song-btn").addEventListener("click", (e) => {
-              e.stopPropagation();
-              playPauseBtn.click();
-            });
-            postElement.querySelector(".song-display").addEventListener("click", (e) => {
-              e.stopPropagation();
-              playPauseBtn.click();
-            });
-            initializeMediaPlayer(audio, player, playPauseBtn, seekBar, timeDisplay, postId);
-            setupCardInteraction(postElement, audio, playPauseBtn, player, postId);
-            observer.observe(postElement);
-          }
-          postElement.querySelectorAll("[data-user-id]").forEach(el => {
-            el.addEventListener("click", (e) => {
-              e.stopPropagation();
-              location.href = `profile.html?id=${post.userId}`;
-            });
-          });
-          postsContainer.appendChild(postElement);
+      }
+
+      // Cloudinary upload buttons
+      if (coverUploadBtn) {
+        coverUploadBtn.addEventListener("click", () => {
+          cloudinaryWidget.open();
+        });
+      }
+      if (videoUploadBtn) {
+        videoUploadBtn.addEventListener("click", () => {
+          cloudinaryWidget.open();
+        });
+      }
+
+      // Form submission
+      if (submitBtn) {
+        submitBtn.addEventListener("click", handleMovieUpload);
+      }
+
+      // Clear errors on input
+      [titleInput, descriptionInput, genreSelect].forEach(input => {
+        if (input) {
+          input.addEventListener("input", clearError);
+          input.addEventListener("change", clearError);
         }
-      }, {
-        onlyOnce: false
       });
-    }
+    });
   </script>
 </body>
 </html>
