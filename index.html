@@ -242,7 +242,7 @@
     </div>
     <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-3 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
     <div class="chat-input-container fixed bottom-1 left-1 right-1 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center z-20">
-      <input type="text" id="chat-input" class="flex-1 bg-transparent p-2 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="1000">
+      <input type="text" id="chat-input" class="flex-1 bg-transparent p-2 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="800">
       <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Send message">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
@@ -256,14 +256,15 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Replace with your Gemini API key
+      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Provided API key
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
       nebulaAnimationFrame: null,
       speechEnabled: localStorage.getItem('speechEnabled') !== 'false',
       hasSpokenWelcome: false,
-      audioCache: new Map(), // Cache audio responses
-      currentAudio: null, // Track current audio
+      audioCache: new Map(),
+      currentAudio: null,
+      userHasInteracted: false,
     };
 
     const elements = {
@@ -279,6 +280,18 @@
       nebulaCanvas: document.getElementById('nebula-canvas'),
     };
 
+    // Track user interaction for autoplay
+    function setUserInteraction() {
+      state.userHasInteracted = true;
+      document.removeEventListener('click', setUserInteraction);
+      document.removeEventListener('keypress', setUserInteraction);
+      if (state.speechEnabled && !state.hasSpokenWelcome && !elements.welcomeContainer.classList.contains('hidden')) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
+    }
+    document.addEventListener('click', setUserInteraction);
+    document.addEventListener('keypress', setUserInteraction);
+
     function showToast(message, type = 'error') {
       const toast = document.createElement('div');
       toast.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg text-white text-sm ${type === 'error' ? 'bg-[var(--error)]' : 'bg-[var(--success)]'} slide-in`;
@@ -290,12 +303,20 @@
 
     async function speakText(text, isWelcome = false) {
       if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      if (!text || text.length > 800) { // Gemini TTS limit: ~800 characters[](https://cloud.google.com/text-to-speech/docs/gemini-tts)
+      if (!text || text.length > 800) {
         showToast('Text is empty or too long for speech', 'error');
         return;
       }
+      if (!state.userHasInteracted && isWelcome) {
+        showToast('Please interact with the page to enable audio', 'error');
+        return;
+      }
       if (state.currentAudio) {
-        state.currentAudio.pause();
+        if (state.currentAudio instanceof Audio) {
+          state.currentAudio.pause();
+        } else {
+          window.speechSynthesis.cancel();
+        }
         state.currentAudio = null;
       }
 
@@ -304,86 +325,128 @@
         const audio = state.audioCache.get(cacheKey);
         audio.currentTime = 0;
         state.currentAudio = audio;
-        audio.play().catch(() => showToast('Audio playback failed', 'error'));
+        audio.play().catch((e) => {
+          console.error('Cached audio playback error:', e);
+          showToast('Cached audio playback failed: ' + e.message, 'error');
+        });
         if (isWelcome) state.hasSpokenWelcome = true;
         return;
       }
 
-      if (!state.geminiApiKey || state.geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-        showToast('Gemini API key is missing', 'error');
-        // Fallback to Web Speech API
-        const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
-        utterance.rate = 0.9;
-        const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.lang === 'en-US') || voices[0];
-        utterance.voice = voice;
-        state.currentAudio = utterance;
-        window.speechSynthesis.speak(utterance);
-        if (isWelcome) state.hasSpokenWelcome = true;
-        return;
-      }
-
-      try {
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': state.geminiApiKey,
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: isWelcome ? "Say in a friendly, natural male voice: Hey, I'm Vynix AI... What's on your mind?" : `Say in a friendly, natural male voice: ${text}`
-              }]
-            }],
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: 'Kore' // Grok-like male voice[](https://ai.google.dev/gemini-api/docs/speech-generation)
+      const maxRetries = 2;
+      let attempt = 0;
+      while (attempt <= maxRetries) {
+        try {
+          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': state.geminiApiKey,
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: isWelcome ? "Say in a friendly, natural male voice: Hey, I'm Vynix AI... What's on your mind?" : `Say in a friendly, natural male voice: ${text}`
+                }]
+              }],
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
+                    }
                   }
                 }
               }
-            }
-          })
-        });
+            })
+          });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          if (!data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+            throw new Error('Invalid audio data from Gemini');
+          }
+
+          const audioData = data.candidates[0].content.parts[0].inlineData.data;
+          let arrayBuffer;
+          try {
+            arrayBuffer = Uint8Array.from(atob(audioData), c => c.charCodeAt(0)).buffer;
+          } catch (e) {
+            throw new Error('Failed to decode base64 audio: ' + e.message);
+          }
+
+          const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
+          const audio = new Audio(URL.createObjectURL(blob));
+          state.audioCache.set(cacheKey, audio);
+          state.currentAudio = audio;
+          audio.play().catch((e) => {
+            console.error('Gemini audio playback error:', e);
+            showToast('Gemini audio playback failed: ' + e.message, 'error');
+            speakWithWebSpeech(text, isWelcome);
+          });
+          if (isWelcome) state.hasSpokenWelcome = true;
+          return;
+        } catch (e) {
+          console.error(`Gemini TTS error (attempt ${attempt + 1}):`, e);
+          let errorMessage = 'Speech synthesis failed';
+          if (e.message.includes('401')) errorMessage = 'Invalid Gemini API key';
+          else if (e.message.includes('429')) errorMessage = 'Gemini API rate limit exceeded';
+          else if (e.message.includes('400')) errorMessage = 'Invalid Gemini request (check model/voice)';
+          else if (e.message.includes('422')) errorMessage = 'Invalid input text';
+          else if (e.message.includes('500')) errorMessage = 'Gemini server error, try again later';
+          else if (e.message.includes('Invalid audio data')) errorMessage = 'Invalid audio data from Gemini';
+          else if (e.message.includes('Failed to decode')) errorMessage = 'Failed to decode audio data';
+
+          if (attempt < maxRetries && (e.message.includes('429') || e.message.includes('500'))) {
+            attempt++;
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+
+          showToast(errorMessage, 'error');
+          await speakWithWebSpeech(text, isWelcome);
+          return;
         }
+      }
+    }
 
-        const data = await response.json();
-        const audioData = data.candidates[0].content.parts[0].inlineData.data;
-        const arrayBuffer = Uint8Array.from(atob(audioData), c => c.charCodeAt(0)).buffer;
-        const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
-        const audio = new Audio(URL.createObjectURL(blob));
-        state.audioCache.set(cacheKey, audio);
-        state.currentAudio = audio;
-        audio.play().catch((e) => {
-          console.error('Audio playback error:', e);
-          showToast('Audio playback failed', 'error');
-        });
-        if (isWelcome) state.hasSpokenWelcome = true;
-      } catch (e) {
-        console.error('Gemini TTS error:', e);
-        let errorMessage = 'Speech synthesis failed';
-        if (e.message.includes('401')) errorMessage = 'Invalid Gemini API key';
-        else if (e.message.includes('429')) errorMessage = 'Gemini API rate limit exceeded';
-        else if (e.message.includes('400')) errorMessage = 'Invalid Gemini request (check model/voice)';
-        else if (e.message.includes('422')) errorMessage = 'Invalid input text';
-        else if (e.message.includes('500')) errorMessage = 'Gemini server error, try again later';
-        showToast(errorMessage, 'error');
-        // Fallback to Web Speech API
+    async function speakWithWebSpeech(text, isWelcome) {
+      return new Promise((resolve) => {
         const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
         utterance.rate = 0.9;
-        const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.lang === 'en-US') || voices[0];
-        utterance.voice = voice;
-        state.currentAudio = utterance;
-        window.speechSynthesis.speak(utterance);
-        if (isWelcome) state.hasSpokenWelcome = true;
-      }
+
+        const setVoice = () => {
+          const voices = window.speechSynthesis.getVoices();
+          const voice = voices.find(v => v.lang === 'en-US') || voices[0];
+          utterance.voice = voice;
+          state.currentAudio = utterance;
+          utterance.onend = () => {
+            state.currentAudio = null;
+            if (isWelcome) state.hasSpokenWelcome = true;
+            resolve();
+          };
+          utterance.onerror = (e) => {
+            console.error('Web Speech API error:', e);
+            showToast('Web Speech API failed: ' + e.error, 'error');
+            state.currentAudio = null;
+            resolve();
+          };
+          window.speechSynthesis.speak(utterance);
+        };
+
+        if (window.speechSynthesis.getVoices().length === 0) {
+          window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.onvoiceschanged = null;
+            setVoice();
+          };
+        } else {
+          setVoice();
+        }
+      });
     }
 
     function startNebulaAnimation() {
@@ -446,7 +509,7 @@
       elements.speechToggle.querySelector('.speech-on').classList.toggle('hidden', !state.speechEnabled);
       elements.speechToggle.querySelector('.speech-off').classList.toggle('hidden', state.speechEnabled);
       showToast(state.speechEnabled ? 'Speech enabled' : 'Speech disabled', 'success');
-      if (state.speechEnabled && !elements.welcomeContainer.classList.contains('hidden') && !state.hasSpokenWelcome) {
+      if (state.speechEnabled && !elements.welcomeContainer.classList.contains('hidden') && !state.hasSpokenWelcome && state.userHasInteracted) {
         speakText("Hey, I'm Vynix AI... What's on your mind?", true);
       }
     });
@@ -460,11 +523,11 @@
     function clearChat() {
       state.messages = [];
       state.hasSpokenWelcome = false;
-      state.audioCache.clear(); // Clear audio cache
+      state.audioCache.clear();
       elements.chatMessages.innerHTML = '';
       elements.welcomeContainer.classList.remove('hidden');
       startNebulaAnimation();
-      if (state.speechEnabled) {
+      if (state.speechEnabled && state.userHasInteracted) {
         speakText("Hey, I'm Vynix AI... What's on your mind?", true);
       }
     }
@@ -494,7 +557,7 @@
       const header = document.createElement('div');
       header.className = 'message-header font-semibold text-xs';
       header.textContent = msg.displayName;
-      const text = document.createElement('p');
+      const text = document.createElement('div');
       text.className = 'text-xs';
       text.innerHTML = marked.parse(msg.text);
       const time = document.createElement('div');
@@ -530,7 +593,7 @@
       } else {
         const tempMsg = {...msg, text: ''};
         const el = renderMessage(tempMsg, msg.id);
-        const p = el.querySelector('p');
+        const p = el.querySelector('.text-xs');
         const indicator = document.createElement('span');
         indicator.className = 'typing-indicator inline-flex gap-1 ml-1';
         for (let i = 0; i < 3; i++) {
@@ -612,22 +675,7 @@
     elements.speechToggle.querySelector('.speech-on').classList.toggle('hidden', !state.speechEnabled);
     elements.speechToggle.querySelector('.speech-off').classList.toggle('hidden', state.speechEnabled);
     startNebulaAnimation();
-    if (state.speechEnabled) {
-      speakText("Hey, I'm Vynix AI... What's on your mind?", true);
-    }
-    elements.chatInput.focus();
-
-    // Stop audio on window blur
-    window.addEventListener('blur', () => {
-      if (state.currentAudio) {
-        if (state.currentAudio instanceof Audio) {
-          state.currentAudio.pause();
-        } else {
-          window.speechSynthesis.cancel();
-        }
-        state.currentAudio = null;
-      }
-    });
+    // Defer welcome audio until user interaction
   </script>
 </body>
 </html>
