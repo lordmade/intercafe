@@ -94,6 +94,56 @@
       padding: 0.75rem;
       border-radius: 1rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .message-content {
+      max-width: 100%;
+      box-sizing: border-box;
+      border-radius: 0.75rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      overflow: hidden;
+    }
+
+    .message-content .scrollable-content {
+      max-width: 100%;
+      max-height: 400px;
+      overflow-x: auto;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      padding: 0.5rem;
+      box-sizing: border-box;
+    }
+
+    .message-content .scrollable-content pre,
+    .message-content .scrollable-content code {
+      margin: 0;
+      white-space: pre-wrap;
+      font-size: 0.875rem;
+    }
+
+    .message-content .scrollable-content::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .message-content .scrollable-content::-webkit-scrollbar-track {
+      background: var(--highlight);
+      border-radius: 4px;
+    }
+
+    .message-content .scrollable-content::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 4px;
+    }
+
+    .message-content .scrollable-content::-webkit-scrollbar-thumb:hover {
+      background: var(--focus);
     }
 
     .message.user {
@@ -102,10 +152,20 @@
       color: var(--white);
     }
 
+    .message.user .scrollable-content {
+      background: transparent;
+      color: var(--white);
+    }
+
     .message.ai {
       align-self: flex-start;
       background: var(--card-bg);
       border: 1px solid var(--border);
+    }
+
+    .message.ai .scrollable-content {
+      background: var(--card-bg);
+      color: var(--text-primary);
     }
 
     .typing-dot {
@@ -164,10 +224,29 @@
     .toggle-container {
       position: fixed;
       top: 0.5rem;
-      right: 0.5rem;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 20;
       display: flex;
       gap: 0.5rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .language-select {
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.3s ease;
+    }
+
+    .language-select:focus {
+      border-color: var(--focus);
+      box-shadow: 0 0 0 2px var(--glow);
     }
 
     .chat-messages {
@@ -259,18 +338,21 @@
       }
       .toggle-container {
         top: 0.25rem;
-        right: 0.25rem;
       }
       .welcome-message {
         font-size: 1rem;
       }
-      .message-content {
-        padding: 0.5rem;
-      }
       .message {
         max-width: 90%;
+        padding: 0.5rem;
       }
-      input, button, textarea {
+      .message-content .scrollable-content {
+        max-height: 300px;
+      }
+      .language-select {
+        font-size: 0.75rem;
+      }
+      input, button, textarea, select {
         font-size: 0.875rem;
       }
       .modal-content {
@@ -282,6 +364,19 @@
 <body data-theme="dark">
   <main class="chat-container p-4 flex flex-col h-[calc(100vh-6rem)] max-w-3xl mx-auto" id="chat-container">
     <div class="toggle-container">
+      <select id="language-select" class="language-select" aria-label="Select language">
+        <option value="en">English</option>
+        <option value="af">Afrikaans</option>
+        <option value="nr">isiNdebele</option>
+        <option value="xh">isiXhosa</option>
+        <option value="zu">isiZulu</option>
+        <option value="nso">Sepedi</option>
+        <option value="st">Sesotho</option>
+        <option value="tn">Setswana</option>
+        <option value="ss">siSwati</option>
+        <option value="ve">Tshivenda</option>
+        <option value="ts">Xitsonga</option>
+      </select>
       <button id="theme-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle theme">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       </button>
@@ -320,7 +415,8 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Provided API key - WARNING: For demo only; use securely in production
+      language: localStorage.getItem('language') || 'en',
+      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw',
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
       nebulaAnimationFrame: null,
@@ -332,6 +428,7 @@
       sendButton: document.getElementById('send-button'),
       newChatButton: document.getElementById('new-chat-button'),
       themeToggle: document.getElementById('theme-toggle'),
+      languageSelect: document.getElementById('language-select'),
       welcomeContainer: document.getElementById('welcome-container'),
       nebulaContainer: document.getElementById('nebula-container'),
       nebulaCanvas: document.getElementById('nebula-canvas'),
@@ -439,6 +536,12 @@
       localStorage.setItem('theme', state.theme);
     });
 
+    elements.languageSelect.addEventListener('change', () => {
+      state.language = elements.languageSelect.value;
+      localStorage.setItem('language', state.language);
+      showToast(`Language set to ${elements.languageSelect.options[elements.languageSelect.selectedIndex].text}`, 'success');
+    });
+
     function clearChat() {
       state.messages = [];
       elements.chatMessages.innerHTML = '';
@@ -468,16 +571,20 @@
         avatar.classList.add('bg-gradient-to-r', 'from-[var(--primary)]', 'to-[var(--accent)]', 'text-white', 'flex', 'items-center', 'justify-center', 'font-bold');
       }
       const body = document.createElement('div');
+      body.className = 'flex-1';
       const header = document.createElement('div');
       header.className = 'message-header font-semibold text-xs';
       header.textContent = msg.displayName;
+      const scrollable = document.createElement('div');
+      scrollable.className = 'scrollable-content';
       const text = document.createElement('div');
       text.className = 'text-xs';
       text.innerHTML = marked.parse(msg.text);
+      scrollable.appendChild(text);
       const time = document.createElement('div');
       time.className = 'message-timestamp text-[0.65rem] text-[var(--text-secondary)] mt-1';
       time.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-      body.append(header, text, time);
+      body.append(header, scrollable, time);
       content.append(avatar, body);
       div.append(content);
       const actions = document.createElement('div');
@@ -526,7 +633,7 @@
       } else {
         const tempMsg = {...msg, text: ''};
         const el = renderMessage(tempMsg, msg.id);
-        const p = el.querySelector('.text-xs');
+        const p = el.querySelector('.scrollable-content .text-xs');
         const indicator = document.createElement('span');
         indicator.className = 'typing-indicator inline-flex gap-1 ml-1';
         for (let i = 0; i < 3; i++) {
@@ -559,10 +666,25 @@
 
     async function getAIResponse(question) {
       try {
+        const languageNames = {
+          en: 'English',
+          af: 'Afrikaans',
+          nr: 'isiNdebele',
+          xh: 'isiXhosa',
+          zu: 'isiZulu',
+          nso: 'Sepedi',
+          st: 'Sesotho',
+          tn: 'Setswana',
+          ss: 'siSwati',
+          ve: 'Tshivenda',
+          ts: 'Xitsonga'
+        };
+        const lang = languageNames[state.language] || 'English';
+        const prompt = `You are Vynix AI, a helpful assistant. Please respond in ${lang}. Query: ${question}`;
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({contents: [{parts: [{text: `You are Vynix AI, a helpful assistant. Query: ${question}`}]}]})
+          body: JSON.stringify({contents: [{parts: [{text: prompt}]}]})
         });
         if (!res.ok) throw new Error(res.statusText);
         const data = await res.json();
@@ -601,6 +723,7 @@
     });
 
     document.body.dataset.theme = state.theme;
+    elements.languageSelect.value = state.language;
     startNebulaAnimation();
   </script>
 </body>
