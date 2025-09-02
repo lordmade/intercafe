@@ -6,18 +6,19 @@
   <title>Vynix AI Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+  <script src="https://unpkg.com/@groq/sdk@0.5.0/dist/index.bundle.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #1E3A8A; /* Blue */
-      --accent: #A855F7; /* Neon purple */
-      --bg: #0A0A0A; /* Dark background */
-      --card-bg: #1A1A1A; /* Chat bubble */
+      --primary: #1E3A8A;
+      --accent: #A855F7;
+      --bg: #0A0A0A;
+      --card-bg: #1A1A1A;
       --text-primary: #F3F4F6;
       --text-secondary: #A3A3A3;
       --border: #2D2D2D;
       --highlight: #2A2A2A;
-      --focus: #C084FC; /* Neon focus */
+      --focus: #C084FC;
       --white: #FFFFFF;
       --error: #EF4444;
       --success: #10B981;
@@ -45,7 +46,7 @@
       min-height: 100vh;
       margin: 0;
       transition: background 0.3s ease;
-      touch-action: manipulation; /* Prevent double-tap zoom */
+      touch-action: manipulation;
     }
 
     @media (prefers-reduced-motion: no-preference) {
@@ -130,7 +131,7 @@
 
     .nebula-container {
       position: absolute;
-      top: -80px; /* Above welcome text */
+      top: -80px;
       left: 50%;
       transform: translateX(-50%);
       width: 200px;
@@ -165,12 +166,12 @@
     }
 
     .chat-messages {
-      -ms-overflow-style: none; /* IE and Edge */
-      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
 
     .chat-messages::-webkit-scrollbar {
-      display: none; /* Chrome, Safari */
+      display: none;
     }
 
     .chat-input-container {
@@ -256,12 +257,15 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      apiKey: 'YOUR_GEMINI_API_KEY_HERE',
+      groqApiKey: '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', // Replace with your Groq API key
+      geminiApiKey: 'YOUR_GEMINI_API_KEY_HERE', // Replace with your Gemini API key
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
       nebulaAnimationFrame: null,
       speechEnabled: localStorage.getItem('speechEnabled') !== 'false',
       hasSpokenWelcome: false,
+      audioCache: new Map(), // Cache audio responses
+      currentAudio: null, // Track current audio
     };
 
     const elements = {
@@ -286,19 +290,44 @@
       setTimeout(() => toast.remove(), 3000);
     }
 
-    function speakText(text, isWelcome = false) {
-      if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
-      utterance.lang = 'en-US';
-      const voices = window.speechSynthesis.getVoices();
-      const naturalVoice = voices.find(v => v.name.includes('Google') && v.lang === 'en-US') || voices.find(v => v.lang === 'en-US');
-      if (naturalVoice) utterance.voice = naturalVoice;
-      utterance.volume = 1;
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      if (isWelcome) state.hasSpokenWelcome = true;
-      window.speechSynthesis.speak(utterance);
+    async function speakText(text, isWelcome = false) {
+      if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (state.currentAudio) {
+        state.currentAudio.pause();
+        state.currentAudio = null;
+      }
+
+      const cacheKey = `${text}_${isWelcome}`;
+      if (state.audioCache.has(cacheKey)) {
+        const audio = state.audioCache.get(cacheKey);
+        audio.currentTime = 0;
+        state.currentAudio = audio;
+        audio.play().catch(() => showToast('Audio playback failed', 'error'));
+        if (isWelcome) state.hasSpokenWelcome = true;
+        return;
+      }
+
+      try {
+        const client = new Groq({ apiKey: state.groqApiKey });
+        const response = await client.audio.speech.create({
+          model: 'playai-tts',
+          voice: 'Fritz-PlayAI', // Grok-like natural male voice
+          input: isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text,
+          response_format: 'mp3',
+          speed: 0.9, // Natural pace
+        });
+
+        const arrayBuffer = await response.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
+        const audio = new Audio(URL.createObjectURL(blob));
+        state.audioCache.set(cacheKey, audio);
+        state.currentAudio = audio;
+        audio.play().catch(() => showToast('Audio playback failed', 'error'));
+        if (isWelcome) state.hasSpokenWelcome = true;
+      } catch (e) {
+        console.error('Groq TTS failed:', e);
+        showToast('Speech synthesis failed', 'error');
+      }
     }
 
     function startNebulaAnimation() {
@@ -310,7 +339,7 @@
       const ctx = elements.nebulaCanvas.getContext('2d');
       elements.nebulaCanvas.width = 200;
       elements.nebulaCanvas.height = 200;
-      const particleCount = window.innerWidth <= 640 ? 10 : 20; // Fewer particles on mobile
+      const particleCount = window.innerWidth <= 640 ? 10 : 20;
       const particles = Array.from({length: particleCount}, () => ({
         x: 100,
         y: 100,
@@ -344,7 +373,10 @@
     function stopNebulaAnimation() {
       cancelAnimationFrame(state.nebulaAnimationFrame);
       elements.nebulaContainer.classList.add('hidden');
-      window.speechSynthesis.cancel();
+      if (state.currentAudio) {
+        state.currentAudio.pause();
+        state.currentAudio = null;
+      }
     }
 
     elements.speechToggle.addEventListener('click', () => {
@@ -368,6 +400,7 @@
     function clearChat() {
       state.messages = [];
       state.hasSpokenWelcome = false;
+      state.audioCache.clear(); // Clear audio cache
       elements.chatMessages.innerHTML = '';
       elements.welcomeContainer.classList.remove('hidden');
       startNebulaAnimation();
@@ -473,7 +506,7 @@
 
     async function getAIResponse(question) {
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiApiKey}`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({contents: [{parts: [{text: `You are Vynix AI, a helpful assistant. Query: ${question}`}]}]})
@@ -524,11 +557,13 @@
     }
     elements.chatInput.focus();
 
-    window.speechSynthesis.onvoiceschanged = () => {
-      if (state.speechEnabled && !state.hasSpokenWelcome && !elements.welcomeContainer.classList.contains('hidden')) {
-        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+    // Stop audio on window blur
+    window.addEventListener('blur', () => {
+      if (state.currentAudio) {
+        state.currentAudio.pause();
+        state.currentAudio = null;
       }
-    };
+    });
   </script>
 </body>
 </html>
