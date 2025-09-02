@@ -162,6 +162,12 @@
       display: flex;
       gap: 1rem;
     }
+
+    .chat-input-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
   </style>
 </head>
 <body data-theme="dark">
@@ -184,6 +190,9 @@
     </div>
     <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-4 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
     <div class="chat-input-container fixed bottom-6 left-4 right-4 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center p-2 z-20">
+      <button id="new-chat-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-3 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition pulse-glow" aria-label="Start new chat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v4m-2 2h4"/></svg>
+      </button>
       <input type="text" id="chat-input" class="flex-1 bg-transparent p-3 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="1000">
       <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-3 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Send message">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -207,6 +216,7 @@
       chatMessages: document.getElementById('chat-messages'),
       chatInput: document.getElementById('chat-input'),
       sendButton: document.getElementById('send-button'),
+      newChatButton: document.getElementById('new-chat-button'),
       themeToggle: document.getElementById('theme-toggle'),
       speechToggle: document.getElementById('speech-toggle'),
       welcomeContainer: document.getElementById('welcome-container'),
@@ -302,6 +312,19 @@
       localStorage.setItem('theme', state.theme);
     });
 
+    function clearChat() {
+      state.messages = [];
+      state.hasSpokenWelcome = false;
+      elements.chatMessages.innerHTML = '';
+      elements.welcomeContainer.classList.remove('hidden');
+      startNebulaAnimation();
+      if (state.speechEnabled) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
+    }
+
+    elements.newChatButton.addEventListener('click', clearChat);
+
     function renderMessage(msg, id) {
       const div = document.createElement('div');
       div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
@@ -386,17 +409,6 @@
           }
         };
         type();
-      }
-    }
-
-    function clearChat() {
-      state.messages = [];
-      state.hasSpokenWelcome = false;
-      elements.chatMessages.innerHTML = '';
-      elements.welcomeContainer.classList.remove('hidden');
-      startNebulaAnimation();
-      if (state.speechEnabled) {
-        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
       }
     }
 
