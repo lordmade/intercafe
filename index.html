@@ -1,168 +1,606 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BanterBox - Privacy Policy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vynix AI Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .gradient-bg { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
-    .tab-active { border-bottom: 2px solid #dc2743; }
-    .fab { transition: transform 0.2s; }
-    .fab:hover { transform: scale(1.1); }
+    :root {
+      --primary: #1E3A8A; /* Blue */
+      --accent: #A855F7; /* Neon purple */
+      --bg: #0A0A0A; /* Dark background */
+      --card-bg: #1A1A1A; /* Chat bubble */
+      --text-primary: #F3F4F6;
+      --text-secondary: #A3A3A3;
+      --border: #2D2D2D;
+      --highlight: #2A2A2A;
+      --focus: #C084FC; /* Neon focus */
+      --white: #FFFFFF;
+      --error: #EF4444;
+      --success: #10B981;
+      --glow: rgba(168, 85, 247, 0.5);
+      --nebula-blue: rgba(30, 58, 138, 0.5);
+      --nebula-purple: rgba(168, 85, 247, 0.3);
+    }
+
+    [data-theme="light"] {
+      --bg: #F9FAFB;
+      --card-bg: #FFFFFF;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --border: #D1D5DB;
+      --highlight: #E5E7EB;
+      --glow: rgba(107, 33, 168, 0.3);
+      --nebula-blue: rgba(59, 130, 246, 0.3);
+      --nebula-purple: rgba(107, 33, 168, 0.2);
+    }
+
+    body {
+      font-family: 'Poppins', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      margin: 0;
+      transition: background 0.3s ease;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .transition { transition: all 0.3s ease; }
+      .slide-in { animation: slideIn 0.3s ease; }
+      .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+      .nebula { animation: nebulaSwirl 6s infinite ease-in-out; }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--glow); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px var(--glow); }
+    }
+
+    @keyframes nebulaSwirl {
+      0% {
+        transform: scale(1) rotate(0deg);
+        filter: blur(10px);
+        opacity: 0.8;
+      }
+      50% {
+        transform: scale(1.2) rotate(180deg);
+        filter: blur(5px);
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1) rotate(360deg);
+        filter: blur(10px);
+        opacity: 0.8;
+      }
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 0.75rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: var(--white);
+    }
+
+    .message.ai {
+      align-self: flex-start;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: typing 1.2s infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 100% { opacity: 0.3; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-3px); }
+    }
+
+    .fab {
+      box-shadow: 0 0 10px var(--glow);
+    }
+
+    .welcome-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 10;
+      transition: opacity 0.3s ease;
+    }
+
+    .nebula-container {
+      position: absolute;
+      top: -80px; /* Above welcome text */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 200px;
+      pointer-events: none;
+      z-index: 9;
+    }
+
+    .nebula {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, var(--nebula-blue) 20%, var(--nebula-purple) 60%, transparent);
+      border-radius: 50%;
+    }
+
+    canvas.nebula-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.5;
+    }
+
+    .speech-toggle-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 20;
+    }
   </style>
 </head>
-<body class="bg-gray-100 text-gray-900">
-  <!-- Navigation Bar -->
-  <nav class="gradient-bg text-white fixed top-0 left-0 right-0 z-10 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <h1 class="text-xl font-bold">BanterBox</h1>
-        </div>
-        <div class="flex space-x-4 items-center">
-         
-        </div>
-      </div>
+<body data-theme="dark">
+  <main class="chat-container p-4 flex flex-col h-[calc(100vh-8rem)] max-w-3xl mx-auto" id="chat-container">
+    <div class="speech-toggle-container">
+      <button id="speech-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)]" aria-label="Toggle speech" aria-pressed="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="speech-on"><path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="speech-off hidden"><path d="M11 5L6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"/></svg>
+      </button>
     </div>
-  </nav>
-
-  <!-- Main Content -->
-  <main class="max-w-3xl mx-auto mt-20 px-4 sm:px-6 lg:px-8 py-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-6">Privacy Policy</h1>
-    <section class="bg-white p-6 rounded-lg shadow-md">
-      <p class="text-sm text-gray-600 mb-4"><strong>Last Updated: July 15, 2025</strong></p>
-      <p class="text-base text-gray-700 mb-4">
-        BanterBox ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our social media and messaging platform ("BanterBox" or the "Service"). By using BanterBox, you agree to the practices described in this policy. If you do not agree, please do not use the Service.
-      </p>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">1. Information We Collect</h2>
-      <p class="text-base text-gray-700 mb-4">We collect information to provide and improve the Service. The types of information we collect include:</p>
-
-      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">a. Personal Information</h3>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Account Information</strong>: When you sign up, we collect your email address, username, and optional profile details (e.g., bio, profile picture) via Firebase Authentication.</li>
-        <li><strong>User Content</strong>: Posts, stories, messages, comments, and media (images, voice notes) you upload are stored via Firebase Realtime Database and Cloudinary.</li>
-        <li><strong>Presence Data</strong>: We track your online/offline status and "Last seen" timestamps to enable real-time interactions.</li>
-        <li><strong>Notifications</strong>: Data related to likes, comments, follows, and verification status is stored to provide real-time notifications.</li>
-      </ul>
-
-      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">b. Automatically Collected Information</h3>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Usage Data</strong>: We collect information about your interactions with BanterBox, such as pages visited, features used (e.g., likes, comments, searches), and timestamps.</li>
-        <li><strong>Device Information</strong>: We may collect device type, browser type, IP address, and operating system to optimize the Service for your device.</li>
-        <li><strong>WebRTC Data</strong>: For video calls, we process temporary connection data (e.g., ICE candidates) via WebRTC and STUN servers to establish peer-to-peer communication.</li>
-      </ul>
-
-      <h3 class="text-lg font-medium text-gray-800 mt-4 mb-2">c. Cookies and Similar Technologies</h3>
-      <p class="text-base text-gray-700 mb-4">
-        We use cookies to maintain your session and preferences (e.g., chat wallpaper settings). Essential cookies are required for the Service to function, and no optional tracking cookies are used.
-      </p>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">2. How We Use Your Information</h2>
-      <p class="text-base text-gray-700 mb-4">We use your information to:</p>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Provide the Service</strong>: Authenticate users, display posts and stories, enable messaging and video calls, and deliver notifications.</li>
-        <li><strong>Personalize Your Experience</strong>: Show relevant content (e.g., posts from followed users) and customize features like chat wallpapers.</li>
-        <li><strong>Improve the Service</strong>: Analyze usage patterns to enhance performance, fix bugs, and optimize responsiveness.</li>
-        <li><strong>Ensure Security</strong>: Detect and prevent unauthorized access or abuse (e.g., oversized uploads or invalid media formats).</li>
-        <li><strong>Communicate</strong>: Send service-related updates, such as verification badge awards or notification alerts.</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">3. How We Share Your Information</h2>
-      <p class="text-base text-gray-700 mb-4">We do not sell your personal information. We may share information as follows:</p>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>With Other Users</strong>: Your username, profile picture, posts, stories, and comments are visible to other users based on your actions (e.g., public posts or private messages to friends).</li>
-        <li><strong>Service Providers</strong>: We use third-party services to operate BanterBox:
-          <ul class="list-circle pl-6">
-            <li><strong>Firebase (Google)</strong>: Handles authentication, real-time database, and hosting.</li>
-            <li><strong>Cloudinary</strong>: Stores and serves media uploads (images, voice notes, profile pictures).</li>
-            <li><strong>WebRTC STUN Servers</strong>: Facilitate video call connectivity.</li>
-          </ul>
-          These providers process data under strict confidentiality agreements.
-        </li>
-        <li><strong>Legal Requirements</strong>: We may disclose information if required by law, such as in response to a court order or to protect the safety of users or the public.</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">4. Data Storage and Security</h2>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Storage</strong>: Personal information and user content are stored in Firebase Realtime Database (United States) and Cloudinary (global servers). Presence data and temporary WebRTC data are not persistently stored.</li>
-        <li><strong>Security Measures</strong>:
-          <ul class="list-circle pl-6">
-            <li>Firebase Authentication ensures secure access.</li>
-            <li>HTTPS encryption protects data in transit.</li>
-            <li>Media uploads are validated for size (max 10MB for chat media, 5MB for profile pictures) and format (JPEG, PNG, GIF).</li>
-            <li>Access to user data is restricted to authenticated users via Firebase security rules.</li>
-          </ul>
-        </li>
-        <li><strong>Retention</strong>: We retain your data as long as your account is active. Deleted posts, messages, or accounts are removed from our systems, though some data (e.g., "This message was deleted" placeholders) may persist for continuity.</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">5. Your Choices and Rights</h2>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Access and Update</strong>: You can view and edit your profile (username, bio, profile picture) via the Profile tab’s Edit Profile modal.</li>
-        <li><strong>Delete Content</strong>: You can delete your posts or messages, which are removed from Firebase and Cloudinary (where applicable).</li>
-        <li><strong>Account Deletion</strong>: Contact us at <a href="mailto:support@banterbox.app" class="text-blue-600 hover:underline">support@banterbox.app</a> to request account deletion. We will remove your personal information within 30 days, subject to legal obligations.</li>
-        <li><strong>Notifications</strong>: You can manage notification preferences in the Settings section.</li>
-        <li><strong>Cookies</strong>: You can disable cookies via your browser settings, but this may affect core functionality (e.g., session persistence).</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">6. Accessibility and Children’s Privacy</h2>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Accessibility</strong>: BanterBox includes ARIA labels and semantic HTML to support screen readers, ensuring accessibility for all users.</li>
-        <li><strong>Children’s Privacy</strong>: BanterBox is not intended for users under 13. We do not knowingly collect data from children under 13. If we learn such data has been collected, we will delete it promptly.</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">7. Third-Party Services</h2>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Firebase</strong>: Authentication and database services are provided by Google Firebase. See their <a href="https://firebase.google.com/support/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</li>
-        <li><strong>Cloudinary</strong>: Media storage is handled by Cloudinary. See their <a href="https://cloudinary.com/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</li>
-        <li><strong>WebRTC</strong>: Video calls use open-source WebRTC with public STUN servers, which do not store personal data.</li>
-      </ul>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">8. International Data Transfers</h2>
-      <p class="text-base text-gray-700 mb-4">
-        BanterBox operates globally, and your data may be processed in the United States or other regions where Firebase and Cloudinary servers are located. We ensure compliance with applicable data protection laws for cross-border transfers.
-      </p>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">9. Changes to This Privacy Policy</h2>
-      <p class="text-base text-gray-700 mb-4">
-        We may update this policy to reflect changes in our practices or legal requirements. We will notify you via the Service or email (if provided) of significant changes. The updated policy will be effective as of the "Last Updated" date above.
-      </p>
-
-      <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-4">10. Contact Us</h2>
-      <p class="text-base text-gray-700 mb-4">
-        For questions, concerns, or requests regarding your privacy, contact us at:
-      </p>
-      <ul class="list-disc pl-6 text-base text-gray-700 mb-4">
-        <li><strong>Email</strong>: <a href="mailto:support@banterbox.app" class="text-blue-600 hover:underline">support@banterbox.app</a></li>
-        <li><strong>Address</strong>: BanterBox, 0601, Mokopane, SOUTH AFRICA</li>
-      </ul>
-      <p class="text-base text-gray-700">
-        By using BanterBox, you acknowledge that you have read and understood this Privacy Policy. Thank you for trusting us with your information.
-      </p>
-    </section>
+    <div class="welcome-container" id="welcome-container">
+      <div id="nebula-container" class="nebula-container">
+        <div class="nebula"></div>
+        <canvas id="nebula-canvas" class="nebula-canvas"></canvas>
+      </div>
+      <div class="welcome-message text-xl font-semibold text-center" id="welcome-message">Hey! I'm Vynix AI. What's on your mind?</div>
+      <button id="replay-button" class="mt-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white px-4 py-2 rounded-lg hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Replay welcome message">Replay</button>
+    </div>
+    <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-4 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
+    <div class="chat-input-container fixed bottom-6 left-4 right-4 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center p-2 z-20">
+      <input type="text" id="chat-input" class="flex-1 bg-transparent p-3 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="1000">
+      <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-3 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Send message">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
   </main>
 
-  <!-- Floating Action Button (FAB) -->
-  <a href="/upload.html" class="fab fixed bottom-6 right-6 bg-gradient-to-r from-[#f09433] to-[#bc1888] text-white p-4 rounded-full shadow-lg" aria-label="Upload new post or story">
-    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-    </svg>
-  </a>
+  <aside id="conversation-sidebar" class="fixed top-0 left-0 h-full w-16 bg-[var(--card-bg)] border-r border-[var(--border)] z-20 flex flex-col overflow-hidden md:hover:w-72 transition-w duration-300" role="complementary" aria-label="Conversations">
+    <div class="user-avatar flex items-center p-4 border-b border-[var(--border)] gap-3">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-bold text-lg" id="user-avatar-img">U</div>
+      <span class="user-avatar-name hidden md:hover:block font-medium truncate" id="user-avatar-name">User</span>
+    </div>
+    <div class="sidebar-header flex justify-between items-center p-4 border-b border-[var(--border)] hidden md:hover:flex">
+      <h2 class="text-lg font-semibold">Chats</h2>
+      <button id="theme-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)]" aria-label="Toggle theme">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
+    <div id="conversation-list" class="flex-1 overflow-y-auto p-4"></div>
+    <button id="new-conversation-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-3 m-4 rounded-lg font-medium flex items-center justify-center gap-2 hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="New conversation">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v4m-2 2h4"/></svg>
+      <span class="hidden md:hover:inline">New Chat</span>
+    </button>
+  </aside>
+
+  <button id="new-conversation-fab" class="fab fixed bottom-20 right-1/2 translate-x-1/2 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center pulse-glow z-40 md:hidden" aria-label="Open conversations">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v4m-2 2h4"/></svg>
+  </button>
+
+  <div id="delete-dialog" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
+    <div class="bg-[var(--card-bg)] p-6 rounded-xl shadow-xl max-w-sm w-full text-center">
+      <h3 id="delete-dialog-title" class="text-lg font-semibold mb-4">Delete Chat?</h3>
+      <div class="flex gap-4 justify-center">
+        <button id="dialog-confirm" class="bg-[var(--accent)] text-white px-4 py-2 rounded-lg hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition">Delete</button>
+        <button id="dialog-cancel" class="bg-[var(--border)] text-[var(--text-primary)] px-4 py-2 rounded-lg hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    // Basic navigation active state handling
-    document.addEventListener('DOMContentLoaded', () => {
-      const navLinks = document.querySelectorAll('nav a');
-      navLinks.forEach(link => {
-        if (link.href === window.location.href) {
-          link.classList.add('tab-active');
+    const state = {
+      conversations: JSON.parse(localStorage.getItem('conversations') || '{}'),
+      currentId: null,
+      theme: localStorage.getItem('theme') || 'dark',
+      apiKey: 'YOUR_GEMINI_API_KEY_HERE',
+      aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
+      userName: 'User',
+      nebulaAnimationFrame: null,
+      speechEnabled: localStorage.getItem('speechEnabled') !== 'false',
+      hasSpokenWelcome: false,
+    };
+
+    const elements = {
+      chatMessages: document.getElementById('chat-messages'),
+      chatInput: document.getElementById('chat-input'),
+      sendButton: document.getElementById('send-button'),
+      themeToggle: document.getElementById('theme-toggle'),
+      speechToggle: document.getElementById('speech-toggle'),
+      replayButton: document.getElementById('replay-button'),
+      sidebar: document.getElementById('conversation-sidebar'),
+      newConvoBtn: document.getElementById('new-conversation-button'),
+      newConvoFab: document.getElementById('new-conversation-fab'),
+      welcomeContainer: document.getElementById('welcome-container'),
+      welcome: document.getElementById('welcome-message'),
+      userNameEl: document.getElementById('user-avatar-name'),
+      userInitial: document.getElementById('user-avatar-img'),
+      convoList: document.getElementById('conversation-list'),
+      deleteDialog: document.getElementById('delete-dialog'),
+      dialogConfirm: document.getElementById('dialog-confirm'),
+      dialogCancel: document.getElementById('dialog-cancel'),
+      nebulaContainer: document.getElementById('nebula-container'),
+      nebulaCanvas: document.getElementById('nebula-canvas'),
+    };
+
+    function showToast(message, type = 'error') {
+      const toast = document.createElement('div');
+      toast.className = `fixed top-6 right-6 p-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-[var(--error)]' : 'bg-[var(--success)]'} slide-in`;
+      toast.textContent = message;
+      toast.role = 'alert';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    function speakText(text, isWelcome = false) {
+      if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel(); // Clear existing utterances
+      const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
+      utterance.lang = 'en-US';
+      // Select a natural voice (e.g., Google US English if available)
+      const voices = window.speechSynthesis.getVoices();
+      const naturalVoice = voices.find(v => v.name.includes('Google') && v.lang === 'en-US') || voices.find(v => v.lang === 'en-US');
+      if (naturalVoice) utterance.voice = naturalVoice;
+      utterance.volume = 1;
+      utterance.rate = 0.9; // Slightly slower for natural feel
+      utterance.pitch = 1;
+      if (isWelcome) state.hasSpokenWelcome = true;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function startNebulaAnimation() {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        elements.nebulaContainer.classList.add('hidden');
+        return;
+      }
+      elements.nebulaContainer.classList.remove('hidden');
+      const ctx = elements.nebulaCanvas.getContext('2d');
+      elements.nebulaCanvas.width = 200;
+      elements.nebulaCanvas.height = 200;
+      const particles = Array.from({length: 20}, () => ({
+        x: 100,
+        y: 100,
+        radius: Math.random() * 5 + 2,
+        angle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.02 + 0.01,
+        color: `hsl(${Math.random() * 60 + 240}, 70%, 50%)`,
+      }));
+
+      function animateNebula() {
+        if (!elements.welcomeContainer.classList.contains('hidden')) {
+          ctx.clearRect(0, 0, 200, 200);
+          particles.forEach(p => {
+            p.angle += p.speed;
+            p.x = 100 + Math.cos(p.angle) * 50;
+            p.y = 100 + Math.sin(p.angle) * 50;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+          });
+          state.nebulaAnimationFrame = requestAnimationFrame(animateNebula);
+        } else {
+          cancelAnimationFrame(state.nebulaAnimationFrame);
+          elements.nebulaContainer.classList.add('hidden');
         }
-      });
+      }
+      animateNebula();
+    }
+
+    function stopNebulaAnimation() {
+      cancelAnimationFrame(state.nebulaAnimationFrame);
+      elements.nebulaContainer.classList.add('hidden');
+      window.speechSynthesis.cancel();
+    }
+
+    elements.speechToggle.addEventListener('click', () => {
+      state.speechEnabled = !state.speechEnabled;
+      localStorage.setItem('speechEnabled', state.speechEnabled);
+      elements.speechToggle.setAttribute('aria-pressed', state.speechEnabled);
+      elements.speechToggle.querySelector('.speech-on').classList.toggle('hidden', !state.speechEnabled);
+      elements.speechToggle.querySelector('.speech-off').classList.toggle('hidden', state.speechEnabled);
+      showToast(state.speechEnabled ? 'Speech enabled' : 'Speech disabled', 'success');
+      if (state.speechEnabled && !elements.welcomeContainer.classList.contains('hidden') && !state.hasSpokenWelcome) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
     });
+
+    elements.replayButton.addEventListener('click', () => {
+      if (state.speechEnabled) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
+    });
+
+    elements.themeToggle.addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.body.dataset.theme = state.theme;
+      localStorage.setItem('theme', state.theme);
+    });
+
+    elements.newConvoFab.addEventListener('click', () => {
+      if (!elements.sidebar.classList.contains('translate-x-0')) {
+        elements.sidebar.classList.add('translate-x-0');
+      } else {
+        state.currentId = null;
+        state.hasSpokenWelcome = false;
+        elements.chatMessages.innerHTML = '';
+        elements.welcomeContainer.classList.remove('hidden');
+        elements.sidebar.classList.remove('translate-x-0');
+        startNebulaAnimation();
+        if (state.speechEnabled) {
+          speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+        }
+      }
+    });
+
+    function renderMessage(msg, id) {
+      const div = document.createElement('div');
+      div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
+      div.role = 'listitem';
+      const content = document.createElement('div');
+      content.className = 'message-content p-4 rounded-xl flex gap-3 items-start';
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar w-9 h-9 rounded-full flex-shrink-0';
+      if (msg.sender === 'ai') {
+        const img = document.createElement('img');
+        img.src = state.aiAvatar;
+        img.alt = 'Vynix AI avatar';
+        img.loading = 'lazy';
+        img.className = 'w-full h-full rounded-full';
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = state.userName[0].toUpperCase();
+        avatar.classList.add('bg-gradient-to-r', 'from-[var(--primary)]', 'to-[var(--accent)]', 'text-white', 'flex', 'items-center', 'justify-center', 'font-bold');
+      }
+      const body = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'message-header font-semibold text-sm';
+      header.textContent = msg.displayName;
+      const text = document.createElement('p');
+      text.className = 'text-sm';
+      text.innerHTML = marked.parse(msg.text);
+      const time = document.createElement('div');
+      time.className = 'message-timestamp text-xs text-[var(--text-secondary)] mt-1';
+      time.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      body.append(header, text, time);
+      content.append(avatar, body);
+      div.append(content);
+      const actions = document.createElement('div');
+      actions.className = 'message-actions flex gap-4 mt-2 self-end';
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition';
+      copyBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      copyBtn.ariaLabel = 'Copy message';
+      copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.text).then(() => showToast('Copied!', 'success')).catch(() => showToast('Copy failed')));
+      actions.append(copyBtn);
+      div.append(actions);
+      elements.chatMessages.appendChild(div);
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+      if (msg.sender === 'ai' && state.speechEnabled) {
+        speakText(msg.text);
+      }
+      return div;
+    }
+
+    async function appendMessage(text, sender, displayName) {
+      if (!state.currentId) state.currentId = Date.now().toString();
+      if (!state.conversations[state.currentId]) state.conversations[state.currentId] = {title: text.slice(0, 30) + (text.length > 30 ? '...' : ''), timestamp: Date.now(), messages: []};
+      const msg = {id: Date.now().toString(), text, sender, displayName, timestamp: Date.now()};
+      state.conversations[state.currentId].messages.push(msg);
+      localStorage.setItem('conversations', JSON.stringify(state.conversations));
+      elements.welcomeContainer.classList.add('hidden');
+      stopNebulaAnimation();
+      if (sender === 'user') {
+        renderMessage(msg, msg.id);
+      } else {
+        const tempMsg = {...msg, text: ''};
+        const el = renderMessage(tempMsg, msg.id);
+        const p = el.querySelector('p');
+        const indicator = document.createElement('span');
+        indicator.className = 'typing-indicator inline-flex gap-1.5 ml-2';
+        for (let i = 0; i < 3; i++) {
+          const dot = document.createElement('span');
+          dot.className = 'typing-dot';
+          indicator.appendChild(dot);
+        }
+        p.appendChild(indicator);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        let i = 0;
+        const type = () => {
+          if (i < text.length) {
+            tempMsg.text = text.slice(0, ++i);
+            p.innerHTML = marked.parse(tempMsg.text);
+            requestAnimationFrame(type);
+          } else {
+            indicator.remove();
+            p.innerHTML = marked.parse(text);
+            if (state.speechEnabled) {
+              speakText(text);
+            }
+          }
+        };
+        type();
+      }
+      loadConversations();
+    }
+
+    function loadConversations() {
+      elements.convoList.innerHTML = '';
+      Object.entries(state.conversations).sort((a, b) => b[1].timestamp - a[1].timestamp).forEach(([id, convo]) => {
+        const item = document.createElement('div');
+        item.className = 'conversation-item p-3 border-b border-[var(--border)] cursor-pointer flex items-center gap-3 hover:bg-[var(--highlight)] focus:bg-[var(--highlight)] outline-none transition';
+        item.dataset.id = id;
+        item.role = 'button';
+        item.tabIndex = 0;
+        item.ariaLabel = `Open: ${convo.title}`;
+        item.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="conversation-title flex-1 truncate text-sm">${convo.title}</span>`;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-convo-btn text-[var(--error)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] hidden md:hover:flex';
+        delBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+        delBtn.ariaLabel = 'Delete';
+        delBtn.addEventListener('click', e => { e.stopPropagation(); showDeleteDialog(id); });
+        item.append(delBtn);
+        item.addEventListener('click', () => loadConversation(id));
+        item.addEventListener('keydown', e => e.key === 'Enter' && loadConversation(id));
+        elements.convoList.appendChild(item);
+      });
+    }
+
+    function loadConversation(id) {
+      state.currentId = id;
+      elements.chatMessages.innerHTML = '';
+      state.conversations[id]?.messages.forEach(msg => renderMessage(msg, msg.id));
+      elements.welcomeContainer.classList.toggle('hidden', !!state.conversations[id]?.messages.length);
+      elements.sidebar.classList.remove('translate-x-0');
+      if (state.conversations[id]?.messages.length) {
+        stopNebulaAnimation();
+      } else {
+        state.hasSpokenWelcome = false;
+        startNebulaAnimation();
+        if (state.speechEnabled) {
+          speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+        }
+      }
+    }
+
+    function sanitize(input) {
+      const div = document.createElement('div');
+      div.textContent = input;
+      return div.innerHTML;
+    }
+
+    async function getAIResponse(question) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({contents: [{parts: [{text: `You are Vynix AI, a helpful assistant. Query: ${question}`}]}]})
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        return data.candidates[0].content.parts[0].text;
+      } catch {
+        showToast('Request failed', 'error');
+        return 'Sorry, something went wrong. Try again.';
+      }
+    }
+
+    const send = async () => {
+      const q = elements.chatInput.value.trim();
+      if (!q || elements.sendButton.disabled) return;
+      elements.sendButton.disabled = true;
+      try {
+        await appendMessage(sanitize(q), 'user', state.userName);
+        elements.chatInput.value = '';
+        const res = await getAIResponse(q);
+        await appendMessage(res, 'ai', 'Vynix AI');
+      } catch {
+        showToast('Error sending message', 'error');
+      } finally {
+        elements.sendButton.disabled = false;
+        elements.chatInput.focus();
+      }
+    };
+    elements.sendButton.addEventListener('click', send);
+    elements.chatInput.addEventListener('keypress', e => e.key === 'Enter' && send());
+
+    elements.newConvoBtn.addEventListener('click', () => {
+      state.currentId = null;
+      state.hasSpokenWelcome = false;
+      elements.chatMessages.innerHTML = '';
+      elements.welcomeContainer.classList.remove('hidden');
+      elements.sidebar.classList.remove('translate-x-0');
+      startNebulaAnimation();
+      if (state.speechEnabled) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
+    });
+
+    let pendingId = null;
+    function showDeleteDialog(id) {
+      pendingId = id;
+      elements.deleteDialog.classList.remove('hidden');
+      elements.dialogConfirm.focus();
+    }
+    elements.dialogCancel.addEventListener('click', () => {
+      elements.deleteDialog.classList.add('hidden');
+      pendingId = null;
+    });
+    elements.dialogConfirm.addEventListener('click', () => {
+      elements.deleteDialog.classList.add('hidden');
+      if (pendingId) {
+        delete state.conversations[pendingId];
+        localStorage.setItem('conversations', JSON.stringify(state.conversations));
+        if (state.currentId === pendingId) {
+          state.currentId = null;
+          state.hasSpokenWelcome = false;
+          elements.chatMessages.innerHTML = '';
+          elements.welcomeContainer.classList.remove('hidden');
+          startNebulaAnimation();
+          if (state.speechEnabled) {
+            speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+          }
+        }
+        loadConversations();
+        showToast('Chat deleted', 'success');
+        pendingId = null;
+      }
+    });
+
+    document.body.dataset.theme = state.theme;
+    elements.userNameEl.textContent = state.userName;
+    elements.userInitial.textContent = state.userName[0].toUpperCase();
+    elements.speechToggle.setAttribute('aria-pressed', state.speechEnabled);
+    elements.speechToggle.querySelector('.speech-on').classList.toggle('hidden', !state.speechEnabled);
+    elements.speechToggle.querySelector('.speech-off').classList.toggle('hidden', state.speechEnabled);
+    loadConversations();
+    startNebulaAnimation();
+    if (state.speechEnabled) {
+      speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+    }
+    elements.chatInput.focus();
+
+    // Ensure voices are loaded before speaking
+    window.speechSynthesis.onvoiceschanged = () => {
+      if (state.speechEnabled && !state.hasSpokenWelcome && !elements.welcomeContainer.classList.contains('hidden')) {
+        speakText("Hey, I'm Vynix AI... What's on your mind?", true);
+      }
+    };
   </script>
 </body>
 </html>
