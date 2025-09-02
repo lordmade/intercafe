@@ -54,6 +54,7 @@
       .slide-in { animation: slideIn 0.3s ease; }
       .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
       .nebula { animation: nebulaSwirl 6s infinite ease-in-out; }
+      .modal-slide-in { animation: modalSlideIn 0.3s ease; }
     }
 
     @keyframes slideIn {
@@ -82,6 +83,11 @@
         filter: blur(10px);
         opacity: 0.8;
       }
+    }
+
+    @keyframes modalSlideIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .message {
@@ -188,6 +194,54 @@
       z-index: 20;
     }
 
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 30;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      max-width: 90%;
+      width: 400px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-content textarea {
+      width: 100%;
+      min-height: 100px;
+      background: var(--highlight);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      color: var(--text-primary);
+      resize: none;
+      outline: none;
+      font-size: 0.875rem;
+    }
+
+    .modal-content textarea:focus {
+      border-color: var(--focus);
+      box-shadow: 0 0 0 2px var(--glow);
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+    }
+
     @media (max-width: 640px) {
       .chat-container {
         padding: 0.5rem;
@@ -217,8 +271,11 @@
       .message {
         max-width: 90%;
       }
-      input, button {
+      input, button, textarea {
         font-size: 0.875rem;
+      }
+      .modal-content {
+        width: 90%;
       }
     }
   </style>
@@ -247,6 +304,17 @@
     <button id="new-chat-button" class="new-chat-button bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition pulse-glow" aria-label="Start new chat">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v4m-2 2h4"/></svg>
     </button>
+    <div id="feedback-modal" class="modal" role="dialog" aria-labelledby="modal-title" aria-describedby="modal-description">
+      <div class="modal-content modal-slide-in">
+        <h2 id="modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Help Vynix AI Learn</h2>
+        <p id="modal-description" class="text-sm text-[var(--text-secondary)] mb-4">What should I have said instead?</p>
+        <textarea id="feedback-input" placeholder="Enter a better response..." aria-label="Enter a better response" maxlength="800"></textarea>
+        <div class="modal-buttons">
+          <button id="modal-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
+          <button id="modal-submit" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Submit feedback">Submit</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -267,11 +335,15 @@
       welcomeContainer: document.getElementById('welcome-container'),
       nebulaContainer: document.getElementById('nebula-container'),
       nebulaCanvas: document.getElementById('nebula-canvas'),
+      feedbackModal: document.getElementById('feedback-modal'),
+      feedbackInput: document.getElementById('feedback-input'),
+      modalSubmit: document.getElementById('modal-submit'),
+      modalCancel: document.getElementById('modal-cancel'),
     };
 
     // Initialize brain.js neural network
     const net = new brain.recurrent.LSTM({
-      hiddenLayers: [20, 20], // Increased hidden layers for better learning
+      hiddenLayers: [20, 20],
       activation: 'sigmoid',
     });
 
@@ -295,8 +367,8 @@
 
     // Train the network initially
     net.train(trainingData, {
-      iterations: 500, // Increased iterations for better initial training
-      errorThresh: 0.015, // Lower error threshold for better accuracy
+      iterations: 500,
+      errorThresh: 0.015,
       log: true,
       logPeriod: 50,
       learningRate: 0.01,
@@ -309,6 +381,44 @@
       toast.role = 'alert';
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
+    }
+
+    function showFeedbackModal(callback) {
+      elements.feedbackModal.style.display = 'flex';
+      elements.feedbackInput.value = '';
+      elements.feedbackInput.focus();
+      
+      const submit = () => {
+        const input = elements.feedbackInput.value.trim();
+        callback(input);
+        closeFeedbackModal();
+      };
+
+      const cancel = () => closeFeedbackModal();
+
+      elements.modalSubmit.onclick = submit;
+      elements.modalCancel.onclick = cancel;
+
+      elements.feedbackInput.onkeypress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submit();
+        }
+      };
+
+      document.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+          cancel();
+        }
+      };
+    }
+
+    function closeFeedbackModal() {
+      elements.feedbackModal.style.display = 'none';
+      elements.modalSubmit.onclick = null;
+      elements.modalCancel.onclick = null;
+      elements.feedbackInput.onkeypress = null;
+      document.onkeydown = null;
     }
 
     function startNebulaAnimation() {
@@ -367,7 +477,6 @@
       elements.chatMessages.innerHTML = '';
       elements.welcomeContainer.classList.remove('hidden');
       startNebulaAnimation();
-      // Keep conversation history in localStorage, don't reset
     }
 
     elements.newChatButton.addEventListener('click', clearChat);
@@ -431,15 +540,16 @@
         thumbsDown.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
         thumbsDown.ariaLabel = 'Bad response';
         thumbsDown.addEventListener('click', () => {
-          showToast('Sorry about that! Please provide a better response to help me learn.', 'error');
-          const input = prompt('What should I have said instead?');
-          if (input && input.trim()) {
-            const lastInput = conversationHistory[conversationHistory.length - 1].input;
-            conversationHistory[conversationHistory.length - 1].output = input;
-            net.train([{ input: normalizeText(lastInput), output: input }], { iterations: 100, learningRate: 0.005 });
-            localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
-            showToast('Thanks for teaching me a better response!', 'success');
-          }
+          showToast('Sorry about that! Please provide a better response.', 'error');
+          showFeedbackModal((input) => {
+            if (input) {
+              const lastInput = conversationHistory[conversationHistory.length - 1].input;
+              conversationHistory[conversationHistory.length - 1].output = input;
+              net.train([{ input: normalizeText(lastInput), output: input }], { iterations: 100, learningRate: 0.005 });
+              localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
+              showToast('Thanks for teaching me a better response!', 'success');
+            }
+          });
         });
         actions.append(thumbsUp, thumbsDown);
       }
