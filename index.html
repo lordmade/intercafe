@@ -6,7 +6,6 @@
   <title>Vynix AI Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
-  <script src="https://unpkg.com/brain.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -321,6 +320,7 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
+      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Provided API key - WARNING: For demo only; use securely in production
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
       nebulaAnimationFrame: null,
@@ -340,39 +340,6 @@
       modalSubmit: document.getElementById('modal-submit'),
       modalCancel: document.getElementById('modal-cancel'),
     };
-
-    // Initialize brain.js neural network
-    const net = new brain.recurrent.LSTM({
-      hiddenLayers: [20, 20],
-      activation: 'sigmoid',
-    });
-
-    // Expanded initial training data
-    const initialTrainingData = [
-      { input: 'hello', output: 'Hi there!' },
-      { input: 'how are you', output: 'I\'m doing great, thanks for asking! How about you?' },
-      { input: 'what is your name', output: 'I\'m Vynix AI, your friendly chat assistant.' },
-      { input: 'tell me a joke', output: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
-      { input: 'what time is it', output: 'I don\'t have a clock, but I can tell you it\'s time to have some fun!' },
-      { input: 'who made you', output: 'I was created by the brilliant minds at xAI to help answer your questions.' },
-      { input: 'what is the weather like', output: 'I can\'t check the weather, but I bet it\'s sunny where you are!' },
-      { input: 'how do i code', output: 'Coding is like telling a computer a story! Start with a language like JavaScript or Python, and I can guide you.' },
-      { input: 'what is ai', output: 'AI is like a super smart assistant that learns from data to help humans, like me!' },
-      { input: 'good morning', output: 'Good morning to you too! Ready to tackle the day?' },
-    ];
-
-    // Load conversation history from localStorage or use initial data
-    let conversationHistory = JSON.parse(localStorage.getItem('conversationHistory')) || [];
-    const trainingData = [...initialTrainingData, ...conversationHistory];
-
-    // Train the network initially
-    net.train(trainingData, {
-      iterations: 500,
-      errorThresh: 0.015,
-      log: true,
-      logPeriod: 50,
-      learningRate: 0.01,
-    });
 
     function showToast(message, type = 'error') {
       const toast = document.createElement('div');
@@ -481,10 +448,6 @@
 
     elements.newChatButton.addEventListener('click', clearChat);
 
-    function normalizeText(text) {
-      return text.toLowerCase().replace(/[.,!?]/g, '').trim();
-    }
-
     function renderMessage(msg, id) {
       const div = document.createElement('div');
       div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
@@ -530,9 +493,6 @@
         thumbsUp.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
         thumbsUp.ariaLabel = 'Good response';
         thumbsUp.addEventListener('click', () => {
-          const lastInput = conversationHistory[conversationHistory.length - 1].input;
-          net.train([{ input: normalizeText(lastInput), output: msg.text }], { iterations: 100, learningRate: 0.005 });
-          localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
           showToast('Thanks for the feedback! I learned from this.', 'success');
         });
         const thumbsDown = document.createElement('button');
@@ -543,10 +503,6 @@
           showToast('Sorry about that! Please provide a better response.', 'error');
           showFeedbackModal((input) => {
             if (input) {
-              const lastInput = conversationHistory[conversationHistory.length - 1].input;
-              conversationHistory[conversationHistory.length - 1].output = input;
-              net.train([{ input: normalizeText(lastInput), output: input }], { iterations: 100, learningRate: 0.005 });
-              localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
               showToast('Thanks for teaching me a better response!', 'success');
             }
           });
@@ -567,7 +523,6 @@
       stopNebulaAnimation();
       if (sender === 'user') {
         renderMessage(msg, msg.id);
-        conversationHistory.push({ input: normalizeText(text) });
       } else {
         const tempMsg = {...msg, text: ''};
         const el = renderMessage(tempMsg, msg.id);
@@ -590,10 +545,6 @@
           } else {
             indicator.remove();
             p.innerHTML = marked.parse(text);
-            const lastInput = conversationHistory[conversationHistory.length - 1].input;
-            conversationHistory[conversationHistory.length - 1].output = text;
-            net.train([{ input: lastInput, output: text }], { iterations: 100, learningRate: 0.005 });
-            localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
           }
         };
         type();
@@ -606,13 +557,20 @@
       return div.innerHTML;
     }
 
-    function getAIResponse(question) {
-      const normalizedQuestion = normalizeText(question);
-      let response = net.run(normalizedQuestion);
-      if (!response || response.trim() === '') {
-        response = "I'm still learning! Can you teach me more?";
+    async function getAIResponse(question) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({contents: [{parts: [{text: `You are Vynix AI, a helpful assistant. Query: ${question}`}]}]})
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        return data.candidates[0].content.parts[0].text;
+      } catch {
+        showToast('Request failed', 'error');
+        return 'Sorry, something went wrong. Try again.';
       }
-      return response;
     }
 
     const send = async () => {
@@ -622,7 +580,7 @@
       try {
         await appendMessage(sanitize(q), 'user', state.userName);
         elements.chatInput.value = '';
-        const res = getAIResponse(q);
+        const res = await getAIResponse(q);
         await appendMessage(res, 'ai', 'Vynix AI');
       } catch {
         showToast('Error sending message', 'error');
