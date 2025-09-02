@@ -6,7 +6,6 @@
   <title>Vynix AI Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
-  <script src="https://unpkg.com/@groq/sdk@0.5.0/dist/index.bundle.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -257,8 +256,7 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      groqApiKey: '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', // Replace with your Groq API key
-      geminiApiKey: 'YOUR_GEMINI_API_KEY_HERE', // Replace with your Gemini API key
+      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Replace with your Gemini API key
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
       nebulaAnimationFrame: null,
@@ -292,7 +290,7 @@
 
     async function speakText(text, isWelcome = false) {
       if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      if (!text || text.length > 1000) {
+      if (!text || text.length > 800) { // Gemini TTS limit: ~800 characters[](https://cloud.google.com/text-to-speech/docs/gemini-tts)
         showToast('Text is empty or too long for speech', 'error');
         return;
       }
@@ -311,8 +309,8 @@
         return;
       }
 
-      if (!state.groqApiKey || state.groqApiKey === 'YOUR_GROQ_API_KEY_HERE') {
-        showToast('Groq API key is missing', 'error');
+      if (!state.geminiApiKey || state.geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+        showToast('Gemini API key is missing', 'error');
         // Fallback to Web Speech API
         const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
         utterance.rate = 0.9;
@@ -326,16 +324,38 @@
       }
 
       try {
-        const client = new Groq({ apiKey: state.groqApiKey });
-        const response = await client.audio.speech.create({
-          model: 'playai-tts',
-          voice: 'Fritz-PlayAI', // Grok-like natural male voice
-          input: isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text,
-          response_format: 'mp3',
-          speed: 0.9, // Natural pace
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': state.geminiApiKey,
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: isWelcome ? "Say in a friendly, natural male voice: Hey, I'm Vynix AI... What's on your mind?" : `Say in a friendly, natural male voice: ${text}`
+              }]
+            }],
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Kore' // Grok-like male voice[](https://ai.google.dev/gemini-api/docs/speech-generation)
+                  }
+                }
+              }
+            }
+          })
         });
 
-        const arrayBuffer = await response.arrayBuffer();
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const audioData = data.candidates[0].content.parts[0].inlineData.data;
+        const arrayBuffer = Uint8Array.from(atob(audioData), c => c.charCodeAt(0)).buffer;
         const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
         const audio = new Audio(URL.createObjectURL(blob));
         state.audioCache.set(cacheKey, audio);
@@ -346,13 +366,13 @@
         });
         if (isWelcome) state.hasSpokenWelcome = true;
       } catch (e) {
-        console.error('Groq TTS error:', e);
+        console.error('Gemini TTS error:', e);
         let errorMessage = 'Speech synthesis failed';
-        if (e.status === 401) errorMessage = 'Invalid Groq API key';
-        else if (e.status === 429) errorMessage = 'Groq API rate limit exceeded';
-        else if (e.status === 400) errorMessage = 'Invalid Groq request (check model/voice)';
-        else if (e.status === 422) errorMessage = 'Invalid input text';
-        else if (e.status === 500) errorMessage = 'Groq server error, try again later';
+        if (e.message.includes('401')) errorMessage = 'Invalid Gemini API key';
+        else if (e.message.includes('429')) errorMessage = 'Gemini API rate limit exceeded';
+        else if (e.message.includes('400')) errorMessage = 'Invalid Gemini request (check model/voice)';
+        else if (e.message.includes('422')) errorMessage = 'Invalid input text';
+        else if (e.message.includes('500')) errorMessage = 'Gemini server error, try again later';
         showToast(errorMessage, 'error');
         // Fallback to Web Speech API
         const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
