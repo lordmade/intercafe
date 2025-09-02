@@ -257,7 +257,7 @@
     const state = {
       messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      groqApiKey: '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', // Replace with your Groq API key
+      groqApiKey: 'YOUR_GROQ_API_KEY_HERE', // Replace with your Groq API key
       geminiApiKey: 'YOUR_GEMINI_API_KEY_HERE', // Replace with your Gemini API key
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
       userName: 'User',
@@ -292,6 +292,10 @@
 
     async function speakText(text, isWelcome = false) {
       if (!state.speechEnabled || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (!text || text.length > 1000) {
+        showToast('Text is empty or too long for speech', 'error');
+        return;
+      }
       if (state.currentAudio) {
         state.currentAudio.pause();
         state.currentAudio = null;
@@ -303,6 +307,20 @@
         audio.currentTime = 0;
         state.currentAudio = audio;
         audio.play().catch(() => showToast('Audio playback failed', 'error'));
+        if (isWelcome) state.hasSpokenWelcome = true;
+        return;
+      }
+
+      if (!state.groqApiKey || state.groqApiKey === 'YOUR_GROQ_API_KEY_HERE') {
+        showToast('Groq API key is missing', 'error');
+        // Fallback to Web Speech API
+        const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
+        utterance.rate = 0.9;
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.lang === 'en-US') || voices[0];
+        utterance.voice = voice;
+        state.currentAudio = utterance;
+        window.speechSynthesis.speak(utterance);
         if (isWelcome) state.hasSpokenWelcome = true;
         return;
       }
@@ -322,11 +340,29 @@
         const audio = new Audio(URL.createObjectURL(blob));
         state.audioCache.set(cacheKey, audio);
         state.currentAudio = audio;
-        audio.play().catch(() => showToast('Audio playback failed', 'error'));
+        audio.play().catch((e) => {
+          console.error('Audio playback error:', e);
+          showToast('Audio playback failed', 'error');
+        });
         if (isWelcome) state.hasSpokenWelcome = true;
       } catch (e) {
-        console.error('Groq TTS failed:', e);
-        showToast('Speech synthesis failed', 'error');
+        console.error('Groq TTS error:', e);
+        let errorMessage = 'Speech synthesis failed';
+        if (e.status === 401) errorMessage = 'Invalid Groq API key';
+        else if (e.status === 429) errorMessage = 'Groq API rate limit exceeded';
+        else if (e.status === 400) errorMessage = 'Invalid Groq request (check model/voice)';
+        else if (e.status === 422) errorMessage = 'Invalid input text';
+        else if (e.status === 500) errorMessage = 'Groq server error, try again later';
+        showToast(errorMessage, 'error');
+        // Fallback to Web Speech API
+        const utterance = new SpeechSynthesisUtterance(isWelcome ? "Hey, I'm Vynix AI... What's on your mind?" : text);
+        utterance.rate = 0.9;
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.lang === 'en-US') || voices[0];
+        utterance.voice = voice;
+        state.currentAudio = utterance;
+        window.speechSynthesis.speak(utterance);
+        if (isWelcome) state.hasSpokenWelcome = true;
       }
     }
 
@@ -374,7 +410,11 @@
       cancelAnimationFrame(state.nebulaAnimationFrame);
       elements.nebulaContainer.classList.add('hidden');
       if (state.currentAudio) {
-        state.currentAudio.pause();
+        if (state.currentAudio instanceof Audio) {
+          state.currentAudio.pause();
+        } else {
+          window.speechSynthesis.cancel();
+        }
         state.currentAudio = null;
       }
     }
@@ -560,7 +600,11 @@
     // Stop audio on window blur
     window.addEventListener('blur', () => {
       if (state.currentAudio) {
-        state.currentAudio.pause();
+        if (state.currentAudio instanceof Audio) {
+          state.currentAudio.pause();
+        } else {
+          window.speechSynthesis.cancel();
+        }
         state.currentAudio = null;
       }
     });
