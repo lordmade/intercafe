@@ -270,26 +270,37 @@
     };
 
     // Initialize brain.js neural network
-    const net = new brain.recurrent.LSTM();
+    const net = new brain.recurrent.LSTM({
+      hiddenLayers: [20, 20], // Increased hidden layers for better learning
+      activation: 'sigmoid',
+    });
 
-    // Initial training data
-    const trainingData = [
+    // Expanded initial training data
+    const initialTrainingData = [
       { input: 'hello', output: 'Hi there!' },
-      { input: 'how are you', output: 'I\'m good, thanks! How about you?' },
-      { input: 'what is your name', output: 'I\'m Vynix AI.' },
+      { input: 'how are you', output: 'I\'m doing great, thanks for asking! How about you?' },
+      { input: 'what is your name', output: 'I\'m Vynix AI, your friendly chat assistant.' },
       { input: 'tell me a joke', output: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
+      { input: 'what time is it', output: 'I don\'t have a clock, but I can tell you it\'s time to have some fun!' },
+      { input: 'who made you', output: 'I was created by the brilliant minds at xAI to help answer your questions.' },
+      { input: 'what is the weather like', output: 'I can\'t check the weather, but I bet it\'s sunny where you are!' },
+      { input: 'how do i code', output: 'Coding is like telling a computer a story! Start with a language like JavaScript or Python, and I can guide you.' },
+      { input: 'what is ai', output: 'AI is like a super smart assistant that learns from data to help humans, like me!' },
+      { input: 'good morning', output: 'Good morning to you too! Ready to tackle the day?' },
     ];
+
+    // Load conversation history from localStorage or use initial data
+    let conversationHistory = JSON.parse(localStorage.getItem('conversationHistory')) || [];
+    const trainingData = [...initialTrainingData, ...conversationHistory];
 
     // Train the network initially
     net.train(trainingData, {
-      iterations: 200,
+      iterations: 500, // Increased iterations for better initial training
+      errorThresh: 0.015, // Lower error threshold for better accuracy
       log: true,
-      logPeriod: 10,
-      learningRate: 0.01
+      logPeriod: 50,
+      learningRate: 0.01,
     });
-
-    // To make it "learn on its own", we'll incrementally train on new conversations
-    let conversationHistory = [];
 
     function showToast(message, type = 'error') {
       const toast = document.createElement('div');
@@ -356,11 +367,14 @@
       elements.chatMessages.innerHTML = '';
       elements.welcomeContainer.classList.remove('hidden');
       startNebulaAnimation();
-      conversationHistory = [];
-      net.train(trainingData); // Retrain with initial data
+      // Keep conversation history in localStorage, don't reset
     }
 
     elements.newChatButton.addEventListener('click', clearChat);
+
+    function normalizeText(text) {
+      return text.toLowerCase().replace(/[.,!?]/g, '').trim();
+    }
 
     function renderMessage(msg, id) {
       const div = document.createElement('div');
@@ -401,6 +415,34 @@
       copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
       copyBtn.ariaLabel = 'Copy message';
       copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.text).then(() => showToast('Copied!', 'success')).catch(() => showToast('Copy failed')));
+      if (msg.sender === 'ai') {
+        const thumbsUp = document.createElement('button');
+        thumbsUp.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--success)] transition';
+        thumbsUp.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
+        thumbsUp.ariaLabel = 'Good response';
+        thumbsUp.addEventListener('click', () => {
+          const lastInput = conversationHistory[conversationHistory.length - 1].input;
+          net.train([{ input: normalizeText(lastInput), output: msg.text }], { iterations: 100, learningRate: 0.005 });
+          localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
+          showToast('Thanks for the feedback! I learned from this.', 'success');
+        });
+        const thumbsDown = document.createElement('button');
+        thumbsDown.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--error)] transition';
+        thumbsDown.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
+        thumbsDown.ariaLabel = 'Bad response';
+        thumbsDown.addEventListener('click', () => {
+          showToast('Sorry about that! Please provide a better response to help me learn.', 'error');
+          const input = prompt('What should I have said instead?');
+          if (input && input.trim()) {
+            const lastInput = conversationHistory[conversationHistory.length - 1].input;
+            conversationHistory[conversationHistory.length - 1].output = input;
+            net.train([{ input: normalizeText(lastInput), output: input }], { iterations: 100, learningRate: 0.005 });
+            localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
+            showToast('Thanks for teaching me a better response!', 'success');
+          }
+        });
+        actions.append(thumbsUp, thumbsDown);
+      }
       actions.append(copyBtn);
       div.append(actions);
       elements.chatMessages.appendChild(div);
@@ -415,7 +457,7 @@
       stopNebulaAnimation();
       if (sender === 'user') {
         renderMessage(msg, msg.id);
-        conversationHistory.push({ input: text });
+        conversationHistory.push({ input: normalizeText(text) });
       } else {
         const tempMsg = {...msg, text: ''};
         const el = renderMessage(tempMsg, msg.id);
@@ -438,12 +480,13 @@
           } else {
             indicator.remove();
             p.innerHTML = marked.parse(text);
+            const lastInput = conversationHistory[conversationHistory.length - 1].input;
+            conversationHistory[conversationHistory.length - 1].output = text;
+            net.train([{ input: lastInput, output: text }], { iterations: 100, learningRate: 0.005 });
+            localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
           }
         };
         type();
-        const lastInput = conversationHistory[conversationHistory.length - 1].input;
-        conversationHistory[conversationHistory.length - 1].output = text;
-        net.train([{ input: lastInput, output: text }], { iterations: 50 });
       }
     }
 
@@ -454,7 +497,8 @@
     }
 
     function getAIResponse(question) {
-      let response = net.run(question);
+      const normalizedQuestion = normalizeText(question);
+      let response = net.run(normalizedQuestion);
       if (!response || response.trim() === '') {
         response = "I'm still learning! Can you teach me more?";
       }
