@@ -390,6 +390,9 @@
       <button id="voice-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle voice">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
       </button>
+      <button id="signout-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Sign out">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      </button>
     </div>
     <div class="welcome-container" id="welcome-container">
       <div id="nebula-container" class="nebula-container">
@@ -426,7 +429,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
@@ -469,6 +472,7 @@
       modalSubmit: document.getElementById('modal-submit'),
       modalCancel: document.getElementById('modal-cancel'),
       chatInputContainer: document.getElementById('chat-input-container'),
+      signoutButton: document.getElementById('signout-button')
     };
 
     let app, auth, db;
@@ -549,6 +553,20 @@
       } catch (error) {
         console.error("Auth state check failed:", error.code || error.message);
         showToast("Failed to check authentication state. Please try again.", 'error');
+      }
+    }
+
+    async function handleSignOut() {
+      try {
+        await signOut(auth);
+        showToast("Signed out successfully.", 'success');
+        document.body.classList.add("fade-out");
+        setTimeout(() => {
+          window.location.href = "signup.html";
+        }, 1500);
+      } catch (error) {
+        console.error("Sign out error:", error);
+        showToast("Failed to sign out. Please try again.", 'error');
       }
     }
 
@@ -694,6 +712,8 @@
       }
       showToast(`Language set to ${elements.languageSelect.options[elements.languageSelect.selectedIndex].text}`, 'success');
     });
+
+    elements.signoutButton.addEventListener('click', handleSignOut);
 
     function clearChat() {
       state.messages = [];
