@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vynix AI - Signup / Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1E3A8A;
+      --accent: #000000;
+      --bg: #0A0A0A;
+      --card-bg: #1A1A1A;
+      --text-primary: #F3F4F6;
+      --text-secondary: #A3A3A3;
+      --border: #2D2D2D;
+      --highlight: #2A2A2A;
+      --focus: #4B5EAA;
+      --white: #FFFFFF;
+      --error: #EF4444;
+      --success: #10B981;
+      --glow: rgba(0, 0, 0, 0.5);
+      --nebula-blue: rgba(30, 58, 138, 0.5);
+      --nebula-dark: rgba(0, 0, 0, 0.3);
+    }
+
+    [data-theme="light"] {
+      --bg: #F9FAFB;
+      --card-bg: #FFFFFF;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --border: #D1D5DB;
+      --highlight: #E5E7EB;
+      --glow: rgba(0, 0, 0, 0.3);
+      --nebula-blue: rgba(59, 130, 246, 0.3);
+      --nebula-dark: rgba(0, 0, 0, 0.2);
+    }
+
+    body {
+      font-family: 'Poppins', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      margin: 0;
+      transition: background 0.3s ease;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .transition { transition: all 0.3s ease; }
+      .slide-in { animation: slideIn 0.3s ease; }
+      .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+      .nebula { animation: nebulaSwirl 6s infinite ease-in-out; }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--glow); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px var(--glow); }
+    }
+
+    @keyframes nebulaSwirl {
+      0% {
+        transform: scale(1) rotate(0deg);
+        filter: blur(10px);
+        opacity: 0.8;
+      }
+      50% {
+        transform: scale(1.2) rotate(180deg);
+        filter: blur(5px);
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1) rotate(360deg);
+        filter: blur(10px);
+        opacity: 0.8;
+      }
+    }
+
+    .auth-container {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 2rem;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .nebula-container {
+      position: absolute;
+      top: -80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 200px;
+      pointer-events: none;
+      z-index: 9;
+    }
+
+    .nebula {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, var(--nebula-blue) 20%, var(--nebula-dark) 60%, transparent);
+      border-radius: 50%;
+    }
+
+    canvas.nebula-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.5;
+    }
+
+    .auth-container input {
+      width: 100%;
+      background: var(--highlight);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      color: var(--text-primary);
+      outline: none;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .auth-container input:focus {
+      border-color: var(--focus);
+      box-shadow: 0 0 0 2px var(--glow);
+    }
+
+    .auth-container .button-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .auth-container button {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: var(--white);
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .auth-container button:hover {
+      transform: scale(1.05);
+    }
+
+    .auth-container button:focus {
+      outline: 2px solid var(--focus);
+    }
+
+    .google-button {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .google-button:hover {
+      background: var(--highlight);
+      transform: scale(1.05);
+    }
+
+    .forgot-password {
+      color: var(--focus);
+      font-size: 0.75rem;
+      text-align: right;
+      width: 100%;
+      margin-bottom: 1rem;
+      text-decoration: none;
+    }
+
+    .forgot-password:hover {
+      text-decoration: underline;
+    }
+
+    .toggle-auth {
+      color: var(--text-secondary);
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .toggle-auth a {
+      color: var(--focus);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toggle-auth a:hover {
+      text-decoration: underline;
+    }
+
+    .error-message {
+      color: var(--error);
+      font-size: 0.75rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    @media (max-width: 640px) {
+      .auth-container {
+        padding: 1.5rem;
+        width: 95%;
+      }
+      .nebula-container {
+        width: 150px;
+        height: 150px;
+        top: -60px;
+      }
+      .auth-container input,
+      .auth-container button,
+      .toggle-auth,
+      .forgot-password {
+        font-size: 0.75rem;
+      }
+      .auth-container .button-container {
+        gap: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="auth-container slide-in" id="auth-container">
+    <div class="nebula-container" id="nebula-container">
+      <div class="nebula"></div>
+      <canvas id="nebula-canvas" class="nebula-canvas"></canvas>
+    </div>
+    <h2 class="text-xl font-semibold text-center mb-4" id="auth-title">Sign Up for Vynix AI</h2>
+    <div id="error-message" class="error-message" role="alert"></div>
+    <input type="email" id="email-input" placeholder="Email" aria-label="Email" required>
+    <input type="password" id="password-input" placeholder="Password" aria-label="Password" required>
+    <input type="text" id="name-input" placeholder="Your Name" aria-label="Your Name" required style="display: none;">
+    <a href="#" id="forgot-password" class="forgot-password" style="display: none;">Forgot Password?</a>
+    <div class="button-container">
+      <button id="google-button" class="google-button transition" aria-label="Sign in with Google">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22.54 12.26c0-.82-.07-1.64-.2-2.45H12v4.64h5.92c-.26 1.33-1.05 2.46-2.2 3.22v2.68h3.56c2.08-1.92 3.27-4.75 3.27-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-1 7.28-2.72l-3.56-2.68c-.99.67-2.25 1.07-3.72 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C4.01 20.64 7.74 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.74 1 4.01 3.36 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>
+      <button id="auth-button" class="transition">Sign Up</button>
+    </div>
+    <div class="toggle-auth">
+      Already have an account? <a href="#" id="toggle-link">Login</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
+      authDomain: "fire-b-a8878.firebaseapp.com",
+      databaseURL: "https://fire-b-a8878.firebaseio.com",
+      projectId: "fire-b-a8878",
+      storageBucket: "fire-b-a8878.firebasestorage.app",
+      messagingSenderId: "658673187627",
+      appId: "1:658673187627:web:6e4c29af661785f0afa36e",
+      measurementId: "G-V4W97VMSKL"
+    };
+
+    const state = {
+      isSignup: true,
+      theme: localStorage.getItem('theme') || 'dark',
+      nebulaAnimationFrame: null
+    };
+
+    const elements = {
+      authContainer: document.getElementById('auth-container'),
+      authTitle: document.getElementById('auth-title'),
+      emailInput: document.getElementById('email-input'),
+      passwordInput: document.getElementById('password-input'),
+      nameInput: document.getElementById('name-input'),
+      authButton: document.getElementById('auth-button'),
+      googleButton: document.getElementById('google-button'),
+      toggleLink: document.getElementById('toggle-link'),
+      forgotPassword: document.getElementById('forgot-password'),
+      errorMessage: document.getElementById('error-message'),
+      nebulaContainer: document.getElementById('nebula-container'),
+      nebulaCanvas: document.getElementById('nebula-canvas')
+    };
+
+    let app, auth, googleProvider;
+
+    function initializeFirebase() {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        googleProvider = new GoogleAuthProvider();
+        console.log("Firebase initialized successfully at", new Date().toLocaleString());
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        showToast("Failed to connect to Firebase. Please check your network.", 'error');
+      }
+    }
+
+    function showToast(message, type = 'error') {
+      const toast = document.createElement('div');
+      toast.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg text-white text-sm ${type === 'error' ? 'bg-[var(--error)]' : 'bg-[var(--success)]'} slide-in`;
+      toast.textContent = message;
+      toast.role = 'alert';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    function startNebulaAnimation() {
+      if (!elements.nebulaCanvas || !elements.nebulaContainer) {
+        console.error("Nebula elements not found");
+        return;
+      }
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        elements.nebulaContainer.classList.add('hidden');
+        return;
+      }
+      elements.nebulaContainer.classList.remove('hidden');
+      const ctx = elements.nebulaCanvas.getContext('2d');
+      elements.nebulaCanvas.width = window.innerWidth <= 640 ? 150 : 200;
+      elements.nebulaCanvas.height = window.innerWidth <= 640 ? 150 : 200;
+      const particleCount = window.innerWidth <= 640 ? 10 : 20;
+      const particles = Array.from({length: particleCount}, () => ({
+        x: elements.nebulaCanvas.width / 2,
+        y: elements.nebulaCanvas.height / 2,
+        radius: Math.random() * 5 + 2,
+        angle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.02 + 0.01,
+        color: `hsl(${Math.random() * 60 + 20}, 70%, 50%)`,
+      }));
+
+      function animateNebula() {
+        ctx.clearRect(0, 0, elements.nebulaCanvas.width, elements.nebulaCanvas.height);
+        particles.forEach(p => {
+          p.angle += p.speed;
+          p.x = elements.nebulaCanvas.width / 2 + Math.cos(p.angle) * 50;
+          p.y = elements.nebulaCanvas.height / 2 + Math.sin(p.angle) * 50;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+        });
+        state.nebulaAnimationFrame = requestAnimationFrame(animateNebula);
+      }
+      animateNebula();
+    }
+
+    function toggleAuthMode() {
+      state.isSignup = !state.isSignup;
+      elements.authTitle.textContent = state.isSignup ? 'Sign Up for Vynix AI' : 'Login to Vynix AI';
+      elements.authButton.textContent = state.isSignup ? 'Sign Up' : 'Login';
+      elements.googleButton.textContent = state.isSignup ? 'Sign Up with Google' : 'Login with Google';
+      elements.toggleLink.textContent = state.isSignup ? 'Login' : 'Sign Up';
+      elements.nameInput.style.display = state.isSignup ? 'block' : 'none';
+      elements.forgotPassword.style.display = state.isSignup ? 'none' : 'block';
+      elements.errorMessage.textContent = '';
+    }
+
+    async function handleAuth() {
+      const email = elements.emailInput.value.trim();
+      const password = elements.passwordInput.value.trim();
+      const name = elements.nameInput.value.trim();
+
+      if (!email || !password || (state.isSignup && !name)) {
+        elements.errorMessage.textContent = 'Please fill in all fields.';
+        return;
+      }
+
+      elements.authButton.disabled = true;
+      elements.googleButton.disabled = true;
+      elements.errorMessage.textContent = '';
+
+      try {
+        if (state.isSignup) {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          await updateProfile(userCredential.user, { displayName: name });
+          showToast(`Welcome, ${name}! Account created successfully.`, 'success');
+        } else {
+          await signInWithEmailAndPassword(auth, email, password);
+          showToast('Login successful!', 'success');
+        }
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 1500);
+      } catch (error) {
+        console.error("Auth error:", error);
+        elements.errorMessage.textContent = error.code === 'auth/email-already-in-use' ? 'Email already in use.' :
+                                          error.code === 'auth/user-not-found' ? 'User not found.' :
+                                          error.code === 'auth/wrong-password' ? 'Incorrect password.' :
+                                          'An error occurred. Please try again.';
+      } finally {
+        elements.authButton.disabled = false;
+        elements.googleButton.disabled = false;
+      }
+    }
+
+    async function handleGoogleAuth() {
+      elements.googleButton.disabled = true;
+      elements.authButton.disabled = true;
+      elements.errorMessage.textContent = '';
+
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        showToast(`Welcome, ${user.displayName || 'User'}!`, 'success');
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 1500);
+      } catch (error) {
+        console.error("Google auth error:", error);
+        elements.errorMessage.textContent = error.code === 'auth/popup-closed-by-user' ? 'Google sign-in was cancelled.' :
+                                          'An error occurred with Google sign-in. Please try again.';
+      } finally {
+        elements.googleButton.disabled = false;
+        elements.authButton.disabled = false;
+      }
+    }
+
+    async function handleForgotPassword(e) {
+      e.preventDefault();
+      const email = elements.emailInput.value.trim();
+      if (!email) {
+        elements.errorMessage.textContent = 'Please enter your email to reset your password.';
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showToast('Password reset email sent! Check your inbox.', 'success');
+      } catch (error) {
+        console.error("Password reset error:", error);
+        elements.errorMessage.textContent = error.code === 'auth/user-not-found' ? 'No user found with this email.' :
+                                          'An error occurred. Please try again.';
+      }
+    }
+
+    elements.toggleLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleAuthMode();
+    });
+
+    elements.authButton.addEventListener('click', handleAuth);
+
+    elements.googleButton.addEventListener('click', handleGoogleAuth);
+
+    elements.forgotPassword.addEventListener('click', handleForgotPassword);
+
+    elements.emailInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleAuth();
+    });
+
+    elements.passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleAuth();
+    });
+
+    elements.nameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleAuth();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.dataset.theme = state.theme;
+      initializeFirebase();
+      startNebulaAnimation();
+    });
+  </script>
+</body>
+</html>
