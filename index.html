@@ -37,7 +37,7 @@
       --border: #D1D5DB;
       --highlight: #E5E7EB;
       --glow: rgba(0, 0, 0, 0.3);
-      --nebula-blue: rgba(59, 130, 246, 0.3);
+      --nebula-blue: rgba(59, 130, 246, 0.4);
       --nebula-dark: rgba(0, 0, 0, 0.2);
     }
 
@@ -55,7 +55,7 @@
       .transition { transition: all 0.3s ease; }
       .slide-in { animation: slideIn 0.3s ease; }
       .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
-      .nebula { animation: nebulaSwirl 6s infinite ease-in-out; }
+      .nebula { animation: nebulaSwirl 8s infinite ease-in-out; }
       .modal-slide-in { animation: modalSlideIn 0.3s ease; }
     }
 
@@ -72,17 +72,17 @@
     @keyframes nebulaSwirl {
       0% {
         transform: scale(1) rotate(0deg);
-        filter: blur(10px);
+        filter: blur(14px);
         opacity: 0.8;
       }
       50% {
-        transform: scale(1.2) rotate(180deg);
-        filter: blur(5px);
+        transform: scale(1.4) rotate(180deg);
+        filter: blur(10px);
         opacity: 0.6;
       }
       100% {
         transform: scale(1) rotate(360deg);
-        filter: blur(10px);
+        filter: blur(14px);
         opacity: 0.8;
       }
     }
@@ -202,8 +202,8 @@
       top: -80px;
       left: 50%;
       transform: translateX(-50%);
-      width: 200px;
-      height: 200px;
+      width: 260px;
+      height: 260px;
       pointer-events: none;
       z-index: 9;
     }
@@ -211,7 +211,7 @@
     .nebula {
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle, var(--nebula-blue) 20%, var(--nebula-dark) 60%, transparent);
+      background: radial-gradient(circle, var(--nebula-blue) 5%, var(--nebula-dark) 40%, transparent);
       border-radius: 50%;
     }
 
@@ -221,7 +221,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      opacity: 0.5;
+      opacity: 0.7;
     }
 
     .toggle-container {
@@ -365,6 +365,11 @@
       .modal-content {
         width: 90%;
       }
+      .nebula-container {
+        width: 200px;
+        height: 200px;
+        top: -60px;
+      }
     }
   </style>
 </head>
@@ -404,10 +409,12 @@
     <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-3 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
     <div class="chat-input-container fixed bottom-1 left-1 right-1 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center z-20" id="chat-input-container">
       <input type="text" id="chat-input" class="flex-1 bg-transparent p-2 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="800">
-      <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Send message">
+      <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Toggle voice">
         <svg id="send-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
         </svg>
       </button>
     </div>
@@ -638,35 +645,36 @@
       }
       elements.nebulaContainer.classList.remove('hidden');
       const ctx = elements.nebulaCanvas.getContext('2d');
-      elements.nebulaCanvas.width = 200;
-      elements.nebulaCanvas.height = 200;
-      const particleCount = window.innerWidth <= 640 ? 10 : 20;
+      elements.nebulaCanvas.width = window.innerWidth <= 640 ? 200 : 260;
+      elements.nebulaCanvas.height = window.innerWidth <= 640 ? 200 : 260;
+      const particleCount = window.innerWidth <= 640 ? 50 : 100; // Increased for cloud effect
       const particles = Array.from({length: particleCount}, () => ({
-        x: 100,
-        y: 100,
-        radius: Math.random() * 5 + 2,
+        x: elements.nebulaCanvas.width / 2,
+        y: elements.nebulaCanvas.height / 2,
+        radius: Math.random() * 6 + 2,
         angle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.02 + 0.01,
-        color: `hsl(${Math.random() * 60 + 20}, 70%, 50%)`,
+        speed: Math.random() * 0.01 + 0.005,
+        opacity: Math.random() * 0.5 + 0.2,
+        offset: Math.random() * 80 + 20,
+        color: `hsl(${Math.random() * 90 + 180}, 70%, ${Math.random() * 20 + 50}%)`
       }));
 
       function animateNebula() {
-        if (!elements.welcomeContainer.classList.contains('hidden')) {
-          ctx.clearRect(0, 0, 200, 200);
-          particles.forEach(p => {
-            p.angle += p.speed;
-            p.x = 100 + Math.cos(p.angle) * 50;
-            p.y = 100 + Math.sin(p.angle) * 50;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-          });
-          state.nebulaAnimationFrame = requestAnimationFrame(animateNebula);
-        } else {
-          cancelAnimationFrame(state.nebulaAnimationFrame);
-          elements.nebulaContainer.classList.add('hidden');
-        }
+        ctx.clearRect(0, 0, elements.nebulaCanvas.width, elements.nebulaCanvas.height);
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+          p.angle += p.speed;
+          p.x = elements.nebulaCanvas.width / 2 + Math.cos(p.angle) * p.offset;
+          p.y = elements.nebulaCanvas.height / 2 + Math.sin(p.angle) * p.offset;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.opacity;
+          ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        state.nebulaAnimationFrame = requestAnimationFrame(animateNebula);
       }
       animateNebula();
     }
@@ -721,7 +729,7 @@
         elements.chatMessages.innerHTML = '';
       }
       elements.welcomeContainer.classList.remove('hidden');
-      elements.chatMessages.classList.remove('hidden');
+      elements.chatMessages.classList.add('hidden');
       startNebulaAnimation();
       if (state.voiceEnabled) {
         const welcomeMessage = "Hey! I'm Vynix AI. What's on your mind?";
@@ -810,9 +818,7 @@
 
     async function appendMessage(text, sender, displayName) {
       if (isVoiceMode) {
-        elements.welcomeContainer.classList.remove('hidden');
-        startNebulaAnimation();
-        return;
+        return; // Suppress text messages in voice mode
       }
       if (!elements.chatMessages) {
         console.error("Chat messages element not found");
@@ -985,9 +991,9 @@
       if (isMicrophone && SpeechRecognition) {
         isVoiceMode = true;
         elements.welcomeContainer.classList.remove('hidden');
-        startNebulaAnimation();
         elements.chatMessages.classList.add('hidden');
         elements.sendButton.disabled = true;
+        startNebulaAnimation();
         showToast('Listening...', 'success');
 
         recognition.lang = state.language || 'en-US';
@@ -1003,6 +1009,7 @@
           try {
             const aiResponse = await getAIResponse(transcript);
             await playElevenLabsAudio(aiResponse);
+            // Do not append messages to chat in voice mode
           } catch (error) {
             showToast('Error processing voice input.', 'error');
             console.error(error);
@@ -1047,7 +1054,6 @@
     function endVoiceMode() {
       isVoiceMode = false;
       elements.sendButton.disabled = false;
-      elements.chatMessages.classList.remove('hidden');
       elements.welcomeContainer.classList.remove('hidden');
       updateSendIcon();
       if (recognition) recognition.stop();
