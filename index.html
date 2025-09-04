@@ -11,7 +11,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Existing styles unchanged */
     :root {
       --primary: #1E3A8A;
       --accent: #000000;
@@ -28,6 +27,8 @@
       --glow: rgba(0, 0, 0, 0.5);
       --nebula-blue: rgba(30, 58, 138, 0.5);
       --nebula-dark: rgba(0, 0, 0, 0.3);
+      /* NEW */
+      --alert-bg: #B91C1C; /* Red background for collision alerts */
     }
 
     [data-theme="light"] {
@@ -40,6 +41,7 @@
       --glow: rgba(0, 0, 0, 0.3);
       --nebula-blue: rgba(59, 130, 246, 0.4);
       --nebula-dark: rgba(0, 0, 0, 0.2);
+      --alert-bg: #FECACA; /* Light red for alerts in light mode */
     }
 
     body {
@@ -170,6 +172,19 @@
     .message.ai .scrollable-content {
       background: var(--card-bg);
       color: var(--text-primary);
+    }
+
+    /* NEW: Style for collision alert messages */
+    .message.alert {
+      align-self: flex-start;
+      background: var(--alert-bg);
+      border: 1px solid var(--error);
+      color: var(--white);
+    }
+
+    .message.alert .scrollable-content {
+      background: transparent;
+      color: var(--white);
     }
 
     .typing-dot {
@@ -303,7 +318,7 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
-    .modal-content textarea {
+    .modal-content textarea, .modal-content select {
       width: 100%;
       min-height: 100px;
       background: var(--highlight);
@@ -316,7 +331,7 @@
       font-size: 0.875rem;
     }
 
-    .modal-content textarea:focus {
+    .modal-content textarea:focus, .modal-content select:focus {
       border-color: var(--focus);
       box-shadow: 0 0 0 2px var(--glow);
     }
@@ -396,8 +411,21 @@
       <button id="voice-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle voice">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
       </button>
+      <!-- NEW: Sensor toggle button -->
+      <button id="sensor-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle collision detection">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v6m0 8v6m-6-6h12"></path>
+        </svg>
+      </button>
       <button id="signout-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Sign out">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      </button>
+      <!-- NEW: Settings button for alert customization -->
+      <button id="settings-button" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Open settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
       </button>
     </div>
     <div class="welcome-container" id="welcome-container">
@@ -441,6 +469,31 @@
         </div>
       </div>
     </div>
+    <!-- NEW: Settings modal for alert customization -->
+    <div id="settings-modal" class="modal" role="dialog" aria-labelledby="settings-modal-title" aria-describedby="settings-modal-description">
+      <div class="modal-content modal-slide-in">
+        <h2 id="settings-modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Collision Alert Settings</h2>
+        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your collision alerts</p>
+        <label class="block mb-2">
+          <span class="text-sm text-[var(--text-primary)]">Alert Sound Pitch</span>
+          <select id="alert-pitch" class="mt-1">
+            <option value="1000">High (1000 Hz)</option>
+            <option value="500">Low (500 Hz)</option>
+          </select>
+        </label>
+        <label class="block mb-2">
+          <span class="text-sm text-[var(--text-primary)]">Vibration Pattern</span>
+          <select id="vibration-pattern" class="mt-1">
+            <option value="short">Short (200ms)</option>
+            <option value="long">Long (200,100,200ms)</option>
+          </select>
+        </label>
+        <div class="modal-buttons">
+          <button id="settings-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
+          <button id="settings-save" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Save settings">Save</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script type="module">
@@ -464,6 +517,10 @@
       theme: localStorage.getItem('theme') || 'dark',
       language: localStorage.getItem('language') || 'en',
       voiceEnabled: localStorage.getItem('voiceEnabled') === 'true' || false,
+      // NEW: Collision detection settings
+      collisionDetectionEnabled: localStorage.getItem('collisionDetectionEnabled') === 'true' || false,
+      alertPitch: localStorage.getItem('alertPitch') || '1000', // Default to high pitch (1000 Hz)
+      vibrationPattern: localStorage.getItem('vibrationPattern') || 'short', // Default to short vibration
       elevenLabsApiKey: 'sk_d88fade7d825518c26eece14b9a8378ededd44ddc7889573', // Move to backend for security
       geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Move to backend for security
       aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
@@ -490,15 +547,23 @@
       chatInputContainer: document.getElementById('chat-input-container'),
       signoutButton: document.getElementById('signout-button'),
       fileUpload: document.getElementById('file-upload'),
-      uploadButton: document.getElementById('upload-button')
+      uploadButton: document.getElementById('upload-button'),
+      // NEW: Settings modal elements
+      settingsModal: document.getElementById('settings-modal'),
+      settingsSave: document.getElementById('settings-save'),
+      settingsCancel: document.getElementById('settings-cancel'),
+      alertPitch: document.getElementById('alert-pitch'),
+      vibrationPattern: document.getElementById('vibration-pattern'),
+      sensorToggle: document.getElementById('sensor-toggle'),
+      settingsButton: document.getElementById('settings-button')
     };
 
     let app, auth, db;
     let isVoiceMode = false;
 
     // Cloudinary Configuration
-    const CLOUD_NAME = 'dqkujefxj'; // Replace with your Cloudinary cloud name
-    const UPLOAD_PRESET = 'banter_box'; // Replace with your unsigned upload preset
+    const CLOUD_NAME = 'dqkujefxj';
+    const UPLOAD_PRESET = 'banter_box';
 
     // Speech Recognition Setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
@@ -527,6 +592,98 @@
       <line x1="12" y1="19" x2="12" y2="23"></line>
       <line x1="8" y1="23" x2="16" y2="23"></line>
     `;
+
+    // NEW: Initialize sensors for collision detection
+    function initializeSensors() {
+      if ('DeviceMotionEvent' in window) {
+        window.addEventListener('devicemotion', handleDeviceMotion, true);
+        console.log("DeviceMotionEvent initialized");
+      } else {
+        showToast("Device motion not supported on this device.", 'error');
+      }
+
+      if ('ProximitySensor' in window) {
+        const proximity = new ProximitySensor();
+        proximity.addEventListener('reading', () => {
+          if (proximity.near) {
+            triggerCollisionAlert(`Wall detected within ${proximity.distance} cm!`);
+          }
+        });
+        proximity.start();
+      } else {
+        console.log("ProximitySensor not supported");
+      }
+    }
+
+    // NEW: Handle device motion for collision detection
+    function handleDeviceMotion(event) {
+      const { acceleration } = event;
+      const threshold = 10; // Adjust based on testing (m/s²)
+      if (
+        Math.abs(acceleration.x) > threshold ||
+        Math.abs(acceleration.y) > threshold ||
+        Math.abs(acceleration.z) > threshold
+      ) {
+        triggerCollisionAlert("Rapid movement detected! Possible collision!");
+      }
+    }
+
+    // NEW: Trigger collision alert with sound and vibration
+    async function triggerCollisionAlert(message) {
+      playAlertSound();
+      const pattern = state.vibrationPattern === 'short' ? [200] : [200, 100, 200];
+      vibrate(pattern);
+      showToast(message, 'error');
+      await appendMessage(message, 'alert', 'Vynix AI Alert');
+    }
+
+    // NEW: Play alert sound
+    function playAlertSound() {
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(parseInt(state.alertPitch), audioContext.currentTime);
+      oscillator.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.2);
+    }
+
+    // NEW: Request sensor permissions
+    async function requestSensorPermissions() {
+      if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const response = await DeviceMotionEvent.requestPermission();
+          if (response === 'granted') {
+            initializeSensors();
+          } else {
+            showToast("Sensor access denied.", 'error');
+            state.collisionDetectionEnabled = false;
+            localStorage.setItem('collisionDetectionEnabled', false);
+            elements.sensorToggle.classList.remove('active');
+          }
+        } catch (error) {
+          showToast("Failed to request sensor permissions.", 'error');
+          console.error(error);
+        }
+      } else {
+        initializeSensors();
+      }
+    }
+
+    // NEW: Show settings modal
+    function showSettingsModal() {
+      elements.settingsModal.style.display = 'flex';
+      elements.alertPitch.value = state.alertPitch;
+      elements.vibrationPattern.value = state.vibrationPattern;
+      elements.alertPitch.focus();
+    }
+
+    // NEW: Close settings modal
+    function closeSettingsModal() {
+      elements.settingsModal.style.display = 'none';
+      elements.settingsSave.onclick = null;
+      elements.settingsCancel.onclick = null;
+    }
 
     function initializeFirebase() {
       try {
@@ -724,7 +881,6 @@
       }
     }
 
-    // File Upload to Cloudinary
     async function uploadToCloudinary(file) {
       const formData = new FormData();
       formData.append('file', file);
@@ -744,7 +900,6 @@
       }
     }
 
-    // Modified getAIResponse to handle file uploads
     async function getAIResponse(question, file = null) {
       try {
         const languageNames = {
@@ -761,7 +916,7 @@
           ts: 'Xitsonga'
         };
         const lang = languageNames[state.language] || 'English';
-        const model = file ? 'gemini-1.5-pro' : 'gemini-2.5-flash'; // Use multimodal model for files
+        const model = file ? 'gemini-1.5-pro' : 'gemini-2.5-flash';
         const contents = [{ parts: [{ text: `You are Vynix AI, a helpful general-knowledge assistant. Respond in ${lang}. Analyze the provided file or answer the query: ${question}` }] }];
 
         if (file) {
@@ -788,10 +943,9 @@
       }
     }
 
-    // Modified appendMessage to store in Firebase
     async function appendMessage(text, sender, displayName, file = null) {
-      if (isVoiceMode && !file) {
-        return; // Suppress text messages in voice mode, allow file messages
+      if (isVoiceMode && !file && sender !== 'alert') {
+        return;
       }
       if (!elements.chatMessages) {
         console.error("Chat messages element not found");
@@ -810,7 +964,7 @@
       state.messages.push(msg);
       elements.welcomeContainer.classList.add('hidden');
       stopNebulaAnimation();
-      if (sender === 'user') {
+      if (sender === 'user' || sender === 'alert') {
         renderMessage(msg, msg.id);
       } else {
         const tempMsg = {...msg, text: ''};
@@ -840,7 +994,6 @@
       }
     }
 
-    // Load chat history from Firebase
     async function loadChatHistory() {
       const messagesRef = ref(db, `users/${state.userId}/messages`);
       const snapshot = await get(messagesRef);
@@ -861,7 +1014,6 @@
       }
     }
 
-    // Modified renderMessage to display files
     function renderMessage(msg, id) {
       if (!elements.chatMessages) {
         console.error("Chat messages element not found");
@@ -875,7 +1027,7 @@
       content.className = 'message-content p-3 rounded-xl flex gap-2 items-start';
       const avatar = document.createElement('div');
       avatar.className = 'message-avatar w-8 h-8 rounded-full flex-shrink-0';
-      if (msg.sender === 'ai') {
+      if (msg.sender === 'ai' || msg.sender === 'alert') {
         const img = document.createElement('img');
         img.src = state.aiAvatar;
         img.alt = 'Vynix AI avatar';
@@ -958,7 +1110,6 @@
       return div.innerHTML;
     }
 
-    // File Upload Handler
     elements.uploadButton.addEventListener('click', () => {
       elements.fileUpload.click();
     });
@@ -980,7 +1131,7 @@
         showToast('Error uploading file', 'error');
       } finally {
         elements.uploadButton.disabled = false;
-        elements.fileUpload.value = ''; // Clear file input
+        elements.fileUpload.value = '';
       }
     });
 
@@ -1226,6 +1377,48 @@
 
     elements.signoutButton.addEventListener('click', handleSignOut);
 
+    // NEW: Sensor toggle event listener
+    elements.sensorToggle.addEventListener('click', () => {
+      state.collisionDetectionEnabled = !state.collisionDetectionEnabled;
+      localStorage.setItem('collisionDetectionEnabled', state.collisionDetectionEnabled);
+      if (state.collisionDetectionEnabled) {
+        requestSensorPermissions();
+        elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
+        showToast("Collision detection enabled", 'success');
+      } else {
+        window.removeEventListener('devicemotion', handleDeviceMotion, true);
+        elements.sensorToggle.classList.remove('bg-[var(--success)]', 'text-white');
+        showToast("Collision detection disabled", 'success');
+      }
+    });
+
+    // NEW: Settings button event listener
+    elements.settingsButton.addEventListener('click', () => {
+      showSettingsModal();
+      const save = () => {
+        state.alertPitch = elements.alertPitch.value;
+        state.vibrationPattern = elements.vibrationPattern.value;
+        localStorage.setItem('alertPitch', state.alertPitch);
+        localStorage.setItem('vibrationPattern', state.vibrationPattern);
+        showToast('Settings saved!', 'success');
+        closeSettingsModal();
+      };
+      const cancel = () => closeSettingsModal();
+      elements.settingsSave.onclick = save;
+      elements.settingsCancel.onclick = cancel;
+      elements.alertPitch.onkeypress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          save();
+        }
+      };
+      document.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+          cancel();
+        }
+      };
+    });
+
     function clearChat() {
       state.messages = [];
       if (elements.chatMessages) {
@@ -1246,6 +1439,11 @@
       startNebulaAnimation();
       updateSendIcon();
       initializeFirebase();
+      // NEW: Initialize sensor toggle state
+      if (state.collisionDetectionEnabled) {
+        requestSensorPermissions();
+        elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
+      }
     });
   </script>
 </body>
