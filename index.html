@@ -486,7 +486,7 @@
     let isVoiceMode = false;
 
     // Speech Recognition Setup
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
     let recognition = null;
 
     if (SpeechRecognition) {
@@ -494,9 +494,10 @@
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = state.language || 'en-US';
+      console.log("SpeechRecognition API initialized successfully");
     } else {
       console.warn('SpeechRecognition API not supported in this browser.');
-      showToast('Voice input is not supported in this browser.', 'error');
+      showToast('Voice input is not supported in this browser. Please use a compatible browser like Chrome or Edge.', 'error');
     }
 
     // SVG Icons
@@ -647,7 +648,7 @@
       const ctx = elements.nebulaCanvas.getContext('2d');
       elements.nebulaCanvas.width = window.innerWidth <= 640 ? 200 : 260;
       elements.nebulaCanvas.height = window.innerWidth <= 640 ? 200 : 260;
-      const particleCount = window.innerWidth <= 640 ? 50 : 100; // Increased for cloud effect
+      const particleCount = window.innerWidth <= 640 ? 50 : 100;
       const particles = Array.from({length: particleCount}, () => ({
         x: elements.nebulaCanvas.width / 2,
         y: elements.nebulaCanvas.height / 2,
@@ -699,6 +700,14 @@
       }
     }
 
+    function vibrate(duration) {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(duration);
+      } else {
+        console.log('Vibration not supported on this device');
+      }
+    }
+
     elements.themeToggle.addEventListener('click', () => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
       document.body.dataset.theme = state.theme;
@@ -731,10 +740,6 @@
       elements.welcomeContainer.classList.remove('hidden');
       elements.chatMessages.classList.add('hidden');
       startNebulaAnimation();
-      if (state.voiceEnabled) {
-        const welcomeMessage = "Hey! I'm Vynix AI. What's on your mind?";
-        playElevenLabsAudio(welcomeMessage);
-      }
     }
 
     elements.newChatButton.addEventListener('click', clearChat);
@@ -996,10 +1001,18 @@
         startNebulaAnimation();
         showToast('Listening...', 'success');
 
+        vibrate(200);
+
         recognition.lang = state.language || 'en-US';
+
+        recognition.onstart = () => {
+          console.log('Speech recognition started');
+          setTimeout(() => vibrate([100, 50, 100]), 0);
+        };
 
         recognition.onresult = async (event) => {
           const transcript = event.results[0][0].transcript.trim();
+          console.log('Speech recognized:', transcript);
           if (!transcript) {
             showToast('No speech detected.', 'error');
             endVoiceMode();
@@ -1009,7 +1022,6 @@
           try {
             const aiResponse = await getAIResponse(transcript);
             await playElevenLabsAudio(aiResponse);
-            // Do not append messages to chat in voice mode
           } catch (error) {
             showToast('Error processing voice input.', 'error');
             console.error(error);
@@ -1019,17 +1031,46 @@
         };
 
         recognition.onerror = (event) => {
-          showToast(`Speech recognition error: ${event.error}`, 'error');
+          console.error('Speech recognition error:', event.error);
+          let errorMessage = 'Speech recognition error occurred.';
+          switch (event.error) {
+            case 'no-speech':
+              errorMessage = 'No speech was detected.';
+              break;
+            case 'audio-capture':
+              errorMessage = 'No microphone found. Please check your permissions.';
+              break;
+            case 'not-allowed':
+              errorMessage = 'Microphone access denied. Please allow access in browser settings.';
+              break;
+            case 'network':
+              errorMessage = 'Network error. Please check your connection.';
+              break;
+            case 'service-not-allowed':
+              errorMessage = 'Speech service not allowed. Please enable it.';
+              break;
+            default:
+              errorMessage = `Error: ${event.error}`;
+          }
+          showToast(errorMessage, 'error');
           endVoiceMode();
         };
 
         recognition.onend = () => {
+          console.log('Speech recognition ended');
           if (isVoiceMode) {
+            setTimeout(() => vibrate(100), 0);
             endVoiceMode();
           }
         };
 
-        recognition.start();
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Failed to start speech recognition:', error);
+          showToast('Failed to start speech recognition. Please check microphone permissions.', 'error');
+          endVoiceMode();
+        }
       } else {
         const q = elements.chatInput.value.trim();
         if (!q || elements.sendButton.disabled) return;
@@ -1039,9 +1080,6 @@
           elements.chatInput.value = '';
           const res = await getAIResponse(q);
           await appendMessage(res, 'ai', 'Vynix AI');
-          if (state.voiceEnabled) {
-            await playElevenLabsAudio(res);
-          }
         } catch {
           showToast('Error sending message', 'error');
         } finally {
@@ -1056,7 +1094,9 @@
       elements.sendButton.disabled = false;
       elements.welcomeContainer.classList.remove('hidden');
       updateSendIcon();
-      if (recognition) recognition.stop();
+      if (recognition) {
+        recognition.stop();
+      }
     }
 
     elements.sendButton.addEventListener('click', send);
@@ -1082,10 +1122,6 @@
       startNebulaAnimation();
       updateSendIcon();
       initializeFirebase();
-      if (state.voiceEnabled) {
-        const welcomeMessage = "Hey! I'm Vynix AI. What's on your mind?";
-        playElevenLabsAudio(welcomeMessage);
-      }
     });
   </script>
 </body>
