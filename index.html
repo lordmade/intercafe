@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* Existing styles unchanged */
     :root {
       --primary: #1E3A8A;
       --accent: #000000;
@@ -409,6 +410,14 @@
     <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-3 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
     <div class="chat-input-container fixed bottom-1 left-1 right-1 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center z-20" id="chat-input-container">
       <input type="text" id="chat-input" class="flex-1 bg-transparent p-2 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="800">
+      <input type="file" id="file-upload" accept="image/*,application/pdf" class="hidden" aria-label="Upload file">
+      <button id="upload-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Upload file">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </button>
       <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Toggle voice">
         <svg id="send-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -437,7 +446,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -479,11 +488,17 @@
       modalSubmit: document.getElementById('modal-submit'),
       modalCancel: document.getElementById('modal-cancel'),
       chatInputContainer: document.getElementById('chat-input-container'),
-      signoutButton: document.getElementById('signout-button')
+      signoutButton: document.getElementById('signout-button'),
+      fileUpload: document.getElementById('file-upload'),
+      uploadButton: document.getElementById('upload-button')
     };
 
     let app, auth, db;
     let isVoiceMode = false;
+
+    // Cloudinary Configuration
+    const CLOUD_NAME = 'dqkujefxj'; // Replace with your Cloudinary cloud name
+    const UPLOAD_PRESET = 'banter_box'; // Replace with your unsigned upload preset
 
     // Speech Recognition Setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
@@ -546,6 +561,7 @@
             }
             elements.chatInput.disabled = false;
             elements.sendButton.disabled = false;
+            loadChatHistory();
           } else {
             console.log("No authenticated user, redirecting to signup.html");
             showToast("Please sign in to access Vynix AI.", 'error');
@@ -708,129 +724,89 @@
       }
     }
 
-    elements.themeToggle.addEventListener('click', () => {
-      state.theme = state.theme === 'dark' ? 'light' : 'dark';
-      document.body.dataset.theme = state.theme;
-      localStorage.setItem('theme', state.theme);
-      showToast(`Theme set to ${state.theme}`, 'success');
-    });
-
-    elements.voiceToggle.addEventListener('click', () => {
-      state.voiceEnabled = !state.voiceEnabled;
-      localStorage.setItem('voiceEnabled', state.voiceEnabled);
-      showToast(`Voice ${state.voiceEnabled ? 'enabled' : 'disabled'}`, 'success');
-    });
-
-    elements.languageSelect.addEventListener('change', () => {
-      state.language = elements.languageSelect.value;
-      localStorage.setItem('language', state.language);
-      if (recognition) {
-        recognition.lang = state.language || 'en-US';
+    // File Upload to Cloudinary
+    async function uploadToCloudinary(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+        return { url: data.secure_url, publicId: data.public_id, type: file.type };
+      } catch (error) {
+        console.error('Cloudinary upload error:', error);
+        showToast(`Failed to upload file: ${error.message}`, 'error');
+        return null;
       }
-      showToast(`Language set to ${elements.languageSelect.options[elements.languageSelect.selectedIndex].text}`, 'success');
-    });
-
-    elements.signoutButton.addEventListener('click', handleSignOut);
-
-    function clearChat() {
-      state.messages = [];
-      if (elements.chatMessages) {
-        elements.chatMessages.innerHTML = '';
-      }
-      elements.welcomeContainer.classList.remove('hidden');
-      elements.chatMessages.classList.add('hidden');
-      startNebulaAnimation();
     }
 
-    elements.newChatButton.addEventListener('click', clearChat);
+    // Modified getAIResponse to handle file uploads
+    async function getAIResponse(question, file = null) {
+      try {
+        const languageNames = {
+          en: 'English',
+          af: 'Afrikaans',
+          nr: 'isiNdebele',
+          xh: 'isiXhosa',
+          zu: 'isiZulu',
+          nso: 'Sepedi',
+          st: 'Sesotho',
+          tn: 'Setswana',
+          ss: 'siSwati',
+          ve: 'Tshivenda',
+          ts: 'Xitsonga'
+        };
+        const lang = languageNames[state.language] || 'English';
+        const model = file ? 'gemini-1.5-pro' : 'gemini-2.5-flash'; // Use multimodal model for files
+        const contents = [{ parts: [{ text: `You are Vynix AI, a helpful general-knowledge assistant. Respond in ${lang}. Analyze the provided file or answer the query: ${question}` }] }];
 
-    function renderMessage(msg, id) {
-      if (!elements.chatMessages) {
-        console.error("Chat messages element not found");
-        showToast("Failed to render message: UI element missing.", 'error');
-        return;
-      }
-      const div = document.createElement('div');
-      div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
-      div.role = 'listitem';
-      const content = document.createElement('div');
-      content.className = 'message-content p-3 rounded-xl flex gap-2 items-start';
-      const avatar = document.createElement('div');
-      avatar.className = 'message-avatar w-8 h-8 rounded-full flex-shrink-0';
-      if (msg.sender === 'ai') {
-        const img = document.createElement('img');
-        img.src = state.aiAvatar;
-        img.alt = 'Vynix AI avatar';
-        img.loading = 'lazy';
-        img.className = 'w-full h-full rounded-full';
-        avatar.appendChild(img);
-      } else {
-        avatar.textContent = state.userName[0].toUpperCase();
-        avatar.classList.add('bg-gradient-to-r', 'from-[var(--primary)]', 'to-[var(--accent)]', 'text-white', 'flex', 'items-center', 'justify-center', 'font-bold');
-      }
-      const body = document.createElement('div');
-      body.className = 'flex-1';
-      const header = document.createElement('div');
-      header.className = 'message-header font-semibold text-xs';
-      header.textContent = msg.displayName;
-      const scrollable = document.createElement('div');
-      scrollable.className = 'scrollable-content';
-      const text = document.createElement('div');
-      text.className = 'text-xs';
-      text.innerHTML = marked.parse(msg.text);
-      scrollable.appendChild(text);
-      const time = document.createElement('div');
-      time.className = 'message-timestamp text-[0.65rem] text-[var(--text-secondary)] mt-1';
-      time.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-      body.append(header, scrollable, time);
-      content.append(avatar, body);
-      div.append(content);
-      const actions = document.createElement('div');
-      actions.className = 'message-actions flex gap-3 mt-1 self-end';
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition';
-      copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
-      copyBtn.ariaLabel = 'Copy message';
-      copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.text).then(() => showToast('Copied!', 'success')).catch(() => showToast('Copy failed', 'error')));
-      if (msg.sender === 'ai') {
-        const thumbsUp = document.createElement('button');
-        thumbsUp.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--success)] transition';
-        thumbsUp.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
-        thumbsUp.ariaLabel = 'Good response';
-        thumbsUp.addEventListener('click', () => {
-          showToast('Thanks for the feedback! I learned from this.', 'success');
+        if (file) {
+          const mimeType = file.type;
+          if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+            contents[0].parts.push({ fileData: { mimeType, fileUri: question.split(': ')[1] } });
+          } else {
+            return 'Unsupported file type. Please upload an image or PDF.';
+          }
+        }
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents })
         });
-        const thumbsDown = document.createElement('button');
-        thumbsDown.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--error)] transition';
-        thumbsDown.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
-        thumbsDown.ariaLabel = 'Bad response';
-        thumbsDown.addEventListener('click', () => {
-          showToast('Sorry about that! Please provide a better response.', 'error');
-          showFeedbackModal((input) => {
-            if (input) {
-              showToast('Thanks for teaching me a better response!', 'success');
-            }
-          });
-        });
-        actions.append(thumbsUp, thumbsDown);
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        return data.candidates[0].content.parts[0].text;
+      } catch (error) {
+        console.error("AI response error:", error);
+        showToast('Request failed', 'error');
+        return 'Sorry, something went wrong. Try again.';
       }
-      actions.append(copyBtn);
-      div.append(actions);
-      elements.chatMessages.appendChild(div);
-      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-      return div;
     }
 
-    async function appendMessage(text, sender, displayName) {
-      if (isVoiceMode) {
-        return; // Suppress text messages in voice mode
+    // Modified appendMessage to store in Firebase
+    async function appendMessage(text, sender, displayName, file = null) {
+      if (isVoiceMode && !file) {
+        return; // Suppress text messages in voice mode, allow file messages
       }
       if (!elements.chatMessages) {
         console.error("Chat messages element not found");
         showToast("Failed to append message: UI element missing.", 'error');
         return;
       }
-      const msg = {id: Date.now().toString(), text, sender, displayName, timestamp: Date.now()};
+      const msg = {
+        id: push(ref(db, `users/${state.userId}/messages`)).key,
+        text,
+        sender,
+        displayName,
+        timestamp: Date.now(),
+        file: file ? { url: file.url, publicId: file.publicId, type: file.type } : null
+      };
+      await set(ref(db, `users/${state.userId}/messages/${msg.id}`), msg);
       state.messages.push(msg);
       elements.welcomeContainer.classList.add('hidden');
       stopNebulaAnimation();
@@ -864,43 +840,149 @@
       }
     }
 
+    // Load chat history from Firebase
+    async function loadChatHistory() {
+      const messagesRef = ref(db, `users/${state.userId}/messages`);
+      const snapshot = await get(messagesRef);
+      if (snapshot.exists()) {
+        state.messages = [];
+        elements.chatMessages.innerHTML = '';
+        snapshot.forEach(child => {
+          const msg = child.val();
+          msg.id = child.key;
+          state.messages.push(msg);
+          renderMessage(msg, msg.id);
+        });
+        if (state.messages.length > 0) {
+          elements.welcomeContainer.classList.add('hidden');
+          elements.chatMessages.classList.remove('hidden');
+          stopNebulaAnimation();
+        }
+      }
+    }
+
+    // Modified renderMessage to display files
+    function renderMessage(msg, id) {
+      if (!elements.chatMessages) {
+        console.error("Chat messages element not found");
+        showToast("Failed to render message: UI element missing.", 'error');
+        return;
+      }
+      const div = document.createElement('div');
+      div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
+      div.role = 'listitem';
+      const content = document.createElement('div');
+      content.className = 'message-content p-3 rounded-xl flex gap-2 items-start';
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar w-8 h-8 rounded-full flex-shrink-0';
+      if (msg.sender === 'ai') {
+        const img = document.createElement('img');
+        img.src = state.aiAvatar;
+        img.alt = 'Vynix AI avatar';
+        img.loading = 'lazy';
+        img.className = 'w-full h-full rounded-full';
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = state.userName[0].toUpperCase();
+        avatar.classList.add('bg-gradient-to-r', 'from-[var(--primary)]', 'to-[var(--accent)]', 'text-white', 'flex', 'items-center', 'justify-center', 'font-bold');
+      }
+      const body = document.createElement('div');
+      body.className = 'flex-1';
+      const header = document.createElement('div');
+      header.className = 'message-header font-semibold text-xs';
+      header.textContent = msg.displayName;
+      const scrollable = document.createElement('div');
+      scrollable.className = 'scrollable-content';
+      const text = document.createElement('div');
+      text.className = 'text-xs';
+      if (msg.file && msg.file.url) {
+        if (msg.file.type.startsWith('image/')) {
+          text.innerHTML = `<a href="${msg.file.url}" target="_blank"><img src="${msg.file.url}" alt="Uploaded image" class="max-w-full h-auto rounded-lg mb-2"></a>${marked.parse(msg.text)}`;
+        } else if (msg.file.type === 'application/pdf') {
+          text.innerHTML = `<a href="${msg.file.url}" target="_blank" class="text-[var(--focus)] underline">View PDF: ${msg.text}</a>`;
+        }
+      } else {
+        text.innerHTML = marked.parse(msg.text);
+      }
+      scrollable.appendChild(text);
+      const time = document.createElement('div');
+      time.className = 'message-timestamp text-[0.65rem] text-[var(--text-secondary)] mt-1';
+      time.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      body.append(header, scrollable, time);
+      content.append(avatar, body);
+      div.append(content);
+      const actions = document.createElement('div');
+      actions.className = 'message-actions flex gap-3 mt-1 self-end';
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition';
+      copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      copyBtn.ariaLabel = 'Copy message';
+      copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.text).then(() => showToast('Copied!', 'success')).catch(() => showToast('Copy failed', 'error')));
+      if (msg.sender === 'ai') {
+        const thumbsUp = document.createElement('button');
+        thumbsUp.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--success)] transition';
+        thumbsUp.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
+        thumbsUp.ariaLabel = 'Good response';
+        thumbsUp.addEventListener('click', () => {
+          showToast('Thanks for the feedback! I learned from this.', 'success');
+        });
+        const thumbsDown = document.createElement('button');
+        thumbsDown.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--error)] transition';
+        thumbsDown.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
+        thumbsDown.ariaLabel = 'Bad response';
+        thumbsDown.addEventListener('click', () => {
+          showToast('Sorry about that! Please provide a better response.', 'error');
+          showFeedbackModal((input) => {
+            if (input) {
+              set(ref(db, `users/${state.userId}/feedback/${id}`), {
+                original: msg.text,
+                suggested: input,
+                timestamp: Date.now()
+              });
+              showToast('Thanks for teaching me a better response!', 'success');
+            }
+          });
+        });
+        actions.append(thumbsUp, thumbsDown);
+      }
+      actions.append(copyBtn);
+      div.append(actions);
+      elements.chatMessages.appendChild(div);
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+      return div;
+    }
+
     function sanitize(input) {
       const div = document.createElement('div');
       div.textContent = input;
       return div.innerHTML;
     }
 
-    async function getAIResponse(question) {
+    // File Upload Handler
+    elements.uploadButton.addEventListener('click', () => {
+      elements.fileUpload.click();
+    });
+
+    elements.fileUpload.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      elements.uploadButton.disabled = true;
       try {
-        const languageNames = {
-          en: 'English',
-          af: 'Afrikaans',
-          nr: 'isiNdebele',
-          xh: 'isiXhosa',
-          zu: 'isiZulu',
-          nso: 'Sepedi',
-          st: 'Sesotho',
-          tn: 'Setswana',
-          ss: 'siSwati',
-          ve: 'Tshivenda',
-          ts: 'Xitsonga'
-        };
-        const lang = languageNames[state.language] || 'English';
-        const prompt = `You are Vynix AI, a helpful general-knowledge assistant. Respond in ${lang} to the user's query. Provide accurate and concise information for general questions. Query: ${question}`;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({contents: [{parts: [{text: prompt}]}]})
-        });
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        return data.candidates[0].content.parts[0].text;
+        await appendMessage(`Uploading file: ${sanitize(file.name)}`, 'user', state.userName);
+        const fileData = await uploadToCloudinary(file);
+        if (fileData) {
+          const displayText = fileData.type.startsWith('image/') ? `Uploaded image: ${sanitize(file.name)}` : `Uploaded PDF: ${sanitize(file.name)}`;
+          await appendMessage(displayText, 'user', state.userName, fileData);
+          const aiResponse = await getAIResponse(`Analyze this file: ${fileData.url}`, fileData);
+          await appendMessage(aiResponse, 'ai', 'Vynix AI');
+        }
       } catch (error) {
-        console.error("AI response error:", error);
-        showToast('Request failed', 'error');
-        return 'Sorry, something went wrong. Try again.';
+        showToast('Error uploading file', 'error');
+      } finally {
+        elements.uploadButton.disabled = false;
+        elements.fileUpload.value = ''; // Clear file input
       }
-    }
+    });
 
     async function playElevenLabsAudio(text) {
       if (!state.elevenLabsApiKey || state.elevenLabsApiKey === 'YOUR_ELEVENLABS_API_KEY') {
@@ -1021,7 +1103,10 @@
 
           try {
             const aiResponse = await getAIResponse(transcript);
-            await playElevenLabsAudio(aiResponse);
+            await appendMessage(aiResponse, 'ai', 'Vynix AI');
+            if (state.voiceEnabled) {
+              await playElevenLabsAudio(aiResponse);
+            }
           } catch (error) {
             showToast('Error processing voice input.', 'error');
             console.error(error);
@@ -1080,6 +1165,9 @@
           elements.chatInput.value = '';
           const res = await getAIResponse(q);
           await appendMessage(res, 'ai', 'Vynix AI');
+          if (state.voiceEnabled) {
+            await playElevenLabsAudio(res);
+          }
         } catch {
           showToast('Error sending message', 'error');
         } finally {
@@ -1113,6 +1201,42 @@
     elements.chatInput.addEventListener('focus', updateSendIcon);
     elements.chatInput.addEventListener('blur', updateSendIcon);
     elements.chatInput.addEventListener('input', updateSendIcon);
+
+    elements.themeToggle.addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.body.dataset.theme = state.theme;
+      localStorage.setItem('theme', state.theme);
+      showToast(`Theme set to ${state.theme}`, 'success');
+    });
+
+    elements.voiceToggle.addEventListener('click', () => {
+      state.voiceEnabled = !state.voiceEnabled;
+      localStorage.setItem('voiceEnabled', state.voiceEnabled);
+      showToast(`Voice ${state.voiceEnabled ? 'enabled' : 'disabled'}`, 'success');
+    });
+
+    elements.languageSelect.addEventListener('change', () => {
+      state.language = elements.languageSelect.value;
+      localStorage.setItem('language', state.language);
+      if (recognition) {
+        recognition.lang = state.language || 'en-US';
+      }
+      showToast(`Language set to ${elements.languageSelect.options[elements.languageSelect.selectedIndex].text}`, 'success');
+    });
+
+    elements.signoutButton.addEventListener('click', handleSignOut);
+
+    function clearChat() {
+      state.messages = [];
+      if (elements.chatMessages) {
+        elements.chatMessages.innerHTML = '';
+      }
+      elements.welcomeContainer.classList.remove('hidden');
+      elements.chatMessages.classList.add('hidden');
+      startNebulaAnimation();
+    }
+
+    elements.newChatButton.addEventListener('click', clearChat);
 
     document.addEventListener('DOMContentLoaded', () => {
       document.body.dataset.theme = state.theme;
