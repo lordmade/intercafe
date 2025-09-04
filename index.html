@@ -3,12 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Vynix AI Chat</title>
+  <title>Vynix Sensor Alerts</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -25,10 +21,9 @@
       --error: #EF4444;
       --success: #10B981;
       --glow: rgba(0, 0, 0, 0.5);
-      --nebula-blue: rgba(30, 58, 138, 0.5);
-      --nebula-dark: rgba(0, 0, 0, 0.3);
-      /* NEW */
-      --alert-bg: #B91C1C; /* Red background for collision alerts */
+      --black-hole-core: rgba(0, 0, 0, 1);
+      --black-hole-disk: rgba(255, 165, 0, 0.3);
+      --alert-bg: #B91C1C;
     }
 
     [data-theme="light"] {
@@ -39,9 +34,9 @@
       --border: #D1D5DB;
       --highlight: #E5E7EB;
       --glow: rgba(0, 0, 0, 0.3);
-      --nebula-blue: rgba(59, 130, 246, 0.4);
-      --nebula-dark: rgba(0, 0, 0, 0.2);
-      --alert-bg: #FECACA; /* Light red for alerts in light mode */
+      --black-hole-core: rgba(0, 0, 0, 1);
+      --black-hole-disk: rgba(255, 165, 0, 0.4);
+      --alert-bg: #FECACA;
     }
 
     body {
@@ -58,7 +53,7 @@
       .transition { transition: all 0.3s ease; }
       .slide-in { animation: slideIn 0.3s ease; }
       .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
-      .nebula { animation: nebulaSwirl 8s infinite ease-in-out; }
+      .black-hole { animation: blackHoleSwirl 10s infinite linear; }
       .modal-slide-in { animation: modalSlideIn 0.3s ease; }
     }
 
@@ -72,22 +67,9 @@
       50% { transform: scale(1.05); box-shadow: 0 0 20px var(--glow); }
     }
 
-    @keyframes nebulaSwirl {
-      0% {
-        transform: scale(1) rotate(0deg);
-        filter: blur(14px);
-        opacity: 0.8;
-      }
-      50% {
-        transform: scale(1.4) rotate(180deg);
-        filter: blur(10px);
-        opacity: 0.6;
-      }
-      100% {
-        transform: scale(1) rotate(360deg);
-        filter: blur(14px);
-        opacity: 0.8;
-      }
+    @keyframes blackHoleSwirl {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     @keyframes modalSlideIn {
@@ -95,149 +77,16 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .message {
+    .alert {
       max-width: 80%;
       padding: 0.75rem;
       border-radius: 1rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .message-content {
-      max-width: 100%;
-      box-sizing: border-box;
-      border-radius: 0.75rem;
-      display: flex;
-      gap: 0.5rem;
-      align-items: flex-start;
-      overflow: hidden;
-    }
-
-    .message-content .scrollable-content {
-      max-width: 100%;
-      max-height: 400px;
-      overflow-x: auto;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      padding: 0.5rem;
-      box-sizing: border-box;
-    }
-
-    .message-content .scrollable-content pre,
-    .message-content .scrollable-content code {
-      margin: 0;
-      white-space: pre-wrap;
-      font-size: 0.875rem;
-    }
-
-    .message-content .scrollable-content::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-
-    .message-content .scrollable-content::-webkit-scrollbar-track {
-      background: var(--highlight);
-      border-radius: 4px;
-    }
-
-    .message-content .scrollable-content::-webkit-scrollbar-thumb {
-      background: var(--accent);
-      border-radius: 4px;
-    }
-
-    .message-content .scrollable-content::-webkit-scrollbar-thumb:hover {
-      background: var(--focus);
-    }
-
-    .message.user {
-      align-self: flex-end;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      color: var(--white);
-    }
-
-    .message.user .scrollable-content {
-      background: transparent;
-      color: var(--white);
-    }
-
-    .message.ai {
-      align-self: flex-start;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-    }
-
-    .message.ai .scrollable-content {
-      background: var(--card-bg);
-      color: var(--text-primary);
-    }
-
-    /* NEW: Style for collision alert messages */
-    .message.alert {
-      align-self: flex-start;
       background: var(--alert-bg);
-      border: 1px solid var(--error);
       color: var(--white);
-    }
-
-    .message.alert .scrollable-content {
-      background: transparent;
-      color: var(--white);
-    }
-
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: typing 1.2s infinite;
-    }
-
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes typing {
-      0%, 100% { opacity: 0.3; transform: translateY(0); }
-      50% { opacity: 1; transform: translateY(-3px); }
-    }
-
-    .welcome-container {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 10;
-      transition: opacity 0.3s ease;
-    }
-
-    .nebula-container {
-      position: absolute;
-      top: -80px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 260px;
-      height: 260px;
-      pointer-events: none;
-      z-index: 9;
-    }
-
-    .nebula {
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, var(--nebula-blue) 5%, var(--nebula-dark) 40%, transparent);
-      border-radius: 50%;
-    }
-
-    canvas.nebula-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0.7;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
     }
 
     .toggle-container {
@@ -252,47 +101,44 @@
       justify-content: center;
     }
 
-    .language-select {
-      background: var(--card-bg);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-      padding: 0.25rem 0.5rem;
-      font-size: 0.875rem;
-      outline: none;
-      transition: border-color 0.3s ease;
-    }
-
-    .language-select:focus {
-      border-color: var(--focus);
-      box-shadow: 0 0 0 2px var(--glow);
-    }
-
-    .chat-messages {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-
-    .chat-messages::-webkit-scrollbar {
-      display: none;
-    }
-
-    .chat-messages.hidden {
-      display: none;
-    }
-
-    .chat-input-container {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem;
-    }
-
-    .new-chat-button {
+    .alert-container {
       position: fixed;
-      bottom: 5rem;
-      right: 1rem;
-      z-index: 20;
+      top: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 90%;
+      width: 600px;
+    }
+
+    .black-hole-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .black-hole {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, var(--black-hole-core) 20%, var(--black-hole-disk) 50%, transparent);
+      border-radius: 50%;
+    }
+
+    canvas.black-hole-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.8;
     }
 
     .modal {
@@ -318,20 +164,18 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
-    .modal-content textarea, .modal-content select {
+    .modal-content select {
       width: 100%;
-      min-height: 100px;
       background: var(--highlight);
       border: 1px solid var(--border);
       border-radius: 0.5rem;
       padding: 0.5rem;
       color: var(--text-primary);
-      resize: none;
       outline: none;
       font-size: 0.875rem;
     }
 
-    .modal-content textarea:focus, .modal-content select:focus {
+    .modal-content select:focus {
       border-color: var(--focus);
       box-shadow: 0 0 0 2px var(--glow);
     }
@@ -344,83 +188,44 @@
     }
 
     @media (max-width: 640px) {
-      .chat-container {
+      .black-hole-container {
+        width: 200px;
+        height: 200px;
+      }
+      .alert-container {
+        top: 2.5rem;
+        width: 90%;
+      }
+      .alert {
+        max-width: 90%;
         padding: 0.5rem;
-      }
-      .chat-messages {
-        padding-bottom: 4rem;
-      }
-      .chat-input-container {
-        bottom: 0.5rem;
-        left: 0.5rem;
-        right: 0.5rem;
-      }
-      .new-chat-button {
-        bottom: 4.5rem;
-        right: 0.5rem;
+        font-size: 0.875rem;
       }
       .toggle-container {
         top: 0.25rem;
       }
-      .welcome-message {
-        font-size: 1rem;
-      }
-      .message {
-        max-width: 90%;
-        padding: 0.5rem;
-      }
-      .message-content .scrollable-content {
-        max-height: 300px;
-      }
-      .language-select {
-        font-size: 0.75rem;
-      }
-      .input, button, textarea, select {
-        font-size: 0.875rem;
-      }
       .modal-content {
         width: 90%;
       }
-      .nebula-container {
-        width: 200px;
-        height: 200px;
-        top: -60px;
+      button, select {
+        font-size: 0.875rem;
       }
     }
   </style>
 </head>
 <body data-theme="dark">
-  <main class="chat-container p-4 flex flex-col h-[calc(100vh-6rem)] max-w-3xl mx-auto" id="chat-container">
+  <main class="sensor-container p-4 flex flex-col h-screen max-w-3xl mx-auto" id="sensor-container">
     <div class="toggle-container">
-      <select id="language-select" class="language-select" aria-label="Select language">
-        <option value="en">English</option>
-        <option value="af">Afrikaans</option>
-        <option value="nr">isiNdebele</option>
-        <option value="xh">isiXhosa</option>
-        <option value="zu">isiZulu</option>
-        <option value="nso">Sepedi</option>
-        <option value="st">Sesotho</option>
-        <option value="tn">Setswana</option>
-        <option value="ss">siSwati</option>
-        <option value="ve">Tshivenda</option>
-        <option value="ts">Xitsonga</option>
-      </select>
       <button id="theme-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle theme">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
       </button>
-      <button id="voice-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle voice">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-      </button>
-      <!-- NEW: Sensor toggle button -->
-      <button id="sensor-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle collision detection">
+      <button id="sensor-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle sensor detection">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2v6m0 8v6m-6-6h12"></path>
         </svg>
       </button>
-      <button id="signout-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Sign out">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-      </button>
-      <!-- NEW: Settings button for alert customization -->
       <button id="settings-button" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Open settings">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
@@ -428,52 +233,15 @@
         </svg>
       </button>
     </div>
-    <div class="welcome-container" id="welcome-container">
-      <div id="nebula-container" class="nebula-container">
-        <div class="nebula"></div>
-        <canvas id="nebula-canvas" class="nebula-canvas"></canvas>
-      </div>
-      <div class="welcome-message text-xl font-semibold text-center" id="welcome-message">Hey! I'm Vynix AI. What's on your mind?</div>
+    <div class="alert-container" id="alert-container" aria-live="polite" role="log"></div>
+    <div class="black-hole-container" id="black-hole-container">
+      <div class="black-hole"></div>
+      <canvas id="black-hole-canvas" class="black-hole-canvas"></canvas>
     </div>
-    <div class="chat-messages flex-1 overflow-y-auto flex flex-col gap-3 pb-20" id="chat-messages" aria-live="polite" role="log"></div>
-    <div class="chat-input-container fixed bottom-1 left-1 right-1 max-w-3xl mx-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-full shadow-xl flex items-center z-20" id="chat-input-container">
-      <input type="text" id="chat-input" class="flex-1 bg-transparent p-2 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--focus)] rounded-full" placeholder="Type your question..." aria-label="Type your question" maxlength="800">
-      <input type="file" id="file-upload" accept="image/*,application/pdf" class="hidden" aria-label="Upload file">
-      <button id="upload-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Upload file">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-      </button>
-      <button id="send-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Toggle voice">
-        <svg id="send-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-          <line x1="12" y1="19" x2="12" y2="23"></line>
-          <line x1="8" y1="23" x2="16" y2="23"></line>
-        </svg>
-      </button>
-    </div>
-    <button id="new-chat-button" class="new-chat-button bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2.5 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition pulse-glow" aria-label="Start new chat">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v4m-2 2h4"/></svg>
-    </button>
-    <div id="feedback-modal" class="modal" role="dialog" aria-labelledby="modal-title" aria-describedby="modal-description">
-      <div class="modal-content modal-slide-in">
-        <h2 id="modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Help Vynix AI Learn</h2>
-        <p id="modal-description" class="text-sm text-[var(--text-secondary)] mb-4">What should I have said instead?</p>
-        <textarea id="feedback-input" placeholder="Enter a better response..." aria-label="Enter a better response" maxlength="800"></textarea>
-        <div class="modal-buttons">
-          <button id="modal-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
-          <button id="modal-submit" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Submit feedback">Submit</button>
-        </div>
-      </div>
-    </div>
-    <!-- NEW: Settings modal for alert customization -->
     <div id="settings-modal" class="modal" role="dialog" aria-labelledby="settings-modal-title" aria-describedby="settings-modal-description">
       <div class="modal-content modal-slide-in">
-        <h2 id="settings-modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Collision Alert Settings</h2>
-        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your collision alerts</p>
+        <h2 id="settings-modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Alert Settings</h2>
+        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your proximity and orientation alerts</p>
         <label class="block mb-2">
           <span class="text-sm text-[var(--text-primary)]">Alert Sound Pitch</span>
           <select id="alert-pitch" class="mt-1">
@@ -488,6 +256,13 @@
             <option value="long">Long (200,100,200ms)</option>
           </select>
         </label>
+        <label class="block mb-2">
+          <span class="text-sm text-[var(--text-primary)]">Proximity Threshold</span>
+          <select id="proximity-threshold" class="mt-1">
+            <option value="5">Close (5 cm)</option>
+            <option value="10">Far (10 cm)</option>
+          </select>
+        </label>
         <div class="modal-buttons">
           <button id="settings-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
           <button id="settings-save" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Save settings">Save</button>
@@ -496,148 +271,111 @@
     </div>
   </main>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
-      authDomain: "fire-b-a8878.firebaseapp.com",
-      databaseURL: "https://fire-b-a8878.firebaseio.com",
-      projectId: "fire-b-a8878",
-      storageBucket: "fire-b-a8878.firebasestorage.app",
-      messagingSenderId: "658673187627",
-      appId: "1:658673187627:web:6e4c29af661785f0afa36e",
-      measurementId: "G-V4W97VMSKL"
-    };
-
+  <script>
     const state = {
-      messages: [],
       theme: localStorage.getItem('theme') || 'dark',
-      language: localStorage.getItem('language') || 'en',
-      voiceEnabled: localStorage.getItem('voiceEnabled') === 'true' || false,
-      // NEW: Collision detection settings
-      collisionDetectionEnabled: localStorage.getItem('collisionDetectionEnabled') === 'true' || false,
-      alertPitch: localStorage.getItem('alertPitch') || '1000', // Default to high pitch (1000 Hz)
-      vibrationPattern: localStorage.getItem('vibrationPattern') || 'short', // Default to short vibration
-      elevenLabsApiKey: 'sk_d88fade7d825518c26eece14b9a8378ededd44ddc7889573', // Move to backend for security
-      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Move to backend for security
-      aiAvatar: 'https://i.postimg.cc/ZR0jj3Yr/Black-and-White-Minimalist-Simple-Modern-Technology-AI-Logo-20250824-182710-0000.png',
-      userName: 'User',
-      userId: null,
-      nebulaAnimationFrame: null
+      sensorDetectionEnabled: localStorage.getItem('sensorDetectionEnabled') === 'true' || false,
+      alertPitch: localStorage.getItem('alertPitch') || '1000',
+      vibrationPattern: localStorage.getItem('vibrationPattern') || 'short',
+      proximityThreshold: localStorage.getItem('proximityThreshold') || '5',
+      blackHoleAnimationFrame: null
     };
 
     const elements = {
-      chatMessages: document.getElementById('chat-messages'),
-      chatInput: document.getElementById('chat-input'),
-      sendButton: document.getElementById('send-button'),
-      newChatButton: document.getElementById('new-chat-button'),
       themeToggle: document.getElementById('theme-toggle'),
-      voiceToggle: document.getElementById('voice-toggle'),
-      languageSelect: document.getElementById('language-select'),
-      welcomeContainer: document.getElementById('welcome-container'),
-      nebulaContainer: document.getElementById('nebula-container'),
-      nebulaCanvas: document.getElementById('nebula-canvas'),
-      feedbackModal: document.getElementById('feedback-modal'),
-      feedbackInput: document.getElementById('feedback-input'),
-      modalSubmit: document.getElementById('modal-submit'),
-      modalCancel: document.getElementById('modal-cancel'),
-      chatInputContainer: document.getElementById('chat-input-container'),
-      signoutButton: document.getElementById('signout-button'),
-      fileUpload: document.getElementById('file-upload'),
-      uploadButton: document.getElementById('upload-button'),
-      // NEW: Settings modal elements
+      sensorToggle: document.getElementById('sensor-toggle'),
+      settingsButton: document.getElementById('settings-button'),
       settingsModal: document.getElementById('settings-modal'),
       settingsSave: document.getElementById('settings-save'),
       settingsCancel: document.getElementById('settings-cancel'),
       alertPitch: document.getElementById('alert-pitch'),
       vibrationPattern: document.getElementById('vibration-pattern'),
-      sensorToggle: document.getElementById('sensor-toggle'),
-      settingsButton: document.getElementById('settings-button')
+      proximityThreshold: document.getElementById('proximity-threshold'),
+      alertContainer: document.getElementById('alert-container'),
+      blackHoleContainer: document.getElementById('black-hole-container'),
+      blackHoleCanvas: document.getElementById('black-hole-canvas')
     };
 
-    let app, auth, db;
-    let isVoiceMode = false;
-
-    // Cloudinary Configuration
-    const CLOUD_NAME = 'dqkujefxj';
-    const UPLOAD_PRESET = 'banter_box';
-
-    // Speech Recognition Setup
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
-    let recognition = null;
-
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = state.language || 'en-US';
-      console.log("SpeechRecognition API initialized successfully");
-    } else {
-      console.warn('SpeechRecognition API not supported in this browser.');
-      showToast('Voice input is not supported in this browser. Please use a compatible browser like Chrome or Edge.', 'error');
-    }
-
-    // SVG Icons
-    const paperPlaneSVG = `
-      <line x1="22" y1="2" x2="11" y2="13"></line>
-      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-    `;
-
-    const microphoneSVG = `
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-      <line x1="12" y1="19" x2="12" y2="23"></line>
-      <line x1="8" y1="23" x2="16" y2="23"></line>
-    `;
-
-    // NEW: Initialize sensors for collision detection
+    // Initialize sensors for proximity and orientation
     function initializeSensors() {
       if ('DeviceMotionEvent' in window) {
-        window.addEventListener('devicemotion', handleDeviceMotion, true);
-        console.log("DeviceMotionEvent initialized");
+        window.addEventListener('devicemotion', handleProximityFallback, true);
+        console.log("DeviceMotionEvent initialized for proximity fallback");
       } else {
-        showToast("Device motion not supported on this device.", 'error');
+        showAlert("Device motion not supported on this device.");
+      }
+
+      if ('DeviceOrientationEvent' in window) {
+        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+        console.log("DeviceOrientationEvent initialized");
+      } else {
+        showAlert("Device orientation not supported on this device.");
       }
 
       if ('ProximitySensor' in window) {
         const proximity = new ProximitySensor();
         proximity.addEventListener('reading', () => {
-          if (proximity.near) {
-            triggerCollisionAlert(`Wall detected within ${proximity.distance} cm!`);
+          if (proximity.near && proximity.distance < parseInt(state.proximityThreshold)) {
+            if (isDeviceUpright()) {
+              showAlert(`Hand detected within ${proximity.distance} cm!`);
+            } else {
+              showAlert("Device not upright! Please hold upright.");
+            }
           }
         });
         proximity.start();
       } else {
-        console.log("ProximitySensor not supported");
+        console.log("ProximitySensor not supported, using accelerometer fallback");
       }
     }
 
-    // NEW: Handle device motion for collision detection
-    function handleDeviceMotion(event) {
+    // Fallback for proximity detection using accelerometer
+    let lastAcceleration = { x: 0, y: 0, z: 0 };
+    function handleProximityFallback(event) {
       const { acceleration } = event;
-      const threshold = 10; // Adjust based on testing (m/s²)
-      if (
-        Math.abs(acceleration.x) > threshold ||
-        Math.abs(acceleration.y) > threshold ||
-        Math.abs(acceleration.z) > threshold
-      ) {
-        triggerCollisionAlert("Rapid movement detected! Possible collision!");
+      const deltaThreshold = 5;
+      if (lastAcceleration.x !== 0) {
+        const deltaX = Math.abs(acceleration.x - lastAcceleration.x);
+        const deltaY = Math.abs(acceleration.y - lastAcceleration.y);
+        const deltaZ = Math.abs(acceleration.z - lastAcceleration.z);
+        if (deltaX > deltaThreshold || deltaY > deltaThreshold || deltaZ > deltaThreshold) {
+          if (isDeviceUpright()) {
+            showAlert("Sudden movement detected! Possible hand proximity!");
+          } else {
+            showAlert("Device not upright! Please hold upright.");
+          }
+        }
+      }
+      lastAcceleration = { ...acceleration };
+    }
+
+    // Check if device is upright
+    let isUpright = true;
+    function handleDeviceOrientation(event) {
+      const { beta } = event;
+      isUpright = beta > -30 && beta < 30;
+      if (!isUpright && state.sensorDetectionEnabled) {
+        showAlert("Device not upright! Please hold upright.");
       }
     }
 
-    // NEW: Trigger collision alert with sound and vibration
-    async function triggerCollisionAlert(message) {
+    function isDeviceUpright() {
+      return isUpright;
+    }
+
+    // Show alert with sound and vibration
+    function showAlert(message) {
       playAlertSound();
       const pattern = state.vibrationPattern === 'short' ? [200] : [200, 100, 200];
       vibrate(pattern);
-      showToast(message, 'error');
-      await appendMessage(message, 'alert', 'Vynix AI Alert');
+      const alert = document.createElement('div');
+      alert.className = 'alert slide-in';
+      alert.textContent = message;
+      elements.alertContainer.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
     }
 
-    // NEW: Play alert sound
+    // Play alert sound
     function playAlertSound() {
       const audioContext = new AudioContext();
       const oscillator = audioContext.createOscillator();
@@ -648,231 +386,7 @@
       oscillator.stop(audioContext.currentTime + 0.2);
     }
 
-    // NEW: Request sensor permissions
-    async function requestSensorPermissions() {
-      if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-          const response = await DeviceMotionEvent.requestPermission();
-          if (response === 'granted') {
-            initializeSensors();
-          } else {
-            showToast("Sensor access denied.", 'error');
-            state.collisionDetectionEnabled = false;
-            localStorage.setItem('collisionDetectionEnabled', false);
-            elements.sensorToggle.classList.remove('active');
-          }
-        } catch (error) {
-          showToast("Failed to request sensor permissions.", 'error');
-          console.error(error);
-        }
-      } else {
-        initializeSensors();
-      }
-    }
-
-    // NEW: Show settings modal
-    function showSettingsModal() {
-      elements.settingsModal.style.display = 'flex';
-      elements.alertPitch.value = state.alertPitch;
-      elements.vibrationPattern.value = state.vibrationPattern;
-      elements.alertPitch.focus();
-    }
-
-    // NEW: Close settings modal
-    function closeSettingsModal() {
-      elements.settingsModal.style.display = 'none';
-      elements.settingsSave.onclick = null;
-      elements.settingsCancel.onclick = null;
-    }
-
-    function initializeFirebase() {
-      try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getDatabase(app);
-        console.log("Firebase initialized successfully at", new Date().toLocaleString());
-        checkAuthState();
-      } catch (error) {
-        console.error("Firebase initialization failed:", error.code || error.message);
-        showToast("Failed to connect to Firebase. Please check your network.", 'error');
-      }
-    }
-
-    async function checkAuthState() {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        console.log("Persistence set to browserLocalPersistence");
-        onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            console.log("Authenticated user detected:", user.uid);
-            state.userId = user.uid;
-            const userRef = ref(db, `users/${user.uid}`);
-            const userSnapshot = await get(userRef);
-            if (userSnapshot.exists()) {
-              state.userName = userSnapshot.val().contactName || user.email || 'User';
-              showToast(`Welcome, ${state.userName}! How can I assist you today?`, 'success');
-            } else {
-              await set(userRef, { contactName: user.email || 'User', createdAt: new Date().toISOString() });
-              state.userName = user.email || 'User';
-              showToast(`Welcome, ${state.userName}! How can I assist you today?`, 'success');
-            }
-            elements.chatInput.disabled = false;
-            elements.sendButton.disabled = false;
-            loadChatHistory();
-          } else {
-            console.log("No authenticated user, redirecting to signup.html");
-            showToast("Please sign in to access Vynix AI.", 'error');
-            document.body.classList.add("fade-out");
-            setTimeout(() => {
-              window.location.href = "signup.html";
-            }, 1500);
-          }
-        }, (error) => {
-          console.error("Auth state error:", error);
-          showToast("Failed to check authentication state.", 'error');
-        });
-      } catch (error) {
-        console.error("Auth state check failed:", error.code || error.message);
-        showToast("Failed to check authentication state. Please try again.", 'error');
-      }
-    }
-
-    async function handleSignOut() {
-      try {
-        await signOut(auth);
-        showToast("Signed out successfully.", 'success');
-        document.body.classList.add("fade-out");
-        setTimeout(() => {
-          window.location.href = "signup.html";
-        }, 1500);
-      } catch (error) {
-        console.error("Sign out error:", error);
-        showToast("Failed to sign out. Please try again.", 'error');
-      }
-    }
-
-    function showToast(message, type = 'error') {
-      if (!document.body) {
-        console.error("Document body not found for toast");
-        return;
-      }
-      const toast = document.createElement('div');
-      toast.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg text-white text-sm ${type === 'error' ? 'bg-[var(--error)]' : 'bg-[var(--success)]'} slide-in`;
-      toast.textContent = message;
-      toast.role = 'alert';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
-    }
-
-    function showFeedbackModal(callback) {
-      if (!elements.feedbackModal || !elements.feedbackInput) {
-        console.error("Feedback modal elements not found");
-        showToast("Feedback modal unavailable.", 'error');
-        return;
-      }
-      elements.feedbackModal.style.display = 'flex';
-      elements.feedbackInput.value = '';
-      elements.feedbackInput.focus();
-      
-      const submit = () => {
-        const input = elements.feedbackInput.value.trim();
-        callback(input);
-        closeFeedbackModal();
-      };
-
-      const cancel = () => closeFeedbackModal();
-
-      elements.modalSubmit.onclick = submit;
-      elements.modalCancel.onclick = cancel;
-
-      elements.feedbackInput.onkeypress = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          submit();
-        }
-      };
-
-      document.onkeydown = (e) => {
-        if (e.key === 'Escape') {
-          cancel();
-        }
-      };
-    }
-
-    function closeFeedbackModal() {
-      if (!elements.feedbackModal) return;
-      elements.feedbackModal.style.display = 'none';
-      elements.modalSubmit.onclick = null;
-      elements.modalCancel.onclick = null;
-      elements.feedbackInput.onkeypress = null;
-      document.onkeydown = null;
-    }
-
-    function startNebulaAnimation() {
-      if (!elements.nebulaCanvas || !elements.nebulaContainer) {
-        console.error("Nebula elements not found");
-        return;
-      }
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        elements.nebulaContainer.classList.add('hidden');
-        return;
-      }
-      elements.nebulaContainer.classList.remove('hidden');
-      const ctx = elements.nebulaCanvas.getContext('2d');
-      elements.nebulaCanvas.width = window.innerWidth <= 640 ? 200 : 260;
-      elements.nebulaCanvas.height = window.innerWidth <= 640 ? 200 : 260;
-      const particleCount = window.innerWidth <= 640 ? 50 : 100;
-      const particles = Array.from({length: particleCount}, () => ({
-        x: elements.nebulaCanvas.width / 2,
-        y: elements.nebulaCanvas.height / 2,
-        radius: Math.random() * 6 + 2,
-        angle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.01 + 0.005,
-        opacity: Math.random() * 0.5 + 0.2,
-        offset: Math.random() * 80 + 20,
-        color: `hsl(${Math.random() * 90 + 180}, 70%, ${Math.random() * 20 + 50}%)`
-      }));
-
-      function animateNebula() {
-        ctx.clearRect(0, 0, elements.nebulaCanvas.width, elements.nebulaCanvas.height);
-        ctx.globalCompositeOperation = 'lighter';
-        particles.forEach(p => {
-          p.angle += p.speed;
-          p.x = elements.nebulaCanvas.width / 2 + Math.cos(p.angle) * p.offset;
-          p.y = elements.nebulaCanvas.height / 2 + Math.sin(p.angle) * p.offset;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.opacity;
-          ctx.fill();
-        });
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-        state.nebulaAnimationFrame = requestAnimationFrame(animateNebula);
-      }
-      animateNebula();
-    }
-
-    function stopNebulaAnimation() {
-      cancelAnimationFrame(state.nebulaAnimationFrame);
-      if (elements.nebulaContainer) {
-        elements.nebulaContainer.classList.add('hidden');
-      }
-    }
-
-    function updateSendIcon() {
-      const sendIcon = document.getElementById('send-icon');
-      const chatInput = elements.chatInput;
-      
-      if (chatInput === document.activeElement || chatInput.value.trim() !== '') {
-        sendIcon.innerHTML = paperPlaneSVG;
-        elements.sendButton.setAttribute('aria-label', 'Send message');
-      } else {
-        sendIcon.innerHTML = microphoneSVG;
-        elements.sendButton.setAttribute('aria-label', 'Toggle voice');
-      }
-    }
-
+    // Vibration
     function vibrate(duration) {
       if ('vibrate' in navigator) {
         navigator.vibrate(duration);
@@ -881,526 +395,150 @@
       }
     }
 
-    async function uploadToCloudinary(file) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', UPLOAD_PRESET);
-      try {
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
-          method: 'POST',
-          body: formData
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
-        return { url: data.secure_url, publicId: data.public_id, type: file.type };
-      } catch (error) {
-        console.error('Cloudinary upload error:', error);
-        showToast(`Failed to upload file: ${error.message}`, 'error');
-        return null;
-      }
-    }
+    // Request sensor permissions
+    async function requestSensorPermissions() {
+      let motionGranted = true;
+      let orientationGranted = true;
 
-    async function getAIResponse(question, file = null) {
-      try {
-        const languageNames = {
-          en: 'English',
-          af: 'Afrikaans',
-          nr: 'isiNdebele',
-          xh: 'isiXhosa',
-          zu: 'isiZulu',
-          nso: 'Sepedi',
-          st: 'Sesotho',
-          tn: 'Setswana',
-          ss: 'siSwati',
-          ve: 'Tshivenda',
-          ts: 'Xitsonga'
-        };
-        const lang = languageNames[state.language] || 'English';
-        const model = file ? 'gemini-1.5-pro' : 'gemini-2.5-flash';
-        const contents = [{ parts: [{ text: `You are Vynix AI, a helpful general-knowledge assistant. Respond in ${lang}. Analyze the provided file or answer the query: ${question}` }] }];
-
-        if (file) {
-          const mimeType = file.type;
-          if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
-            contents[0].parts.push({ fileData: { mimeType, fileUri: question.split(': ')[1] } });
-          } else {
-            return 'Unsupported file type. Please upload an image or PDF.';
-          }
-        }
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiApiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents })
-        });
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        return data.candidates[0].content.parts[0].text;
-      } catch (error) {
-        console.error("AI response error:", error);
-        showToast('Request failed', 'error');
-        return 'Sorry, something went wrong. Try again.';
-      }
-    }
-
-    async function appendMessage(text, sender, displayName, file = null) {
-      if (isVoiceMode && !file && sender !== 'alert') {
-        return;
-      }
-      if (!elements.chatMessages) {
-        console.error("Chat messages element not found");
-        showToast("Failed to append message: UI element missing.", 'error');
-        return;
-      }
-      const msg = {
-        id: push(ref(db, `users/${state.userId}/messages`)).key,
-        text,
-        sender,
-        displayName,
-        timestamp: Date.now(),
-        file: file ? { url: file.url, publicId: file.publicId, type: file.type } : null
-      };
-      await set(ref(db, `users/${state.userId}/messages/${msg.id}`), msg);
-      state.messages.push(msg);
-      elements.welcomeContainer.classList.add('hidden');
-      stopNebulaAnimation();
-      if (sender === 'user' || sender === 'alert') {
-        renderMessage(msg, msg.id);
-      } else {
-        const tempMsg = {...msg, text: ''};
-        const el = renderMessage(tempMsg, msg.id);
-        const p = el.querySelector('.scrollable-content .text-xs');
-        const indicator = document.createElement('span');
-        indicator.className = 'typing-indicator inline-flex gap-1 ml-1';
-        for (let i = 0; i < 3; i++) {
-          const dot = document.createElement('span');
-          dot.className = 'typing-dot';
-          indicator.appendChild(dot);
-        }
-        p.appendChild(indicator);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        let i = 0;
-        const type = () => {
-          if (i < text.length) {
-            tempMsg.text = text.slice(0, ++i);
-            p.innerHTML = marked.parse(tempMsg.text);
-            requestAnimationFrame(type);
-          } else {
-            indicator.remove();
-            p.innerHTML = marked.parse(text);
-          }
-        };
-        type();
-      }
-    }
-
-    async function loadChatHistory() {
-      const messagesRef = ref(db, `users/${state.userId}/messages`);
-      const snapshot = await get(messagesRef);
-      if (snapshot.exists()) {
-        state.messages = [];
-        elements.chatMessages.innerHTML = '';
-        snapshot.forEach(child => {
-          const msg = child.val();
-          msg.id = child.key;
-          state.messages.push(msg);
-          renderMessage(msg, msg.id);
-        });
-        if (state.messages.length > 0) {
-          elements.welcomeContainer.classList.add('hidden');
-          elements.chatMessages.classList.remove('hidden');
-          stopNebulaAnimation();
-        }
-      }
-    }
-
-    function renderMessage(msg, id) {
-      if (!elements.chatMessages) {
-        console.error("Chat messages element not found");
-        showToast("Failed to render message: UI element missing.", 'error');
-        return;
-      }
-      const div = document.createElement('div');
-      div.className = `message ${msg.sender} flex flex-col gap-2 slide-in`;
-      div.role = 'listitem';
-      const content = document.createElement('div');
-      content.className = 'message-content p-3 rounded-xl flex gap-2 items-start';
-      const avatar = document.createElement('div');
-      avatar.className = 'message-avatar w-8 h-8 rounded-full flex-shrink-0';
-      if (msg.sender === 'ai' || msg.sender === 'alert') {
-        const img = document.createElement('img');
-        img.src = state.aiAvatar;
-        img.alt = 'Vynix AI avatar';
-        img.loading = 'lazy';
-        img.className = 'w-full h-full rounded-full';
-        avatar.appendChild(img);
-      } else {
-        avatar.textContent = state.userName[0].toUpperCase();
-        avatar.classList.add('bg-gradient-to-r', 'from-[var(--primary)]', 'to-[var(--accent)]', 'text-white', 'flex', 'items-center', 'justify-center', 'font-bold');
-      }
-      const body = document.createElement('div');
-      body.className = 'flex-1';
-      const header = document.createElement('div');
-      header.className = 'message-header font-semibold text-xs';
-      header.textContent = msg.displayName;
-      const scrollable = document.createElement('div');
-      scrollable.className = 'scrollable-content';
-      const text = document.createElement('div');
-      text.className = 'text-xs';
-      if (msg.file && msg.file.url) {
-        if (msg.file.type.startsWith('image/')) {
-          text.innerHTML = `<a href="${msg.file.url}" target="_blank"><img src="${msg.file.url}" alt="Uploaded image" class="max-w-full h-auto rounded-lg mb-2"></a>${marked.parse(msg.text)}`;
-        } else if (msg.file.type === 'application/pdf') {
-          text.innerHTML = `<a href="${msg.file.url}" target="_blank" class="text-[var(--focus)] underline">View PDF: ${msg.text}</a>`;
-        }
-      } else {
-        text.innerHTML = marked.parse(msg.text);
-      }
-      scrollable.appendChild(text);
-      const time = document.createElement('div');
-      time.className = 'message-timestamp text-[0.65rem] text-[var(--text-secondary)] mt-1';
-      time.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-      body.append(header, scrollable, time);
-      content.append(avatar, body);
-      div.append(content);
-      const actions = document.createElement('div');
-      actions.className = 'message-actions flex gap-3 mt-1 self-end';
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition';
-      copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
-      copyBtn.ariaLabel = 'Copy message';
-      copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.text).then(() => showToast('Copied!', 'success')).catch(() => showToast('Copy failed', 'error')));
-      if (msg.sender === 'ai') {
-        const thumbsUp = document.createElement('button');
-        thumbsUp.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--success)] transition';
-        thumbsUp.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
-        thumbsUp.ariaLabel = 'Good response';
-        thumbsUp.addEventListener('click', () => {
-          showToast('Thanks for the feedback! I learned from this.', 'success');
-        });
-        const thumbsDown = document.createElement('button');
-        thumbsDown.className = 'action-btn text-[var(--text-secondary)] hover:text-[var(--error)] transition';
-        thumbsDown.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
-        thumbsDown.ariaLabel = 'Bad response';
-        thumbsDown.addEventListener('click', () => {
-          showToast('Sorry about that! Please provide a better response.', 'error');
-          showFeedbackModal((input) => {
-            if (input) {
-              set(ref(db, `users/${state.userId}/feedback/${id}`), {
-                original: msg.text,
-                suggested: input,
-                timestamp: Date.now()
-              });
-              showToast('Thanks for teaching me a better response!', 'success');
-            }
-          });
-        });
-        actions.append(thumbsUp, thumbsDown);
-      }
-      actions.append(copyBtn);
-      div.append(actions);
-      elements.chatMessages.appendChild(div);
-      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-      return div;
-    }
-
-    function sanitize(input) {
-      const div = document.createElement('div');
-      div.textContent = input;
-      return div.innerHTML;
-    }
-
-    elements.uploadButton.addEventListener('click', () => {
-      elements.fileUpload.click();
-    });
-
-    elements.fileUpload.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      elements.uploadButton.disabled = true;
-      try {
-        await appendMessage(`Uploading file: ${sanitize(file.name)}`, 'user', state.userName);
-        const fileData = await uploadToCloudinary(file);
-        if (fileData) {
-          const displayText = fileData.type.startsWith('image/') ? `Uploaded image: ${sanitize(file.name)}` : `Uploaded PDF: ${sanitize(file.name)}`;
-          await appendMessage(displayText, 'user', state.userName, fileData);
-          const aiResponse = await getAIResponse(`Analyze this file: ${fileData.url}`, fileData);
-          await appendMessage(aiResponse, 'ai', 'Vynix AI');
-        }
-      } catch (error) {
-        showToast('Error uploading file', 'error');
-      } finally {
-        elements.uploadButton.disabled = false;
-        elements.fileUpload.value = '';
-      }
-    });
-
-    async function playElevenLabsAudio(text) {
-      if (!state.elevenLabsApiKey || state.elevenLabsApiKey === 'YOUR_ELEVENLABS_API_KEY') {
-        showToast('Please configure ElevenLabs API key on the backend.', 'error');
-        return;
-      }
-      try {
-        const voiceId = '21m00Tcm4TlvDq8ikWAM';
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'xi-api-key': state.elevenLabsApiKey,
-          },
-          body: JSON.stringify({
-            text: text,
-            model_id: 'eleven_flash_v2_5',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.8,
-            },
-            output_format: 'pcm_16000',
-            optimize_streaming_latency: 3,
-          }),
-        });
-
-        if (!response.ok) throw new Error('Failed to generate audio stream');
-
-        const audioContext = new AudioContext();
-        const reader = response.body.getReader();
-        let bufferQueue = [];
-        let isPlaying = false;
-        let source = null;
-
-        async function processStream() {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              audioContext.close();
-              break;
-            }
-
-            bufferQueue.push(value);
-
-            if (!isPlaying && bufferQueue.length >= 2) {
-              isPlaying = true;
-              const concatenated = new Uint8Array(bufferQueue.reduce((acc, curr) => acc + curr.length, 0));
-              let offset = 0;
-              for (const chunk of bufferQueue) {
-                concatenated.set(chunk, offset);
-                offset += chunk.length;
-              }
-              bufferQueue = [];
-
-              audioContext.decodeAudioData(concatenated.buffer, (buffer) => {
-                source = audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(audioContext.destination);
-                source.start();
-              }, (err) => {
-                showToast('Audio decoding failed', 'error');
-                console.error(err);
-              });
-            } else if (isPlaying) {
-              audioContext.decodeAudioData(value.buffer, (buffer) => {
-                const newSource = audioContext.createBufferSource();
-                newSource.buffer = buffer;
-                newSource.connect(audioContext.destination);
-                newSource.start(audioContext.currentTime + source.buffer.duration);
-                source = newSource;
-              }, (err) => {
-                showToast('Audio decoding failed', 'error');
-                console.error(err);
-              });
-            }
-          }
-        }
-
-        processStream().catch(err => {
-          showToast('Error streaming audio', 'error');
-          console.error(err);
-        });
-      } catch (error) {
-        showToast('Error generating audio', 'error');
-        console.error(error);
-      }
-    }
-
-    async function send() {
-      const sendIcon = document.getElementById('send-icon');
-      const isMicrophone = sendIcon.innerHTML === microphoneSVG;
-
-      if (isMicrophone && SpeechRecognition) {
-        isVoiceMode = true;
-        elements.welcomeContainer.classList.remove('hidden');
-        elements.chatMessages.classList.add('hidden');
-        elements.sendButton.disabled = true;
-        startNebulaAnimation();
-        showToast('Listening...', 'success');
-
-        vibrate(200);
-
-        recognition.lang = state.language || 'en-US';
-
-        recognition.onstart = () => {
-          console.log('Speech recognition started');
-          setTimeout(() => vibrate([100, 50, 100]), 0);
-        };
-
-        recognition.onresult = async (event) => {
-          const transcript = event.results[0][0].transcript.trim();
-          console.log('Speech recognized:', transcript);
-          if (!transcript) {
-            showToast('No speech detected.', 'error');
-            endVoiceMode();
-            return;
-          }
-
-          try {
-            const aiResponse = await getAIResponse(transcript);
-            await appendMessage(aiResponse, 'ai', 'Vynix AI');
-            if (state.voiceEnabled) {
-              await playElevenLabsAudio(aiResponse);
-            }
-          } catch (error) {
-            showToast('Error processing voice input.', 'error');
-            console.error(error);
-          } finally {
-            endVoiceMode();
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          let errorMessage = 'Speech recognition error occurred.';
-          switch (event.error) {
-            case 'no-speech':
-              errorMessage = 'No speech was detected.';
-              break;
-            case 'audio-capture':
-              errorMessage = 'No microphone found. Please check your permissions.';
-              break;
-            case 'not-allowed':
-              errorMessage = 'Microphone access denied. Please allow access in browser settings.';
-              break;
-            case 'network':
-              errorMessage = 'Network error. Please check your connection.';
-              break;
-            case 'service-not-allowed':
-              errorMessage = 'Speech service not allowed. Please enable it.';
-              break;
-            default:
-              errorMessage = `Error: ${event.error}`;
-          }
-          showToast(errorMessage, 'error');
-          endVoiceMode();
-        };
-
-        recognition.onend = () => {
-          console.log('Speech recognition ended');
-          if (isVoiceMode) {
-            setTimeout(() => vibrate(100), 0);
-            endVoiceMode();
-          }
-        };
-
+      if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
         try {
-          recognition.start();
+          const response = await DeviceMotionEvent.requestPermission();
+          motionGranted = response === 'granted';
         } catch (error) {
-          console.error('Failed to start speech recognition:', error);
-          showToast('Failed to start speech recognition. Please check microphone permissions.', 'error');
-          endVoiceMode();
+          showAlert("Failed to request motion sensor permissions.");
+          console.error(error);
+          motionGranted = false;
         }
-      } else {
-        const q = elements.chatInput.value.trim();
-        if (!q || elements.sendButton.disabled) return;
-        elements.sendButton.disabled = true;
+      }
+
+      if ('DeviceOrientationEvent' in window && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
-          await appendMessage(sanitize(q), 'user', state.userName);
-          elements.chatInput.value = '';
-          const res = await getAIResponse(q);
-          await appendMessage(res, 'ai', 'Vynix AI');
-          if (state.voiceEnabled) {
-            await playElevenLabsAudio(res);
+          const response = await DeviceOrientationEvent.requestPermission();
+          orientationGranted = response === 'granted';
+        } catch (error) {
+          showAlert("Failed to request orientation sensor permissions.");
+          console.error(error);
+          orientationGranted = false;
+        }
+      }
+
+      if (motionGranted && orientationGranted) {
+        initializeSensors();
+      } else {
+        showAlert("Sensor access denied.");
+        state.sensorDetectionEnabled = false;
+        localStorage.setItem('sensorDetectionEnabled', false);
+        elements.sensorToggle.classList.remove('bg-[var(--success)]', 'text-white');
+      }
+    }
+
+    // Show settings modal
+    function showSettingsModal() {
+      elements.settingsModal.style.display = 'flex';
+      elements.alertPitch.value = state.alertPitch;
+      elements.vibrationPattern.value = state.vibrationPattern;
+      elements.proximityThreshold.value = state.proximityThreshold;
+      elements.alertPitch.focus();
+    }
+
+    // Close settings modal
+    function closeSettingsModal() {
+      elements.settingsModal.style.display = 'none';
+      elements.settingsSave.onclick = null;
+      elements.settingsCancel.onclick = null;
+    }
+
+    // Black hole animation
+    function startBlackHoleAnimation() {
+      if (!elements.blackHoleCanvas || !elements.blackHoleContainer) {
+        console.error("Black hole elements not found");
+        return;
+      }
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        elements.blackHoleContainer.classList.add('hidden');
+        return;
+      }
+      elements.blackHoleContainer.classList.remove('hidden');
+      const ctx = elements.blackHoleCanvas.getContext('2d');
+      elements.blackHoleCanvas.width = window.innerWidth <= 640 ? 200 : 300;
+      elements.blackHoleCanvas.height = window.innerWidth <= 640 ? 200 : 300;
+      const particleCount = window.innerWidth <= 640 ? 100 : 200;
+      const particles = Array.from({length: particleCount}, () => ({
+        x: elements.blackHoleCanvas.width / 2,
+        y: elements.blackHoleCanvas.height / 2,
+        radius: Math.random() * 2 + 1,
+        angle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.02 + 0.01,
+        distance: Math.random() * 50 + 50,
+        opacity: Math.random() * 0.5 + 0.3,
+        color: `hsl(${Math.random() * 60 + 30}, 80%, ${Math.random() * 30 + 50}%)`
+      }));
+
+      function animateBlackHole() {
+        ctx.clearRect(0, 0, elements.blackHoleCanvas.width, elements.blackHoleCanvas.height);
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+          p.angle += p.speed;
+          p.x = elements.blackHoleCanvas.width / 2 + Math.cos(p.angle) * p.distance;
+          p.y = elements.blackHoleCanvas.height / 2 + Math.sin(p.angle) * p.distance;
+          p.distance *= 0.995; // Gradually pull particles toward center
+          if (p.distance < 10) {
+            p.distance = Math.random() * 50 + 50;
+            p.angle = Math.random() * Math.PI * 2;
           }
-        } catch {
-          showToast('Error sending message', 'error');
-        } finally {
-          elements.sendButton.disabled = false;
-          elements.chatInput.focus();
-        }
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.opacity;
+          ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        state.blackHoleAnimationFrame = requestAnimationFrame(animateBlackHole);
+      }
+      animateBlackHole();
+    }
+
+    function stopBlackHoleAnimation() {
+      cancelAnimationFrame(state.blackHoleAnimationFrame);
+      if (elements.blackHoleContainer) {
+        elements.blackHoleContainer.classList.add('hidden');
       }
     }
 
-    function endVoiceMode() {
-      isVoiceMode = false;
-      elements.sendButton.disabled = false;
-      elements.welcomeContainer.classList.remove('hidden');
-      updateSendIcon();
-      if (recognition) {
-        recognition.stop();
-      }
-    }
-
-    elements.sendButton.addEventListener('click', send);
-    elements.chatInput.addEventListener('keypress', e => {
-      if (e.key === 'Enter') {
-        if (e.shiftKey) {
-          clearChat();
-        } else {
-          send();
-        }
-      }
-    });
-
-    elements.chatInput.addEventListener('focus', updateSendIcon);
-    elements.chatInput.addEventListener('blur', updateSendIcon);
-    elements.chatInput.addEventListener('input', updateSendIcon);
-
+    // Event listeners
     elements.themeToggle.addEventListener('click', () => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
       document.body.dataset.theme = state.theme;
       localStorage.setItem('theme', state.theme);
-      showToast(`Theme set to ${state.theme}`, 'success');
+      showAlert(`Theme set to ${state.theme}`);
     });
 
-    elements.voiceToggle.addEventListener('click', () => {
-      state.voiceEnabled = !state.voiceEnabled;
-      localStorage.setItem('voiceEnabled', state.voiceEnabled);
-      showToast(`Voice ${state.voiceEnabled ? 'enabled' : 'disabled'}`, 'success');
-    });
-
-    elements.languageSelect.addEventListener('change', () => {
-      state.language = elements.languageSelect.value;
-      localStorage.setItem('language', state.language);
-      if (recognition) {
-        recognition.lang = state.language || 'en-US';
-      }
-      showToast(`Language set to ${elements.languageSelect.options[elements.languageSelect.selectedIndex].text}`, 'success');
-    });
-
-    elements.signoutButton.addEventListener('click', handleSignOut);
-
-    // NEW: Sensor toggle event listener
     elements.sensorToggle.addEventListener('click', () => {
-      state.collisionDetectionEnabled = !state.collisionDetectionEnabled;
-      localStorage.setItem('collisionDetectionEnabled', state.collisionDetectionEnabled);
-      if (state.collisionDetectionEnabled) {
+      state.sensorDetectionEnabled = !state.sensorDetectionEnabled;
+      localStorage.setItem('sensorDetectionEnabled', state.sensorDetectionEnabled);
+      if (state.sensorDetectionEnabled) {
         requestSensorPermissions();
         elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
-        showToast("Collision detection enabled", 'success');
+        showAlert("Proximity and orientation detection enabled");
       } else {
-        window.removeEventListener('devicemotion', handleDeviceMotion, true);
+        window.removeEventListener('devicemotion', handleProximityFallback, true);
+        window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
         elements.sensorToggle.classList.remove('bg-[var(--success)]', 'text-white');
-        showToast("Collision detection disabled", 'success');
+        showAlert("Proximity and orientation detection disabled");
       }
     });
 
-    // NEW: Settings button event listener
     elements.settingsButton.addEventListener('click', () => {
       showSettingsModal();
       const save = () => {
         state.alertPitch = elements.alertPitch.value;
         state.vibrationPattern = elements.vibrationPattern.value;
+        state.proximityThreshold = elements.proximityThreshold.value;
         localStorage.setItem('alertPitch', state.alertPitch);
         localStorage.setItem('vibrationPattern', state.vibrationPattern);
-        showToast('Settings saved!', 'success');
+        localStorage.setItem('proximityThreshold', state.proximityThreshold);
+        showAlert('Settings saved!');
         closeSettingsModal();
       };
       const cancel = () => closeSettingsModal();
@@ -1419,28 +557,10 @@
       };
     });
 
-    function clearChat() {
-      state.messages = [];
-      if (elements.chatMessages) {
-        elements.chatMessages.innerHTML = '';
-      }
-      elements.welcomeContainer.classList.remove('hidden');
-      elements.chatMessages.classList.add('hidden');
-      startNebulaAnimation();
-    }
-
-    elements.newChatButton.addEventListener('click', clearChat);
-
     document.addEventListener('DOMContentLoaded', () => {
       document.body.dataset.theme = state.theme;
-      elements.languageSelect.value = state.language;
-      elements.chatInput.disabled = true;
-      elements.sendButton.disabled = true;
-      startNebulaAnimation();
-      updateSendIcon();
-      initializeFirebase();
-      // NEW: Initialize sensor toggle state
-      if (state.collisionDetectionEnabled) {
+      startBlackHoleAnimation();
+      if (state.sensorDetectionEnabled) {
         requestSensorPermissions();
         elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
       }
