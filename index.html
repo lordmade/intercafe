@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Vynix Sensor Alerts</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -229,7 +233,14 @@
       <button id="settings-button" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Open settings">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+      <button id="signout-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Sign out">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
         </svg>
       </button>
     </div>
@@ -271,14 +282,33 @@
     </div>
   </main>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
+      authDomain: "fire-b-a8878.firebaseapp.com",
+      databaseURL: "https://fire-b-a8878.firebaseio.com",
+      projectId: "fire-b-a8878",
+      storageBucket: "fire-b-a8878.firebasestorage.app",
+      messagingSenderId: "658673187627",
+      appId: "1:658673187627:web:6e4c29af661785f0afa36e",
+      measurementId: "G-V4W97VMSKL"
+    };
+
     const state = {
       theme: localStorage.getItem('theme') || 'dark',
       sensorDetectionEnabled: localStorage.getItem('sensorDetectionEnabled') === 'true' || false,
       alertPitch: localStorage.getItem('alertPitch') || '1000',
       vibrationPattern: localStorage.getItem('vibrationPattern') || 'short',
       proximityThreshold: localStorage.getItem('proximityThreshold') || '5',
-      blackHoleAnimationFrame: null
+      userId: null,
+      userName: 'User',
+      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Move to backend for security
+      blackHoleAnimationFrame: null,
+      alerts: []
     };
 
     const elements = {
@@ -293,8 +323,114 @@
       proximityThreshold: document.getElementById('proximity-threshold'),
       alertContainer: document.getElementById('alert-container'),
       blackHoleContainer: document.getElementById('black-hole-container'),
-      blackHoleCanvas: document.getElementById('black-hole-canvas')
+      blackHoleCanvas: document.getElementById('black-hole-canvas'),
+      signoutButton: document.getElementById('signout-button')
     };
+
+    let app, auth, db;
+
+    // Initialize Firebase
+    function initializeFirebase() {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getDatabase(app);
+        console.log("Firebase initialized successfully at", new Date().toLocaleString());
+        checkAuthState();
+      } catch (error) {
+        console.error("Firebase initialization failed:", error.code || error.message);
+        showAlert("Failed to connect to Firebase. Please check your network.");
+      }
+    }
+
+    // Check authentication state
+    async function checkAuthState() {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        console.log("Persistence set to browserLocalPersistence");
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            console.log("Authenticated user detected:", user.uid);
+            state.userId = user.uid;
+            const userRef = ref(db, `users/${user.uid}`);
+            const userSnapshot = await get(userRef);
+            if (userSnapshot.exists()) {
+              state.userName = userSnapshot.val().contactName || user.email || 'User';
+              showAlert(`Welcome, ${state.userName}! Sensor monitoring ready.`);
+            } else {
+              await set(userRef, { contactName: user.email || 'User', createdAt: new Date().toISOString() });
+              state.userName = user.email || 'User';
+              showAlert(`Welcome, ${state.userName}! Sensor monitoring ready.`);
+            }
+            loadAlertHistory();
+          } else {
+            console.log("No authenticated user, redirecting to signup.html");
+            showAlert("Please sign in to access Vynix Sensor Alerts.");
+            document.body.classList.add("fade-out");
+            setTimeout(() => {
+              window.location.href = "signup.html";
+            }, 1500);
+          }
+        }, (error) => {
+          console.error("Auth state error:", error);
+          showAlert("Failed to check authentication state.");
+        });
+      } catch (error) {
+        console.error("Auth state check failed:", error.code || error.message);
+        showAlert("Failed to check authentication state. Please try again.");
+      }
+    }
+
+    // Handle sign out
+    async function handleSignOut() {
+      try {
+        await signOut(auth);
+        showAlert("Signed out successfully.");
+        document.body.classList.add("fade-out");
+        setTimeout(() => {
+          window.location.href = "signup.html";
+        }, 1500);
+      } catch (error) {
+        console.error("Sign out error:", error);
+        showAlert("Failed to sign out. Please try again.");
+      }
+    }
+
+    // Load alert history from Firebase
+    async function loadAlertHistory() {
+      const alertsRef = ref(db, `users/${state.userId}/alerts`);
+      const snapshot = await get(alertsRef);
+      if (snapshot.exists()) {
+        state.alerts = [];
+        elements.alertContainer.innerHTML = '';
+        snapshot.forEach(child => {
+          const alert = child.val();
+          alert.id = child.key;
+          state.alerts.push(alert);
+          renderAlert(alert, alert.id);
+        });
+      }
+    }
+
+    // Get AI-generated alert message
+    async function getAIAlertMessage(eventType, details) {
+      try {
+        const prompt = `You are Vynix AI, a sensor alert assistant. Generate a concise, user-friendly alert message for a ${eventType} event. Details: ${JSON.stringify(details)}. Suggest a corrective action if applicable.`;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        return data.candidates[0].content.parts[0].text;
+      } catch (error) {
+        console.error("Gemini API error:", error);
+        return `Alert: ${eventType} detected. ${details.fallback || 'Please check device.'}`;
+      }
+    }
 
     // Initialize sensors for proximity and orientation
     function initializeSensors() {
@@ -314,12 +450,19 @@
 
       if ('ProximitySensor' in window) {
         const proximity = new ProximitySensor();
-        proximity.addEventListener('reading', () => {
+        proximity.addEventListener('reading', async () => {
           if (proximity.near && proximity.distance < parseInt(state.proximityThreshold)) {
+            const message = await getAIAlertMessage('proximity', {
+              distance: proximity.distance,
+              threshold: state.proximityThreshold,
+              fallback: `Hand detected within ${proximity.distance} cm!`
+            });
             if (isDeviceUpright()) {
-              showAlert(`Hand detected within ${proximity.distance} cm!`);
+              showAlert(message);
             } else {
-              showAlert("Device not upright! Please hold upright.");
+              showAlert(await getAIAlertMessage('orientation', {
+                fallback: "Device not upright! Please hold upright."
+              }));
             }
           }
         });
@@ -331,7 +474,7 @@
 
     // Fallback for proximity detection using accelerometer
     let lastAcceleration = { x: 0, y: 0, z: 0 };
-    function handleProximityFallback(event) {
+    async function handleProximityFallback(event) {
       const { acceleration } = event;
       const deltaThreshold = 5;
       if (lastAcceleration.x !== 0) {
@@ -339,10 +482,16 @@
         const deltaY = Math.abs(acceleration.y - lastAcceleration.y);
         const deltaZ = Math.abs(acceleration.z - lastAcceleration.z);
         if (deltaX > deltaThreshold || deltaY > deltaThreshold || deltaZ > deltaThreshold) {
+          const message = await getAIAlertMessage('motion', {
+            delta: Math.max(deltaX, deltaY, deltaZ),
+            fallback: "Sudden movement detected! Possible hand proximity!"
+          });
           if (isDeviceUpright()) {
-            showAlert("Sudden movement detected! Possible hand proximity!");
+            showAlert(message);
           } else {
-            showAlert("Device not upright! Please hold upright.");
+            showAlert(await getAIAlertMessage('orientation', {
+              fallback: "Device not upright! Please hold upright."
+            }));
           }
         }
       }
@@ -351,11 +500,15 @@
 
     // Check if device is upright
     let isUpright = true;
-    function handleDeviceOrientation(event) {
+    async function handleDeviceOrientation(event) {
       const { beta } = event;
       isUpright = beta > -30 && beta < 30;
       if (!isUpright && state.sensorDetectionEnabled) {
-        showAlert("Device not upright! Please hold upright.");
+        const message = await getAIAlertMessage('orientation', {
+          beta,
+          fallback: "Device not upright! Please hold upright."
+        });
+        showAlert(message);
       }
     }
 
@@ -363,16 +516,30 @@
       return isUpright;
     }
 
-    // Show alert with sound and vibration
-    function showAlert(message) {
+    // Show and store alert
+    async function showAlert(message) {
       playAlertSound();
       const pattern = state.vibrationPattern === 'short' ? [200] : [200, 100, 200];
       vibrate(pattern);
-      const alert = document.createElement('div');
-      alert.className = 'alert slide-in';
-      alert.textContent = message;
-      elements.alertContainer.appendChild(alert);
-      setTimeout(() => alert.remove(), 5000);
+      
+      const alert = {
+        id: push(ref(db, `users/${state.userId}/alerts`)).key,
+        message: message,
+        timestamp: Date.now()
+      };
+      await set(ref(db, `users/${state.userId}/alerts/${alert.id}`), alert);
+      state.alerts.push(alert);
+      renderAlert(alert, alert.id);
+    }
+
+    // Render alert in UI
+    function renderAlert(alert, id) {
+      const div = document.createElement('div');
+      div.className = 'alert slide-in';
+      div.innerHTML = marked.parse(alert.message);
+      div.role = 'alert';
+      elements.alertContainer.appendChild(div);
+      setTimeout(() => div.remove(), 5000);
     }
 
     // Play alert sound
@@ -481,7 +648,7 @@
           p.angle += p.speed;
           p.x = elements.blackHoleCanvas.width / 2 + Math.cos(p.angle) * p.distance;
           p.y = elements.blackHoleCanvas.height / 2 + Math.sin(p.angle) * p.distance;
-          p.distance *= 0.995; // Gradually pull particles toward center
+          p.distance *= 0.995;
           if (p.distance < 10) {
             p.distance = Math.random() * 50 + 50;
             p.angle = Math.random() * Math.PI * 2;
@@ -557,9 +724,12 @@
       };
     });
 
+    elements.signoutButton.addEventListener('click', handleSignOut);
+
     document.addEventListener('DOMContentLoaded', () => {
       document.body.dataset.theme = state.theme;
       startBlackHoleAnimation();
+      initializeFirebase();
       if (state.sensorDetectionEnabled) {
         requestSensorPermissions();
         elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
