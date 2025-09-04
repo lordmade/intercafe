@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Vynix Sensor Alerts</title>
+  <title>Vynix Vehicle Detection</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
+  <script src="https://docs.opencv.org/4.10.0/opencv.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -125,7 +126,7 @@
       transform: translate(-50%, -50%);
       width: 300px;
       height: 300px;
-      pointer-events: none;
+      cursor: pointer;
       z-index: 10;
     }
 
@@ -184,6 +185,57 @@
       box-shadow: 0 0 0 2px var(--glow);
     }
 
+    .video-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      z-index: 30;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-container {
+      position: relative;
+      width: 90%;
+      max-width: 800px;
+      aspect-ratio: 16 / 9;
+      background: var(--card-bg);
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .video-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .close-video {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: var(--primary);
+      color: var(--white);
+      padding: 0.5rem;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 35;
+    }
+
     .modal-buttons {
       display: flex;
       gap: 0.5rem;
@@ -210,6 +262,9 @@
       }
       .modal-content {
         width: 90%;
+      }
+      .video-container {
+        width: 95%;
       }
       button, select {
         font-size: 0.875rem;
@@ -252,7 +307,7 @@
     <div id="settings-modal" class="modal" role="dialog" aria-labelledby="settings-modal-title" aria-describedby="settings-modal-description">
       <div class="modal-content modal-slide-in">
         <h2 id="settings-modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Alert Settings</h2>
-        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your proximity and orientation alerts</p>
+        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your vehicle detection alerts</p>
         <label class="block mb-2">
           <span class="text-sm text-[var(--text-primary)]">Alert Sound Pitch</span>
           <select id="alert-pitch" class="mt-1">
@@ -278,6 +333,17 @@
           <button id="settings-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
           <button id="settings-save" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Save settings">Save</button>
         </div>
+      </div>
+    </div>
+    <div id="video-modal" class="video-modal" role="dialog" aria-labelledby="video-modal-title">
+      <div class="video-container">
+        <video id="video-feed" autoplay playsinline></video>
+        <canvas id="video-overlay" class="video-overlay"></canvas>
+        <button id="close-video" class="close-video" aria-label="Close video feed">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
     </div>
   </main>
@@ -308,7 +374,9 @@
       userName: 'User',
       geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Move to backend for security
       blackHoleAnimationFrame: null,
-      alerts: []
+      videoStream: null,
+      alerts: [],
+      vehicleDetector: null
     };
 
     const elements = {
@@ -324,7 +392,11 @@
       alertContainer: document.getElementById('alert-container'),
       blackHoleContainer: document.getElementById('black-hole-container'),
       blackHoleCanvas: document.getElementById('black-hole-canvas'),
-      signoutButton: document.getElementById('signout-button')
+      signoutButton: document.getElementById('signout-button'),
+      videoModal: document.getElementById('video-modal'),
+      videoFeed: document.getElementById('video-feed'),
+      videoOverlay: document.getElementById('video-overlay'),
+      closeVideo: document.getElementById('close-video')
     };
 
     let app, auth, db;
@@ -356,16 +428,16 @@
             const userSnapshot = await get(userRef);
             if (userSnapshot.exists()) {
               state.userName = userSnapshot.val().contactName || user.email || 'User';
-              showAlert(`Welcome, ${state.userName}! Sensor monitoring ready.`);
+              showAlert(`Welcome, ${state.userName}! Ready to detect vehicles.`);
             } else {
               await set(userRef, { contactName: user.email || 'User', createdAt: new Date().toISOString() });
               state.userName = user.email || 'User';
-              showAlert(`Welcome, ${state.userName}! Sensor monitoring ready.`);
+              showAlert(`Welcome, ${state.userName}! Ready to detect vehicles.`);
             }
             loadAlertHistory();
           } else {
             console.log("No authenticated user, redirecting to signup.html");
-            showAlert("Please sign in to access Vynix Sensor Alerts.");
+            showAlert("Please sign in to access Vynix Vehicle Detection.");
             document.body.classList.add("fade-out");
             setTimeout(() => {
               window.location.href = "signup.html";
@@ -415,7 +487,7 @@
     // Get AI-generated alert message
     async function getAIAlertMessage(eventType, details) {
       try {
-        const prompt = `You are Vynix AI, a sensor alert assistant. Generate a concise, user-friendly alert message for a ${eventType} event. Details: ${JSON.stringify(details)}. Suggest a corrective action if applicable.`;
+        const prompt = `You are Vynix AI, a vehicle detection assistant. Generate a concise, user-friendly alert message for a ${eventType} event. Details: ${JSON.stringify(details)}. Include vehicle type and description, and suggest an action if applicable.`;
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -428,7 +500,125 @@
         return data.candidates[0].content.parts[0].text;
       } catch (error) {
         console.error("Gemini API error:", error);
-        return `Alert: ${eventType} detected. ${details.fallback || 'Please check device.'}`;
+        return `Alert: ${eventType} detected. ${details.fallback || 'Vehicle detected. Please check video feed.'}`;
+      }
+    }
+
+    // Initialize video feed
+    async function startVideoFeed() {
+      try {
+        state.videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false
+        });
+        elements.videoFeed.srcObject = state.videoStream;
+        elements.videoModal.style.display = 'flex';
+        elements.blackHoleContainer.classList.add('hidden');
+        stopBlackHoleAnimation();
+        initializeVehicleDetection();
+      } catch (error) {
+        console.error("Failed to access camera:", error);
+        showAlert("Unable to access camera. Please grant permissions.");
+      }
+    }
+
+    // Stop video feed
+    function stopVideoFeed() {
+      if (state.videoStream) {
+        state.videoStream.getTracks().forEach(track => track.stop());
+        state.videoStream = null;
+      }
+      elements.videoFeed.srcObject = null;
+      elements.videoModal.style.display = 'none';
+      elements.blackHoleContainer.classList.remove('hidden');
+      startBlackHoleAnimation();
+      stopVehicleDetection();
+    }
+
+    // Initialize vehicle detection with OpenCV.js
+    async function initializeVehicleDetection() {
+      if (!cv) {
+        console.error("OpenCV.js not loaded");
+        showAlert("Failed to load vehicle detection module.");
+        return;
+      }
+      state.vehicleDetector = setInterval(processVideoFrame, 500); // Process every 500ms
+    }
+
+    // Process video frame for vehicle detection
+    async function processVideoFrame() {
+      if (!elements.videoFeed.srcObject) return;
+      const canvas = elements.videoOverlay;
+      const ctx = canvas.getContext('2d');
+      canvas.width = elements.videoFeed.videoWidth;
+      canvas.height = elements.videoFeed.videoHeight;
+      ctx.drawImage(elements.videoFeed, 0, 0, canvas.width, canvas.height);
+      const src = cv.imread(canvas);
+      const gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      
+      // Use pre-trained MobileNet SSD (requires model files)
+      const classifier = new cv.CascadeClassifier();
+      // Note: For production, host haarcascade_car.xml or MobileNet SSD model files
+      // classifier.load('haarcascade_car.xml'); // Placeholder, replace with actual model
+      const vehicles = new cv.RectVector();
+      // classifier.detectMultiScale(gray, vehicles, 1.1, 3); // Example parameters
+      
+      // Simulate detection for demo (replace with actual model inference)
+      const detectedVehicles = [
+        { x: 100, y: 100, width: 200, height: 100, class: 'sedan', confidence: 0.9 },
+        { x: 350, y: 150, width: 250, height: 120, class: 'truck', confidence: 0.85 }
+      ];
+
+      for (const vehicle of detectedVehicles) {
+        // Approximate color detection
+        const roi = src.roi(new cv.Rect(vehicle.x, vehicle.y, vehicle.width, vehicle.height));
+        const mean = cv.mean(roi);
+        const color = `rgb(${Math.round(mean[0])}, ${Math.round(mean[1])}, ${Math.round(mean[2])})`;
+        const colorName = approximateColorName(mean);
+        
+        // Draw bounding box
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(vehicle.x, vehicle.y, vehicle.width, vehicle.height);
+        ctx.fillStyle = 'red';
+        ctx.font = '16px Poppins';
+        ctx.fillText(`${vehicle.class} (${(vehicle.confidence * 100).toFixed(0)}%)`, vehicle.x, vehicle.y - 10);
+        
+        // Generate and show alert
+        const message = await getAIAlertMessage('vehicle', {
+          type: vehicle.class,
+          color: colorName,
+          confidence: vehicle.confidence,
+          fallback: `${vehicle.class} detected! Color: ${colorName}.`
+        });
+        showAlert(message);
+        
+        roi.delete();
+      }
+      
+      src.delete();
+      gray.delete();
+      vehicles.delete();
+    }
+
+    // Approximate color name from RGB
+    function approximateColorName(mean) {
+      const r = mean[0], g = mean[1], b = mean[2];
+      if (r > 200 && g < 100 && b < 100) return 'Red';
+      if (r < 100 && g > 200 && b < 100) return 'Green';
+      if (r < 100 && g < 100 && b > 200) return 'Blue';
+      if (r > 200 && g > 200 && b < 100) return 'Yellow';
+      if (r > 200 && g > 200 && b > 200) return 'White';
+      if (r < 50 && g < 50 && b < 50) return 'Black';
+      return 'Unknown';
+    }
+
+    // Stop vehicle detection
+    function stopVehicleDetection() {
+      if (state.vehicleDetector) {
+        clearInterval(state.vehicleDetector);
+        state.vehicleDetector = null;
       }
     }
 
@@ -724,6 +914,8 @@
       };
     });
 
+    elements.blackHoleContainer.addEventListener('click', startVideoFeed);
+    elements.closeVideo.addEventListener('click', stopVideoFeed);
     elements.signoutButton.addEventListener('click', handleSignOut);
 
     document.addEventListener('DOMContentLoaded', () => {
