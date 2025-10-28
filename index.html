@@ -2,356 +2,167 @@
 <html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Vynix Vehicle Detection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vynix AI Training Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
-  <script src="https://docs.opencv.org/4.10.0/opencv.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #1E3A8A;
-      --accent: #000000;
-      --bg: #0A0A0A;
-      --card-bg: #1A1A1A;
-      --text-primary: #F3F4F6;
-      --text-secondary: #A3A3A3;
-      --border: #2D2D2D;
-      --highlight: #2A2A2A;
-      --focus: #4B5EAA;
-      --white: #FFFFFF;
-      --error: #EF4444;
-      --success: #10B981;
-      --glow: rgba(0, 0, 0, 0.5);
-      --black-hole-core: rgba(0, 0, 0, 1);
-      --black-hole-disk: rgba(255, 165, 0, 0.3);
-      --alert-bg: #B91C1C;
+      --bg: #f8f8f8;
+      --card-bg: #ffffff;
+      --text-primary: #000000;
+      --text-secondary: #666666;
+      --border: #e0e0e0;
+      --accent: #d40000;
+      --bbm-red: #d40000;
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+      --glow: 0 0 10px rgba(212, 0, 0, 0.3);
     }
-
-    [data-theme="light"] {
-      --bg: #F9FAFB;
-      --card-bg: #FFFFFF;
-      --text-primary: #111827;
-      --text-secondary: #6B7280;
-      --border: #D1D5DB;
-      --highlight: #E5E7EB;
-      --glow: rgba(0, 0, 0, 0.3);
-      --black-hole-core: rgba(0, 0, 0, 1);
-      --black-hole-disk: rgba(255, 165, 0, 0.4);
-      --alert-bg: #FECACA;
-    }
-
     body {
-      font-family: 'Poppins', system-ui, sans-serif;
+      font-family: 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text-primary);
-      min-height: 100vh;
       margin: 0;
-      transition: background 0.3s ease;
-      touch-action: manipulation;
+      padding: 0;
+      line-height: 1.6;
     }
-
-    @media (prefers-reduced-motion: no-preference) {
-      .transition { transition: all 0.3s ease; }
-      .slide-in { animation: slideIn 0.3s ease; }
-      .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
-      .black-hole { animation: blackHoleSwirl 10s infinite linear; }
-      .modal-slide-in { animation: modalSlideIn 0.3s ease; }
-    }
-
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(20px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--glow); }
-      50% { transform: scale(1.05); box-shadow: 0 0 20px var(--glow); }
-    }
-
-    @keyframes blackHoleSwirl {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    @keyframes modalSlideIn {
-      from { opacity: 0; transform: translateY(-20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .alert {
-      max-width: 80%;
-      padding: 0.75rem;
-      border-radius: 1rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      background: var(--alert-bg);
-      color: var(--white);
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    .toggle-container {
-      position: fixed;
-      top: 0.5rem;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 20;
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .alert-container {
-      position: fixed;
-      top: 3rem;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 15;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      max-width: 90%;
-      width: 600px;
-    }
-
-    .black-hole-container {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 300px;
-      height: 300px;
-      cursor: pointer;
-      z-index: 10;
-    }
-
-    .black-hole {
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, var(--black-hole-core) 20%, var(--black-hole-disk) 50%, transparent);
-      border-radius: 50%;
-    }
-
-    canvas.black-hole-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0.8;
-    }
-
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 30;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-content {
+    .header {
       background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      max-width: 90%;
-      width: 400px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      border-bottom: 1px solid var(--border);
     }
-
-    .modal-content select {
-      width: 100%;
-      background: var(--highlight);
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-      padding: 0.5rem;
-      color: var(--text-primary);
-      outline: none;
-      font-size: 0.875rem;
+    .header h1 {
+      font-family: 'Orbitron', monospace;
+      color: var(--bbm-red);
+      font-weight: 900;
+      font-size: 28px;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 10px rgba(212, 0, 0, 0.3);
+      margin: 0;
     }
-
-    .modal-content select:focus {
-      border-color: var(--focus);
-      box-shadow: 0 0 0 2px var(--glow);
-    }
-
-    .video-modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: var(--bg);
-      z-index: 30;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .video-container {
-      position: relative;
-      width: 90%;
+    .container {
       max-width: 800px;
-      aspect-ratio: 16 / 9;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .add-form {
       background: var(--card-bg);
-      border-radius: 1rem;
-      overflow: hidden;
-    }
-
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .video-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .close-video {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: var(--primary);
-      color: var(--white);
-      padding: 0.5rem;
-      border-radius: 50%;
-      cursor: pointer;
-      z-index: 35;
-    }
-
-    .modal-buttons {
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
       display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
-      margin-top: 1rem;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-
-    @media (max-width: 640px) {
-      .black-hole-container {
-        width: 200px;
-        height: 200px;
-      }
-      .alert-container {
-        top: 2.5rem;
-        width: 90%;
-      }
-      .alert {
-        max-width: 90%;
-        padding: 0.5rem;
-        font-size: 0.875rem;
-      }
-      .toggle-container {
-        top: 0.25rem;
-      }
-      .modal-content {
-        width: 90%;
-      }
-      .video-container {
-        width: 95%;
-      }
-      button, select {
-        font-size: 0.875rem;
-      }
+    .add-form input {
+      flex: 1;
+      min-width: 200px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    .btn {
+      background: var(--bbm-red);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .btn:hover {
+      background: #b30000;
+      box-shadow: var(--glow);
+    }
+    .btn-danger {
+      background: #ff4444;
+    }
+    .btn-danger:hover {
+      background: #cc0000;
+    }
+    .training-pair {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .training-pair input {
+      flex: 1;
+      min-width: 150px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .pair-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .stats {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+      color: var(--text-secondary);
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-style: italic;
+      color: var(--text-secondary);
+    }
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border-left: 4px solid #c33;
     }
   </style>
 </head>
-<body data-theme="dark">
-  <main class="sensor-container p-4 flex flex-col h-screen max-w-3xl mx-auto" id="sensor-container">
-    <div class="toggle-container">
-      <button id="theme-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle theme">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      </button>
-      <button id="sensor-toggle" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Toggle sensor detection">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v6m0 8v6m-6-6h12"></path>
-        </svg>
-      </button>
-      <button id="settings-button" class="text-[var(--accent)] hover:scale-110 focus:outline focus:outline-2 focus:outline-[var(--focus)] p-2" aria-label="Open settings">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </button>
-      <button id="signout-button" class="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white p-2 rounded-full hover:scale-105 focus:outline focus:outline-2 focus:outline-[var(--focus)] transition" aria-label="Sign out">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-          <polyline points="16 17 21 12 16 7"></polyline>
-          <line x1="21" y1="12" x2="9" y2="12"></line>
-        </svg>
-      </button>
-    </div>
-    <div class="alert-container" id="alert-container" aria-live="polite" role="log"></div>
-    <div class="black-hole-container" id="black-hole-container">
-      <div class="black-hole"></div>
-      <canvas id="black-hole-canvas" class="black-hole-canvas"></canvas>
-    </div>
-    <div id="settings-modal" class="modal" role="dialog" aria-labelledby="settings-modal-title" aria-describedby="settings-modal-description">
-      <div class="modal-content modal-slide-in">
-        <h2 id="settings-modal-title" class="text-lg font-semibold text-[var(--text-primary)] mb-2">Alert Settings</h2>
-        <p id="settings-modal-description" class="text-sm text-[var(--text-secondary)] mb-4">Customize your vehicle detection alerts</p>
-        <label class="block mb-2">
-          <span class="text-sm text-[var(--text-primary)]">Alert Sound Pitch</span>
-          <select id="alert-pitch" class="mt-1">
-            <option value="1000">High (1000 Hz)</option>
-            <option value="500">Low (500 Hz)</option>
-          </select>
-        </label>
-        <label class="block mb-2">
-          <span class="text-sm text-[var(--text-primary)]">Vibration Pattern</span>
-          <select id="vibration-pattern" class="mt-1">
-            <option value="short">Short (200ms)</option>
-            <option value="long">Long (200,100,200ms)</option>
-          </select>
-        </label>
-        <label class="block mb-2">
-          <span class="text-sm text-[var(--text-primary)]">Proximity Threshold</span>
-          <select id="proximity-threshold" class="mt-1">
-            <option value="5">Close (5 cm)</option>
-            <option value="10">Far (10 cm)</option>
-          </select>
-        </label>
-        <div class="modal-buttons">
-          <button id="settings-cancel" class="px-3 py-1.5 bg-[var(--highlight)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--border)] transition" aria-label="Cancel">Cancel</button>
-          <button id="settings-save" class="px-3 py-1.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-lg hover:scale-105 transition" aria-label="Save settings">Save</button>
-        </div>
-      </div>
-    </div>
-    <div id="video-modal" class="video-modal" role="dialog" aria-labelledby="video-modal-title">
-      <div class="video-container">
-        <video id="video-feed" autoplay playsinline></video>
-        <canvas id="video-overlay" class="video-overlay"></canvas>
-        <button id="close-video" class="close-video" aria-label="Close video feed">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </main>
+<body>
+  <header class="header">
+    <h1>Vynix AI Training Dashboard</h1>
+    <p>Manage training data for your AI companion</p>
+  </header>
+
+  <div class="container">
+    <div id="auth-status" class="stats">Loading...</div>
+    <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
+
+    <div id="error-message" class="error hidden"></div>
+
+    <form id="add-form" class="add-form hidden">
+      <input type="text" id="new-q" placeholder="Question (e.g., 'hello')" required>
+      <input type="text" id="new-a" placeholder="Answer (e.g., 'Hi! What's up?')" required>
+      <button type="submit" class="btn">Add Pair</button>
+    </form>
+
+    <div id="loading" class="loading">Loading training data...</div>
+    <div id="pairs-list"></div>
+
+    <button id="retrain-btn" class="btn hidden" style="display: block; margin: 20px auto;">Trigger Retrain (Saves & Notifies)</button>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -364,569 +175,180 @@
       measurementId: "G-V4W97VMSKL"
     };
 
-    const state = {
-      theme: localStorage.getItem('theme') || 'dark',
-      sensorDetectionEnabled: localStorage.getItem('sensorDetectionEnabled') === 'true' || false,
-      alertPitch: localStorage.getItem('alertPitch') || '1000',
-      vibrationPattern: localStorage.getItem('vibrationPattern') || 'short',
-      proximityThreshold: localStorage.getItem('proximityThreshold') || '5',
-      userId: null,
-      userName: 'User',
-      geminiApiKey: 'AIzaSyBZb3DQUktOdE_3IKDKdGLOB2B75nc9zjw', // Move to backend for security
-      blackHoleAnimationFrame: null,
-      videoStream: null,
-      alerts: [],
-      vehicleDetector: null
-    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
     const elements = {
-      themeToggle: document.getElementById('theme-toggle'),
-      sensorToggle: document.getElementById('sensor-toggle'),
-      settingsButton: document.getElementById('settings-button'),
-      settingsModal: document.getElementById('settings-modal'),
-      settingsSave: document.getElementById('settings-save'),
-      settingsCancel: document.getElementById('settings-cancel'),
-      alertPitch: document.getElementById('alert-pitch'),
-      vibrationPattern: document.getElementById('vibration-pattern'),
-      proximityThreshold: document.getElementById('proximity-threshold'),
-      alertContainer: document.getElementById('alert-container'),
-      blackHoleContainer: document.getElementById('black-hole-container'),
-      blackHoleCanvas: document.getElementById('black-hole-canvas'),
-      signoutButton: document.getElementById('signout-button'),
-      videoModal: document.getElementById('video-modal'),
-      videoFeed: document.getElementById('video-feed'),
-      videoOverlay: document.getElementById('video-overlay'),
-      closeVideo: document.getElementById('close-video')
+      authStatus: document.getElementById('auth-status'),
+      stats: document.getElementById('stats'),
+      pairCount: document.getElementById('pair-count'),
+      errorMessage: document.getElementById('error-message'),
+      addForm: document.getElementById('add-form'),
+      newQ: document.getElementById('new-q'),
+      newA: document.getElementById('new-a'),
+      loading: document.getElementById('loading'),
+      pairsList: document.getElementById('pairs-list'),
+      retrainBtn: document.getElementById('retrain-btn')
     };
 
-    let app, auth, db;
+    let currentUser;
+    let trainingData = {};
+    let dataKeys = [];  // To track push keys
 
-    // Initialize Firebase
-    function initializeFirebase() {
+    function showError(msg) {
+      elements.errorMessage.textContent = msg;
+      elements.errorMessage.classList.remove('hidden');
+    }
+
+    function hideError() {
+      elements.errorMessage.classList.add('hidden');
+    }
+
+    function updateStats() {
+      elements.pairCount.textContent = Object.keys(trainingData).length;
+      elements.stats.classList.remove('hidden');
+    }
+
+    function renderPairs() {
+      elements.pairsList.innerHTML = '';
+      dataKeys.forEach(key => {
+        const pair = trainingData[key];
+        if (!pair || !pair.q || !pair.a) return;
+
+        const pairDiv = document.createElement('div');
+        pairDiv.className = 'training-pair';
+        pairDiv.innerHTML = `
+          <input type="text" value="${pair.q}" data-key="${key}" data-field="q" placeholder="Question">
+          <input type="text" value="${pair.a}" data-key="${key}" data-field="a" placeholder="Answer">
+          <div class="pair-actions">
+            <button class="btn" onclick="updatePair('${key}')">Update</button>
+            <button class="btn btn-danger" onclick="deletePair('${key}')">Delete</button>
+          </div>
+        `;
+        elements.pairsList.appendChild(pairDiv);
+      });
+      updateStats();
+    }
+
+    async function addPair(q, a) {
+      if (!currentUser || !q.trim() || !a.trim()) {
+        showError('Please log in and enter both question and answer.');
+        return;
+      }
       try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getDatabase(app);
-        console.log("Firebase initialized successfully at", new Date().toLocaleString());
-        checkAuthState();
+        hideError();
+        const trainingRef = ref(db, 'training_data');
+        const newPairRef = push(trainingRef);
+        const newPair = { q: q.trim().toLowerCase(), a: a.trim(), timestamp: Date.now() };
+        await set(newPairRef, newPair);
+        elements.newQ.value = '';
+        elements.newA.value = '';
+        console.log('Added training pair:', newPair);
       } catch (error) {
-        console.error("Firebase initialization failed:", error.code || error.message);
-        showAlert("Failed to connect to Firebase. Please check your network.");
+        showError('Failed to add pair: ' + error.message);
+        console.error('Add pair error:', error);
       }
     }
 
-    // Check authentication state
-    async function checkAuthState() {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        console.log("Persistence set to browserLocalPersistence");
-        onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            console.log("Authenticated user detected:", user.uid);
-            state.userId = user.uid;
-            const userRef = ref(db, `users/${user.uid}`);
-            const userSnapshot = await get(userRef);
-            if (userSnapshot.exists()) {
-              state.userName = userSnapshot.val().contactName || user.email || 'User';
-              showAlert(`Welcome, ${state.userName}! Ready to detect vehicles.`);
-            } else {
-              await set(userRef, { contactName: user.email || 'User', createdAt: new Date().toISOString() });
-              state.userName = user.email || 'User';
-              showAlert(`Welcome, ${state.userName}! Ready to detect vehicles.`);
-            }
-            loadAlertHistory();
-          } else {
-            console.log("No authenticated user, redirecting to signup.html");
-            showAlert("Please sign in to access Vynix Vehicle Detection.");
-            document.body.classList.add("fade-out");
-            setTimeout(() => {
-              window.location.href = "signup.html";
-            }, 1500);
-          }
-        }, (error) => {
-          console.error("Auth state error:", error);
-          showAlert("Failed to check authentication state.");
-        });
-      } catch (error) {
-        console.error("Auth state check failed:", error.code || error.message);
-        showAlert("Failed to check authentication state. Please try again.");
+    window.updatePair = async function(key) {
+      if (!currentUser) return;
+      const inputs = document.querySelectorAll(`[data-key="${key}"]`);
+      const qInput = inputs[0].value.trim().toLowerCase();
+      const aInput = inputs[1].value.trim();
+      if (!qInput || !aInput) {
+        showError('Question and answer cannot be empty.');
+        return;
       }
+      try {
+        hideError();
+        const pairRef = ref(db, `training_data/${key}`);
+        await update(pairRef, { q: qInput, a: aInput, timestamp: Date.now() });
+        console.log('Updated pair:', { key, q: qInput, a: aInput });
+      } catch (error) {
+        showError('Failed to update pair: ' + error.message);
+        console.error('Update pair error:', error);
+      }
+    };
+
+    window.deletePair = async function(key) {
+      if (!currentUser) return;
+      if (!confirm('Delete this training pair?')) return;
+      try {
+        hideError();
+        const pairRef = ref(db, `training_data/${key}`);
+        await remove(pairRef);
+        console.log('Deleted pair:', key);
+      } catch (error) {
+        showError('Failed to delete pair: ' + error.message);
+        console.error('Delete pair error:', error);
+      }
+    };
+
+    async function triggerRetrain() {
+      // Since main app listens in real-time, just save any pending changes and notify
+      alert('Training data saved! Vynix will retrain automatically in connected apps.');
+      // Optionally, could add a Firebase flag to force retrain, but for now, rely on data change
     }
 
-    // Handle sign out
-    async function handleSignOut() {
+    function loadTrainingData() {
+      const trainingRef = ref(db, 'training_data');
+      onValue(trainingRef, (snapshot) => {
+        const data = snapshot.val();
+        trainingData = data || {};
+        dataKeys = Object.keys(trainingData);
+        renderPairs();
+        elements.loading.classList.add('hidden');
+      }, (error) => {
+        showError('Failed to load training data: ' + error.message);
+        elements.loading.classList.add('hidden');
+        console.error('Load data error:', error);
+      });
+    }
+
+    elements.addForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = elements.newQ.value;
+      const a = elements.newA.value;
+      addPair(q, a);
+    });
+
+    elements.retrainBtn.addEventListener('click', triggerRetrain);
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      if (user) {
+        elements.authStatus.innerHTML = `Logged in as: ${user.displayName || user.email || 'User'} <button class="btn" onclick="signOutUser()" style="font-size: 12px; padding: 4px 8px;">Sign Out</button>`;
+        elements.addForm.classList.remove('hidden');
+        elements.retrainBtn.classList.remove('hidden');
+        loadTrainingData();
+      } else {
+        elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
+        elements.addForm.classList.add('hidden');
+        elements.retrainBtn.classList.add('hidden');
+        elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
+        elements.loading.classList.add('hidden');
+      }
+    });
+
+    window.signInAnonymously = async function() {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        showError('Sign in failed: ' + error.message);
+      }
+    };
+
+    window.signOutUser = async function() {
       try {
         await signOut(auth);
-        showAlert("Signed out successfully.");
-        document.body.classList.add("fade-out");
-        setTimeout(() => {
-          window.location.href = "signup.html";
-        }, 1500);
       } catch (error) {
-        console.error("Sign out error:", error);
-        showAlert("Failed to sign out. Please try again.");
+        showError('Sign out failed: ' + error.message);
       }
-    }
+    };
 
-    // Load alert history from Firebase
-    async function loadAlertHistory() {
-      const alertsRef = ref(db, `users/${state.userId}/alerts`);
-      const snapshot = await get(alertsRef);
-      if (snapshot.exists()) {
-        state.alerts = [];
-        elements.alertContainer.innerHTML = '';
-        snapshot.forEach(child => {
-          const alert = child.val();
-          alert.id = child.key;
-          state.alerts.push(alert);
-          renderAlert(alert, alert.id);
-        });
-      }
-    }
-
-    // Get AI-generated alert message
-    async function getAIAlertMessage(eventType, details) {
-      try {
-        const prompt = `You are Vynix AI, a vehicle detection assistant. Generate a concise, user-friendly alert message for a ${eventType} event. Details: ${JSON.stringify(details)}. Include vehicle type and description, and suggest an action if applicable.`;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        });
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        return data.candidates[0].content.parts[0].text;
-      } catch (error) {
-        console.error("Gemini API error:", error);
-        return `Alert: ${eventType} detected. ${details.fallback || 'Vehicle detected. Please check video feed.'}`;
-      }
-    }
-
-    // Initialize video feed
-    async function startVideoFeed() {
-      try {
-        state.videoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false
-        });
-        elements.videoFeed.srcObject = state.videoStream;
-        elements.videoModal.style.display = 'flex';
-        elements.blackHoleContainer.classList.add('hidden');
-        stopBlackHoleAnimation();
-        initializeVehicleDetection();
-      } catch (error) {
-        console.error("Failed to access camera:", error);
-        showAlert("Unable to access camera. Please grant permissions.");
-      }
-    }
-
-    // Stop video feed
-    function stopVideoFeed() {
-      if (state.videoStream) {
-        state.videoStream.getTracks().forEach(track => track.stop());
-        state.videoStream = null;
-      }
-      elements.videoFeed.srcObject = null;
-      elements.videoModal.style.display = 'none';
-      elements.blackHoleContainer.classList.remove('hidden');
-      startBlackHoleAnimation();
-      stopVehicleDetection();
-    }
-
-    // Initialize vehicle detection with OpenCV.js
-    async function initializeVehicleDetection() {
-      if (!cv) {
-        console.error("OpenCV.js not loaded");
-        showAlert("Failed to load vehicle detection module.");
-        return;
-      }
-      state.vehicleDetector = setInterval(processVideoFrame, 500); // Process every 500ms
-    }
-
-    // Process video frame for vehicle detection
-    async function processVideoFrame() {
-      if (!elements.videoFeed.srcObject) return;
-      const canvas = elements.videoOverlay;
-      const ctx = canvas.getContext('2d');
-      canvas.width = elements.videoFeed.videoWidth;
-      canvas.height = elements.videoFeed.videoHeight;
-      ctx.drawImage(elements.videoFeed, 0, 0, canvas.width, canvas.height);
-      const src = cv.imread(canvas);
-      const gray = new cv.Mat();
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-      
-      // Use pre-trained MobileNet SSD (requires model files)
-      const classifier = new cv.CascadeClassifier();
-      // Note: For production, host haarcascade_car.xml or MobileNet SSD model files
-      // classifier.load('haarcascade_car.xml'); // Placeholder, replace with actual model
-      const vehicles = new cv.RectVector();
-      // classifier.detectMultiScale(gray, vehicles, 1.1, 3); // Example parameters
-      
-      // Simulate detection for demo (replace with actual model inference)
-      const detectedVehicles = [
-        { x: 100, y: 100, width: 200, height: 100, class: 'sedan', confidence: 0.9 },
-        { x: 350, y: 150, width: 250, height: 120, class: 'truck', confidence: 0.85 }
-      ];
-
-      for (const vehicle of detectedVehicles) {
-        // Approximate color detection
-        const roi = src.roi(new cv.Rect(vehicle.x, vehicle.y, vehicle.width, vehicle.height));
-        const mean = cv.mean(roi);
-        const color = `rgb(${Math.round(mean[0])}, ${Math.round(mean[1])}, ${Math.round(mean[2])})`;
-        const colorName = approximateColorName(mean);
-        
-        // Draw bounding box
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(vehicle.x, vehicle.y, vehicle.width, vehicle.height);
-        ctx.fillStyle = 'red';
-        ctx.font = '16px Poppins';
-        ctx.fillText(`${vehicle.class} (${(vehicle.confidence * 100).toFixed(0)}%)`, vehicle.x, vehicle.y - 10);
-        
-        // Generate and show alert
-        const message = await getAIAlertMessage('vehicle', {
-          type: vehicle.class,
-          color: colorName,
-          confidence: vehicle.confidence,
-          fallback: `${vehicle.class} detected! Color: ${colorName}.`
-        });
-        showAlert(message);
-        
-        roi.delete();
-      }
-      
-      src.delete();
-      gray.delete();
-      vehicles.delete();
-    }
-
-    // Approximate color name from RGB
-    function approximateColorName(mean) {
-      const r = mean[0], g = mean[1], b = mean[2];
-      if (r > 200 && g < 100 && b < 100) return 'Red';
-      if (r < 100 && g > 200 && b < 100) return 'Green';
-      if (r < 100 && g < 100 && b > 200) return 'Blue';
-      if (r > 200 && g > 200 && b < 100) return 'Yellow';
-      if (r > 200 && g > 200 && b > 200) return 'White';
-      if (r < 50 && g < 50 && b < 50) return 'Black';
-      return 'Unknown';
-    }
-
-    // Stop vehicle detection
-    function stopVehicleDetection() {
-      if (state.vehicleDetector) {
-        clearInterval(state.vehicleDetector);
-        state.vehicleDetector = null;
-      }
-    }
-
-    // Initialize sensors for proximity and orientation
-    function initializeSensors() {
-      if ('DeviceMotionEvent' in window) {
-        window.addEventListener('devicemotion', handleProximityFallback, true);
-        console.log("DeviceMotionEvent initialized for proximity fallback");
-      } else {
-        showAlert("Device motion not supported on this device.");
-      }
-
-      if ('DeviceOrientationEvent' in window) {
-        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
-        console.log("DeviceOrientationEvent initialized");
-      } else {
-        showAlert("Device orientation not supported on this device.");
-      }
-
-      if ('ProximitySensor' in window) {
-        const proximity = new ProximitySensor();
-        proximity.addEventListener('reading', async () => {
-          if (proximity.near && proximity.distance < parseInt(state.proximityThreshold)) {
-            const message = await getAIAlertMessage('proximity', {
-              distance: proximity.distance,
-              threshold: state.proximityThreshold,
-              fallback: `Hand detected within ${proximity.distance} cm!`
-            });
-            if (isDeviceUpright()) {
-              showAlert(message);
-            } else {
-              showAlert(await getAIAlertMessage('orientation', {
-                fallback: "Device not upright! Please hold upright."
-              }));
-            }
-          }
-        });
-        proximity.start();
-      } else {
-        console.log("ProximitySensor not supported, using accelerometer fallback");
-      }
-    }
-
-    // Fallback for proximity detection using accelerometer
-    let lastAcceleration = { x: 0, y: 0, z: 0 };
-    async function handleProximityFallback(event) {
-      const { acceleration } = event;
-      const deltaThreshold = 5;
-      if (lastAcceleration.x !== 0) {
-        const deltaX = Math.abs(acceleration.x - lastAcceleration.x);
-        const deltaY = Math.abs(acceleration.y - lastAcceleration.y);
-        const deltaZ = Math.abs(acceleration.z - lastAcceleration.z);
-        if (deltaX > deltaThreshold || deltaY > deltaThreshold || deltaZ > deltaThreshold) {
-          const message = await getAIAlertMessage('motion', {
-            delta: Math.max(deltaX, deltaY, deltaZ),
-            fallback: "Sudden movement detected! Possible hand proximity!"
-          });
-          if (isDeviceUpright()) {
-            showAlert(message);
-          } else {
-            showAlert(await getAIAlertMessage('orientation', {
-              fallback: "Device not upright! Please hold upright."
-            }));
-          }
-        }
-      }
-      lastAcceleration = { ...acceleration };
-    }
-
-    // Check if device is upright
-    let isUpright = true;
-    async function handleDeviceOrientation(event) {
-      const { beta } = event;
-      isUpright = beta > -30 && beta < 30;
-      if (!isUpright && state.sensorDetectionEnabled) {
-        const message = await getAIAlertMessage('orientation', {
-          beta,
-          fallback: "Device not upright! Please hold upright."
-        });
-        showAlert(message);
-      }
-    }
-
-    function isDeviceUpright() {
-      return isUpright;
-    }
-
-    // Show and store alert
-    async function showAlert(message) {
-      playAlertSound();
-      const pattern = state.vibrationPattern === 'short' ? [200] : [200, 100, 200];
-      vibrate(pattern);
-      
-      const alert = {
-        id: push(ref(db, `users/${state.userId}/alerts`)).key,
-        message: message,
-        timestamp: Date.now()
-      };
-      await set(ref(db, `users/${state.userId}/alerts/${alert.id}`), alert);
-      state.alerts.push(alert);
-      renderAlert(alert, alert.id);
-    }
-
-    // Render alert in UI
-    function renderAlert(alert, id) {
-      const div = document.createElement('div');
-      div.className = 'alert slide-in';
-      div.innerHTML = marked.parse(alert.message);
-      div.role = 'alert';
-      elements.alertContainer.appendChild(div);
-      setTimeout(() => div.remove(), 5000);
-    }
-
-    // Play alert sound
-    function playAlertSound() {
-      const audioContext = new AudioContext();
-      const oscillator = audioContext.createOscillator();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(parseInt(state.alertPitch), audioContext.currentTime);
-      oscillator.connect(audioContext.destination);
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.2);
-    }
-
-    // Vibration
-    function vibrate(duration) {
-      if ('vibrate' in navigator) {
-        navigator.vibrate(duration);
-      } else {
-        console.log('Vibration not supported on this device');
-      }
-    }
-
-    // Request sensor permissions
-    async function requestSensorPermissions() {
-      let motionGranted = true;
-      let orientationGranted = true;
-
-      if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-          const response = await DeviceMotionEvent.requestPermission();
-          motionGranted = response === 'granted';
-        } catch (error) {
-          showAlert("Failed to request motion sensor permissions.");
-          console.error(error);
-          motionGranted = false;
-        }
-      }
-
-      if ('DeviceOrientationEvent' in window && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const response = await DeviceOrientationEvent.requestPermission();
-          orientationGranted = response === 'granted';
-        } catch (error) {
-          showAlert("Failed to request orientation sensor permissions.");
-          console.error(error);
-          orientationGranted = false;
-        }
-      }
-
-      if (motionGranted && orientationGranted) {
-        initializeSensors();
-      } else {
-        showAlert("Sensor access denied.");
-        state.sensorDetectionEnabled = false;
-        localStorage.setItem('sensorDetectionEnabled', false);
-        elements.sensorToggle.classList.remove('bg-[var(--success)]', 'text-white');
-      }
-    }
-
-    // Show settings modal
-    function showSettingsModal() {
-      elements.settingsModal.style.display = 'flex';
-      elements.alertPitch.value = state.alertPitch;
-      elements.vibrationPattern.value = state.vibrationPattern;
-      elements.proximityThreshold.value = state.proximityThreshold;
-      elements.alertPitch.focus();
-    }
-
-    // Close settings modal
-    function closeSettingsModal() {
-      elements.settingsModal.style.display = 'none';
-      elements.settingsSave.onclick = null;
-      elements.settingsCancel.onclick = null;
-    }
-
-    // Black hole animation
-    function startBlackHoleAnimation() {
-      if (!elements.blackHoleCanvas || !elements.blackHoleContainer) {
-        console.error("Black hole elements not found");
-        return;
-      }
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        elements.blackHoleContainer.classList.add('hidden');
-        return;
-      }
-      elements.blackHoleContainer.classList.remove('hidden');
-      const ctx = elements.blackHoleCanvas.getContext('2d');
-      elements.blackHoleCanvas.width = window.innerWidth <= 640 ? 200 : 300;
-      elements.blackHoleCanvas.height = window.innerWidth <= 640 ? 200 : 300;
-      const particleCount = window.innerWidth <= 640 ? 100 : 200;
-      const particles = Array.from({length: particleCount}, () => ({
-        x: elements.blackHoleCanvas.width / 2,
-        y: elements.blackHoleCanvas.height / 2,
-        radius: Math.random() * 2 + 1,
-        angle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.02 + 0.01,
-        distance: Math.random() * 50 + 50,
-        opacity: Math.random() * 0.5 + 0.3,
-        color: `hsl(${Math.random() * 60 + 30}, 80%, ${Math.random() * 30 + 50}%)`
-      }));
-
-      function animateBlackHole() {
-        ctx.clearRect(0, 0, elements.blackHoleCanvas.width, elements.blackHoleCanvas.height);
-        ctx.globalCompositeOperation = 'lighter';
-        particles.forEach(p => {
-          p.angle += p.speed;
-          p.x = elements.blackHoleCanvas.width / 2 + Math.cos(p.angle) * p.distance;
-          p.y = elements.blackHoleCanvas.height / 2 + Math.sin(p.angle) * p.distance;
-          p.distance *= 0.995;
-          if (p.distance < 10) {
-            p.distance = Math.random() * 50 + 50;
-            p.angle = Math.random() * Math.PI * 2;
-          }
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.opacity;
-          ctx.fill();
-        });
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-        state.blackHoleAnimationFrame = requestAnimationFrame(animateBlackHole);
-      }
-      animateBlackHole();
-    }
-
-    function stopBlackHoleAnimation() {
-      cancelAnimationFrame(state.blackHoleAnimationFrame);
-      if (elements.blackHoleContainer) {
-        elements.blackHoleContainer.classList.add('hidden');
-      }
-    }
-
-    // Event listeners
-    elements.themeToggle.addEventListener('click', () => {
-      state.theme = state.theme === 'dark' ? 'light' : 'dark';
-      document.body.dataset.theme = state.theme;
-      localStorage.setItem('theme', state.theme);
-      showAlert(`Theme set to ${state.theme}`);
-    });
-
-    elements.sensorToggle.addEventListener('click', () => {
-      state.sensorDetectionEnabled = !state.sensorDetectionEnabled;
-      localStorage.setItem('sensorDetectionEnabled', state.sensorDetectionEnabled);
-      if (state.sensorDetectionEnabled) {
-        requestSensorPermissions();
-        elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
-        showAlert("Proximity and orientation detection enabled");
-      } else {
-        window.removeEventListener('devicemotion', handleProximityFallback, true);
-        window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
-        elements.sensorToggle.classList.remove('bg-[var(--success)]', 'text-white');
-        showAlert("Proximity and orientation detection disabled");
-      }
-    });
-
-    elements.settingsButton.addEventListener('click', () => {
-      showSettingsModal();
-      const save = () => {
-        state.alertPitch = elements.alertPitch.value;
-        state.vibrationPattern = elements.vibrationPattern.value;
-        state.proximityThreshold = elements.proximityThreshold.value;
-        localStorage.setItem('alertPitch', state.alertPitch);
-        localStorage.setItem('vibrationPattern', state.vibrationPattern);
-        localStorage.setItem('proximityThreshold', state.proximityThreshold);
-        showAlert('Settings saved!');
-        closeSettingsModal();
-      };
-      const cancel = () => closeSettingsModal();
-      elements.settingsSave.onclick = save;
-      elements.settingsCancel.onclick = cancel;
-      elements.alertPitch.onkeypress = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          save();
-        }
-      };
-      document.onkeydown = (e) => {
-        if (e.key === 'Escape') {
-          cancel();
-        }
-      };
-    });
-
-    elements.blackHoleContainer.addEventListener('click', startVideoFeed);
-    elements.closeVideo.addEventListener('click', stopVideoFeed);
-    elements.signoutButton.addEventListener('click', handleSignOut);
-
-    document.addEventListener('DOMContentLoaded', () => {
-      document.body.dataset.theme = state.theme;
-      startBlackHoleAnimation();
-      initializeFirebase();
-      if (state.sensorDetectionEnabled) {
-        requestSensorPermissions();
-        elements.sensorToggle.classList.add('bg-[var(--success)]', 'text-white');
-      }
-    });
+    // Initial load
+    elements.loading.classList.remove('hidden');
   </script>
 </body>
 </html>
