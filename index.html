@@ -196,6 +196,21 @@
       transition: width 0.3s ease;
       width: 0%;
     }
+    .ai-training-section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+    }
+    .ai-training-section button {
+      margin-top: 10px;
+    }
+    #model-status {
+      margin-top: 10px;
+      font-style: italic;
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 <body>
@@ -244,12 +259,22 @@
     <div id="pairs-list"></div>
 
     <button id="retrain-btn" class="btn hidden" style="display: block; margin: 20px auto;">Trigger Retrain (Saves & Notifies)</button>
+
+    <div id="ai-training-section" class="ai-training-section hidden">
+      <h3>AI Model Training (Brain.js)</h3>
+      <p>Train a local neural network on your Q&A data for client-side predictions.</p>
+      <button id="train-model-btn" class="btn">Train Model</button>
+      <button id="test-model-btn" class="btn btn-secondary" disabled>Test Prediction</button>
+      <div id="model-status"></div>
+      <input type="text" id="test-input" placeholder="Enter a test question..." style="margin-top: 10px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%;">
+    </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import brain from 'https://cdn.skypack.dev/brain.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -283,12 +308,21 @@
       progressFill: document.getElementById('progress-fill'),
       loading: document.getElementById('loading'),
       pairsList: document.getElementById('pairs-list'),
-      retrainBtn: document.getElementById('retrain-btn')
+      retrainBtn: document.getElementById('retrain-btn'),
+      aiTrainingSection: document.getElementById('ai-training-section'),
+      trainModelBtn: document.getElementById('train-model-btn'),
+      testModelBtn: document.getElementById('test-model-btn'),
+      modelStatus: document.getElementById('model-status'),
+      testInput: document.getElementById('test-input')
     };
 
     let currentUser;
     let trainingData = {};
-    let dataKeys = [];  // To track push keys
+    let dataKeys = [];
+    let net;  // Brain.js network
+    let wordToIdx = {};
+    let idxToWord = {};
+    let vocab = new Set();
 
     function showError(msg) {
       elements.errorMessage.textContent = msg;
@@ -381,9 +415,7 @@
     };
 
     async function triggerRetrain() {
-      // Since main app listens in real-time, just save any pending changes and notify
       showSuccess('Training data saved! Vynix will retrain automatically in connected apps.');
-      // Optionally, could add a Firebase flag to force retrain, but for now, rely on data change
     }
 
     function loadTrainingData() {
@@ -394,6 +426,9 @@
         dataKeys = Object.keys(trainingData);
         renderPairs();
         elements.loading.classList.add('hidden');
+        if (currentUser && dataKeys.length > 0) {
+          elements.aiTrainingSection.classList.remove('hidden');
+        }
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
@@ -405,14 +440,12 @@
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
-        // Simple CSV parser assuming first line is header, and comma-separated
         lines = content.split('\n').slice(1).filter(line => line.trim());
         return lines.map(line => {
           const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
           return { q, a };
         }).filter(pair => pair.q && pair.a);
       } else {
-        // Text mode: q|a per line
         lines = content.split('\n').filter(line => line.trim());
         return lines.map(line => {
           const [q, a] = line.split('|').map(s => s.trim());
@@ -469,7 +502,6 @@
           errors++;
           console.error(`Failed to add pair ${i + 1}:`, error);
         }
-        // Update progress
         const progress = ((i + 1) / pairs.length) * 100;
         elements.progressFill.style.width = `${progress}%`;
       }
@@ -490,6 +522,86 @@
       }
     }
 
+    // Brain.js Training
+    async function trainBrainJS() {
+      if (!currentUser || Object.keys(trainingData).length === 0) {
+        showError('No data to train on. Add some Q&A pairs first.');
+        return;
+      }
+
+      elements.trainModelBtn.disabled = true;
+      elements.modelStatus.textContent = 'Training model... (This may take a moment)';
+      hideMessages();
+
+      try {
+        // Preprocess data
+        vocab.clear();
+        const trainingSet = dataKeys.map(key => {
+          const q = trainingData[key].q.toLowerCase().split(' ').slice(0, 10);
+          const a = trainingData[key].a.toLowerCase().split(' ').slice(0, 20);
+          q.forEach(word => vocab.add(word));
+          a.forEach(word => vocab.add(word));
+          return { input: q, output: a };
+        });
+
+        wordToIdx = Array.from(vocab).reduce((acc, word, i) => { acc[word] = i; return acc; }, {});
+        idxToWord = Object.fromEntries(Object.entries(wordToIdx).map(([k, v]) => [v, k]));
+
+        const processedData = trainingSet.map(item => ({
+          input: item.input.map(word => [(wordToIdx[word] || 0) / vocab.size]),
+          output: item.output.map(word => [(wordToIdx[word] || 0) / vocab.size])
+        }));
+
+        // Train LSTM
+        net = new brain.recurrent.LSTMTimeStep({
+          inputSize: 1,
+          hiddenLayers: [10],
+          outputSize: 1
+        });
+
+        net.train(processedData, {
+          iterations: 200,
+          errorThresh: 0.005,
+          log: true,
+          logPeriod: 50
+        });
+
+        // Export model (e.g., to localStorage for chat app use)
+        const modelJson = net.toJSON();
+        localStorage.setItem('vynix-brain-model', JSON.stringify(modelJson));
+        localStorage.setItem('vynix-vocab', JSON.stringify({ wordToIdx, idxToWord }));
+
+        elements.modelStatus.textContent = `Model trained on ${processedData.length} pairs! Ready for predictions.`;
+        elements.testModelBtn.disabled = false;
+        showSuccess('Brain.js model trained successfully!');
+        console.log('Trained model exported to localStorage.');
+      } catch (error) {
+        showError('Training failed: ' + error.message);
+        elements.modelStatus.textContent = 'Training failed.';
+        console.error('Training error:', error);
+      } finally {
+        elements.trainModelBtn.disabled = false;
+      }
+    }
+
+    function predictResponse(question) {
+      if (!net) {
+        showError('No trained model. Train first.');
+        return;
+      }
+      try {
+        const inputSeq = question.toLowerCase().split(' ').slice(0, 10).map(word => [(wordToIdx[word] || 0) / vocab.size]);
+        const outputSeq = net.run(inputSeq);
+        const words = outputSeq.map(val => idxToWord[Math.round(val * vocab.size)] || '').filter(Boolean).join(' ');
+        const response = words.charAt(0).toUpperCase() + words.slice(1) + '.';
+        elements.modelStatus.textContent = `Prediction: ${response}`;
+        return response;
+      } catch (error) {
+        showError('Prediction failed: ' + error.message);
+        console.error('Prediction error:', error);
+      }
+    }
+
     // Event listeners
     elements.addForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -506,7 +618,6 @@
 
     elements.retrainBtn.addEventListener('click', triggerRetrain);
 
-    // Bulk form listeners
     elements.bulkForm.addEventListener('submit', handleBulkSubmit);
 
     const modeRadios = document.querySelectorAll('input[name="bulk-mode"]');
@@ -534,6 +645,23 @@
       updateBulkPreview(pairs);
     });
 
+    elements.trainModelBtn.addEventListener('click', trainBrainJS);
+
+    elements.testModelBtn.addEventListener('click', () => {
+      const question = elements.testInput.value.trim();
+      if (!question) {
+        showError('Enter a test question.');
+        return;
+      }
+      predictResponse(question);
+    });
+
+    elements.testInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        elements.testModelBtn.click();
+      }
+    });
+
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
@@ -547,6 +675,7 @@
         elements.addForm.classList.add('hidden');
         elements.bulkForm.classList.add('hidden');
         elements.retrainBtn.classList.add('hidden');
+        elements.aiTrainingSection.classList.add('hidden');
         elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
       }
