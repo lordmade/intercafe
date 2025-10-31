@@ -566,15 +566,21 @@
           logPeriod: 50
         });
 
-        // Export model (e.g., to localStorage for chat app use)
+        // Save to Firebase instead of localStorage
         const modelJson = net.toJSON();
-        localStorage.setItem('vynix-brain-model', JSON.stringify(modelJson));
-        localStorage.setItem('vynix-vocab', JSON.stringify({ wordToIdx, idxToWord }));
+        const modelData = {
+          modelJson: modelJson,
+          vocab: { wordToIdx, idxToWord },
+          timestamp: Date.now(),
+          numPairs: processedData.length
+        };
+        const modelsRef = ref(db, 'models/current-model');
+        await set(modelsRef, modelData);
 
-        elements.modelStatus.textContent = `Model trained on ${processedData.length} pairs! Ready for predictions.`;
+        elements.modelStatus.textContent = `Model trained & saved to Firebase on ${processedData.length} pairs! Ready for predictions.`;
         elements.testModelBtn.disabled = false;
-        showSuccess('Brain.js model trained successfully!');
-        console.log('Trained model exported to localStorage.');
+        showSuccess('Brain.js model trained and uploaded to Firebase!');
+        console.log('Model saved to Firebase:', modelData);
       } catch (error) {
         showError('Training failed: ' + error.message);
         elements.modelStatus.textContent = 'Training failed.';
