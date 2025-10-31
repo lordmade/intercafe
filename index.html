@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
@@ -211,6 +212,36 @@
       font-style: italic;
       color: var(--text-secondary);
     }
+    .flex {
+      display: flex;
+    }
+    .gap-4 {
+      gap: 1rem;
+    }
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+    .block {
+      display: block;
+    }
+    .text-sm {
+      font-size: 0.875rem;
+    }
+    .font-medium {
+      font-weight: 500;
+    }
+    .text-gray-700 {
+      color: #374151;
+    }
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+    .items-center {
+      align-items: center;
+    }
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -254,6 +285,17 @@
       </div>
       <button type="submit" class="btn" id="bulk-submit" disabled>Bulk Add Pairs</button>
     </form>
+
+    <div id="hf-section" class="ai-training-section hidden">
+      <h3>Load Hugging Face Dataset</h3>
+      <p>Fetch Q&A pairs from public HF datasets to boost training.</p>
+      <div class="flex gap-4 mb-4">
+        <input type="text" id="hf-dataset" placeholder="e.g., bitext/Bitext-customer-support-llm-chatbot-training-dataset" value="bitext/Bitext-customer-support-llm-chatbot-training-dataset" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:4px;">
+        <input type="number" id="hf-count" placeholder="Num pairs (max 1000)" value="100" min="10" max="1000" style="width:120px; padding:8px; border:1px solid var(--border); border-radius:4px;">
+        <button id="load-hf-btn" class="btn">Load & Add Pairs</button>
+      </div>
+      <div id="hf-status"></div>
+    </div>
 
     <div id="loading" class="loading">Loading training data...</div>
     <div id="pairs-list"></div>
@@ -316,6 +358,15 @@
       testInput: document.getElementById('test-input')
     };
 
+    // HF elements
+    const hfElements = {
+      section: document.getElementById('hf-section'),
+      datasetInput: document.getElementById('hf-dataset'),
+      countInput: document.getElementById('hf-count'),
+      loadBtn: document.getElementById('load-hf-btn'),
+      status: document.getElementById('hf-status')
+    };
+
     let currentUser;
     let trainingData = {};
     let dataKeys = [];
@@ -323,11 +374,13 @@
     let wordToIdx = {};
     let idxToWord = {};
     let vocab = new Set();
+    let allQuestions = [];  // For retrieval fallback
 
     function showError(msg) {
       elements.errorMessage.textContent = msg;
       elements.errorMessage.classList.remove('hidden');
       elements.successMessage.classList.add('hidden');
+      if (hfElements.status) hfElements.status.textContent = '';
     }
 
     function showSuccess(msg) {
@@ -365,6 +418,7 @@
         elements.pairsList.appendChild(pairDiv);
       });
       updateStats();
+      allQuestions = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));  // Update for retrieval
     }
 
     async function addPair(q, a) {
@@ -436,17 +490,24 @@
       });
     }
 
-    // Bulk functionality
-    function parseBulkData(content, mode) {
-      let lines;
+    // Updated Bulk functionality with PapaParse for CSV
+    async function parseBulkData(content, mode) {
       if (mode === 'csv') {
-        lines = content.split('\n').slice(1).filter(line => line.trim());
-        return lines.map(line => {
-          const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          return { q, a };
-        }).filter(pair => pair.q && pair.a);
+        return new Promise((resolve) => {
+          Papa.parse(content, {
+            header: false,
+            complete: (results) => {
+              const pairs = results.data.slice(1).map(row => {
+                if (row.length < 2) return null;
+                const [q, a] = [row[0], row[1]].map(s => s ? s.trim().replace(/"/g, '') : '');
+                return { q, a };
+              }).filter(pair => pair && pair.q && pair.a);
+              resolve(pairs);
+            }
+          });
+        });
       } else {
-        lines = content.split('\n').filter(line => line.trim());
+        const lines = content.split('\n').filter(line => line.trim());
         return lines.map(line => {
           const [q, a] = line.split('|').map(s => s.trim());
           return { q, a };
@@ -482,7 +543,7 @@
         content = text;
       }
 
-      const pairs = parseBulkData(content, mode);
+      const pairs = await parseBulkData(content, mode);
       if (pairs.length === 0) {
         showError('No valid pairs found in the input.');
         return;
@@ -522,7 +583,85 @@
       }
     }
 
-    // Brain.js Training
+    // HF Integration
+    async function fetchHFPairs(dataset, count) {
+      const batchSize = 100;  // HF limit per call
+      const pairs = [];
+      let offset = 0;
+      hfElements.status.textContent = 'Fetching...';
+      hfElements.loadBtn.disabled = true;
+
+      while (pairs.length < count && offset < 10000) {  // Safety cap
+        const url = `https://datasets-server.huggingface.co/rows?dataset=${encodeURIComponent(dataset)}&config=default&split=train&offset=${offset}&length=${Math.min(batchSize, count - pairs.length)}`;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const data = await response.json();
+          if (!data.rows || data.rows.length === 0) break;
+
+          const batchPairs = data.rows
+            .map(row => {
+              const q = row.row.instruction?.trim();
+              const a = row.row.response?.trim();
+              return (q && a && q.length > 5 && a.length > 10) ? { q: q.toLowerCase(), a } : null;  // Filter junk
+            })
+            .filter(Boolean);
+
+          pairs.push(...batchPairs);
+          offset += batchSize;
+          hfElements.status.textContent = `Fetched ${pairs.length}/${count} pairs...`;
+        } catch (error) {
+          showError(`HF fetch failed: ${error.message}`);
+          return [];
+        }
+      }
+
+      hfElements.status.textContent = `${pairs.length} valid pairs ready!`;
+      hfElements.loadBtn.disabled = false;
+      return pairs.slice(0, count);  // Trim if over
+    }
+
+    async function handleHFLoad(e) {
+      e?.preventDefault();  // Optional, for consistency
+      hideMessages();
+      const dataset = hfElements.datasetInput.value.trim();
+      const count = parseInt(hfElements.countInput.value) || 100;
+      if (!dataset || count < 10) {
+        showError('Enter a valid dataset name and count (10-1000).');
+        return;
+      }
+
+      const pairs = await fetchHFPairs(dataset, count);
+      if (pairs.length === 0) {
+        showError('No pairs fetched—check dataset name or try another.');
+        return;
+      }
+
+      // Reuse bulk progress logic
+      const progressBar = elements.progressFill.parentElement;
+      progressBar.classList.remove('hidden');
+      let added = 0;
+      let errors = 0;
+
+      for (let i = 0; i < pairs.length; i++) {
+        try {
+          await addPair(pairs[i].q, pairs[i].a);
+          added++;
+        } catch (error) {
+          errors++;
+          console.error(`Failed pair ${i + 1}:`, error);
+        }
+        const progress = ((i + 1) / pairs.length) * 100;
+        elements.progressFill.style.width = `${progress}%`;
+      }
+
+      progressBar.classList.add('hidden');
+      elements.progressFill.style.width = '0%';
+
+      showSuccess(`HF load complete: ${added} pairs added to Firebase (${errors} errors). Train Vynix now!`);
+    }
+
+    // Updated Brain.js Training with vocab check & dynamic slicing
     async function trainBrainJS() {
       if (!currentUser || Object.keys(trainingData).length === 0) {
         showError('No data to train on. Add some Q&A pairs first.');
@@ -537,20 +676,28 @@
         // Preprocess data
         vocab.clear();
         const trainingSet = dataKeys.map(key => {
-          const q = trainingData[key].q.toLowerCase().split(' ').slice(0, 10);
-          const a = trainingData[key].a.toLowerCase().split(' ').slice(0, 20);
-          q.forEach(word => vocab.add(word));
-          a.forEach(word => vocab.add(word));
-          return { input: q, output: a };
+          const qWords = trainingData[key].q.toLowerCase().split(' ').filter(w => w.length > 0);
+          const aWords = trainingData[key].a.toLowerCase().split(' ').filter(w => w.length > 0);
+          qWords.forEach(word => vocab.add(word));
+          aWords.forEach(word => vocab.add(word));
+          return { input: qWords, output: aWords };
         });
+
+        if (vocab.size < 5) {
+          throw new Error('Vocab too small (<5 unique words). Add more diverse pairs!');
+        }
 
         wordToIdx = Array.from(vocab).reduce((acc, word, i) => { acc[word] = i; return acc; }, {});
         idxToWord = Object.fromEntries(Object.entries(wordToIdx).map(([k, v]) => [v, k]));
 
-        const processedData = trainingSet.map(item => ({
-          input: item.input.map(word => [(wordToIdx[word] || 0) / vocab.size]),
-          output: item.output.map(word => [(wordToIdx[word] || 0) / vocab.size])
-        }));
+        const maxInputLen = Math.max(...trainingSet.map(s => s.input.length)) || 10;
+        const maxOutputLen = Math.max(...trainingSet.map(s => s.output.length)) || 20;
+
+        const processedData = trainingSet.map(item => {
+          const input = item.input.slice(0, maxInputLen).map(word => [(wordToIdx[word] || 0) / vocab.size]);
+          const output = item.output.slice(0, maxOutputLen).map(word => [(wordToIdx[word] || 0) / vocab.size]);
+          return { input, output };
+        });
 
         // Train LSTM
         net = new brain.recurrent.LSTMTimeStep({
@@ -566,7 +713,7 @@
           logPeriod: 50
         });
 
-        // Save to Firebase instead of localStorage
+        // Save to Firebase
         const modelJson = net.toJSON();
         const modelData = {
           modelJson: modelJson,
@@ -590,18 +737,49 @@
       }
     }
 
+    // Hybrid Predict: NN + Retrieval Fallback
+    function cosineSim(vecA, vecB) {
+      const dot = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
+      const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a*a, 0));
+      const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b*b, 0));
+      return dot / (magA * magB) || 0;
+    }
+
     function predictResponse(question) {
       if (!net) {
         showError('No trained model. Train first.');
         return;
       }
       try {
-        const inputSeq = question.toLowerCase().split(' ').slice(0, 10).map(word => [(wordToIdx[word] || 0) / vocab.size]);
+        const qWords = question.toLowerCase().split(' ').slice(0, 10).filter(w => w.length > 0);
+        if (qWords.length === 0) return 'Sorry, unclear question.';
+
+        const inputSeq = qWords.map(word => [wordToIdx[word] || 0 / vocab.size]);
         const outputSeq = net.run(inputSeq);
-        const words = outputSeq.map(val => idxToWord[Math.round(val * vocab.size)] || '').filter(Boolean).join(' ');
-        const response = words.charAt(0).toUpperCase() + words.slice(1) + '.';
-        elements.modelStatus.textContent = `Prediction: ${response}`;
-        return response;
+        let nnWords = outputSeq.map(val => idxToWord[Math.round(val * (vocab.size - 1))] || '').filter(Boolean);
+        const nnResponse = nnWords.join(' ').charAt(0).toUpperCase() + nnWords.join(' ').slice(1) + '.';
+
+        // Fallback: Nearest neighbor if NN short (<3 words)
+        if (nnWords.length < 3) {
+          const qVec = inputSeq.map(v => v[0]);  // Flatten to 1D vec
+          let bestMatch = { sim: 0, response: 'Sorry, I don\'t know that yet.' };
+          allQuestions.forEach(pair => {
+            const matchWords = pair.q.toLowerCase().split(' ').slice(0, 10).filter(w => w.length > 0);
+            const matchVec = matchWords.map(w => wordToIdx[w] || 0 / vocab.size);
+            if (matchVec.length !== qVec.length) return;  // Skip if lengths mismatch
+            const sim = cosineSim(qVec, matchVec);
+            if (sim > bestMatch.sim) {
+              bestMatch = { sim, response: pair.a };
+            }
+          });
+          if (bestMatch.sim > 0.3) {  // Threshold for "good" match
+            elements.modelStatus.textContent = `Prediction (retrieval): ${bestMatch.response}`;
+            return bestMatch.response;
+          }
+        }
+
+        elements.modelStatus.textContent = `Prediction: ${nnResponse}`;
+        return nnResponse;
       } catch (error) {
         showError('Prediction failed: ' + error.message);
         console.error('Prediction error:', error);
@@ -641,13 +819,13 @@
       const file = e.target.files[0];
       if (!file) return;
       const content = await file.text();
-      const pairs = parseBulkData(content, 'csv');
+      const pairs = await parseBulkData(content, 'csv');
       updateBulkPreview(pairs);
     });
 
-    elements.bulkText.addEventListener('input', (e) => {
+    elements.bulkText.addEventListener('input', async (e) => {
       const content = e.target.value;
-      const pairs = parseBulkData(content, 'text');
+      const pairs = await parseBulkData(content, 'text');
       updateBulkPreview(pairs);
     });
 
@@ -668,6 +846,8 @@
       }
     });
 
+    hfElements.loadBtn.addEventListener('click', handleHFLoad);
+
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
@@ -675,6 +855,8 @@
         elements.addForm.classList.remove('hidden');
         elements.bulkForm.classList.remove('hidden');
         elements.retrainBtn.classList.remove('hidden');
+        elements.aiTrainingSection.classList.remove('hidden');
+        hfElements.section.classList.remove('hidden');
         loadTrainingData();
       } else {
         elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
@@ -682,6 +864,7 @@
         elements.bulkForm.classList.add('hidden');
         elements.retrainBtn.classList.add('hidden');
         elements.aiTrainingSection.classList.add('hidden');
+        hfElements.section.classList.add('hidden');
         elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
       }
