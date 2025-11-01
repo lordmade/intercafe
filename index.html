@@ -264,7 +264,7 @@
     <button id="retrain-btn" class="btn hidden" style="display: block; margin: 20px auto;">Trigger Retrain (Saves & Notifies)</button>
 
     <!-- Dynamic Train Section -->
-    <div id="train-section"></div>
+    <div id="train-section" class="hidden"></div>
     <div id="train-status" class="train-status hidden"></div>
     <div id="model-status" class="model-status hidden"></div>
   </div>
@@ -506,15 +506,21 @@
         const predictedA = uniqueAnswers[predIdx];
         elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
 
-        // Save to RTDB
-        const modelJson = model.toJSON(true);  // Include weights
+        // Get topology and weights for saving
+        const savedModel = model.toJSON();  // Topology only
+        const weights = await Promise.all(model.getWeights().map(async (w) => await w.array()));  // Weights as arrays
+
+        // Save to RTDB with embedded weights
         const modelRef = ref(db, 'models/current-model');
         await set(modelRef, {
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
           uniqueAnswers,
-          model: modelJson
+          model: {
+            ...savedModel,  // Topology
+            weights  // Embed weights as arrays (small model OK)
+          }
         });
 
         elements.modelStatus.innerHTML = `<p class="success">Model trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p>`;
@@ -552,6 +558,7 @@
           `;
           document.getElementById('train-btn').addEventListener('click', trainModel);
         }
+        elements.trainSection.classList.remove('hidden');
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
