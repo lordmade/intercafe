@@ -432,74 +432,107 @@
       // Optionally, could add a Firebase flag to force retrain, but for now, rely on data change
     }
 
-    // TF.js Helpers
-    function textToVector(text, vocab) {
-      const vec = new Array(vocab.length).fill(0);
-      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);  // Ignore short words
-      words.forEach(word => {
-        const idx = vocab.indexOf(word);
-        if (idx > -1) vec[idx] = 1;
-      });
-      return vec;
+    // TF.js Helpers for Seq2Seq
+    async function buildVocab(pairs) {
+      const allText = pairs.map(p => p.q + ' ' + p.a).join(' ');
+      const words = allText.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      const vocabSet = new Set(words);
+      const specialTokens = ['<pad>', '<sos>', '<eos>', '<unk>'];
+      const vocab = [...specialTokens, ...Array.from(vocabSet).sort()];
+      return { vocab, wordToIdx: new Map(vocab.map((w, i) => [w, i])) };
     }
 
-    function buildVocab(pairs) {
-      const vocabSet = new Set();
-      pairs.forEach(pair => {
-        pair.q.split(/\s+/).filter(w => w.length > 1).forEach(word => vocabSet.add(word.toLowerCase()));
-      });
-      return Array.from(vocabSet).slice(0, 200);  // Limit vocab size
+    function tokenize(text, wordToIdx, unkIdx, sosIdx, eosIdx, maxLen) {
+      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      const tokens = words.map(w => wordToIdx.get(w) || unkIdx);
+      return tokens.slice(0, maxLen);
     }
 
-    function encodeAnswers(pairs, uniqueAnswers) {
-      const answerToIdx = {};
-      uniqueAnswers.forEach((ans, idx) => { answerToIdx[ans] = idx; });
-      return pairs.map(pair => answerToIdx[pair.a]);
-    }
+    async function generateResponse(model, query, vocab, wordToIdx, maxLen, sosIdx, eosIdx, padIdx, embedDim, lstmUnits) {
+      const idxToWord = new Map(Array.from(wordToIdx.entries()).map(([k, v]) => [v, k]));
+      const unkIdx = wordToIdx.get('<unk>');
+      const qTokens = query.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      let encSeq = qTokens.map(w => wordToIdx.get(w) || unkIdx);
+      encSeq = encSeq.concat(Array(maxLen - encSeq.length).fill(padIdx));
+      const encTensor = tf.tensor2d([encSeq]);
 
-    async function loadModelFromSaved(saved) {
-      let model;
-      if (saved.modelType === 'classifier') {
-        model = tf.sequential({
-          layers: [
-            tf.layers.dense({ inputShape: [saved.inputDim], units: 64, activation: 'relu' }),
-            tf.layers.dropout({ rate: 0.2 }),
-            tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
-          ]
-        });
-      } else { // lstm
-        model = tf.sequential({
-          layers: [
-            tf.layers.embedding({
-              inputDim: saved.vocabSize,
-              outputDim: saved.embedDim || 32,
-              inputLength: saved.maxLen
-            }),
-            tf.layers.lstm({
-              units: saved.lstmUnits || 64,
-              dropout: 0.2
-            }),
-            tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
-          ]
-        });
+      let currentDecInput = [sosIdx];
+      let generatedTokens = [];
+      const maxGenLen = maxLen - 1;
+
+      for (let step = 0; step < maxGenLen; step++) {
+        let paddedDec = currentDecInput.concat(Array(maxLen - currentDecInput.length).fill(padIdx));
+        const decTensor = tf.tensor2d([paddedDec]);
+        const outputTensor = model.predict([encTensor, decTensor]);
+        const predictions = await outputTensor.array();
+        const lastProbs = predictions[0][currentDecInput.length - 1];
+        const nextToken = lastProbs.indexOf(Math.max(...lastProbs));
+        outputTensor.dispose();
+
+        if (nextToken === eosIdx || nextToken === padIdx) break;
+        generatedTokens.push(idxToWord.get(nextToken) || '<unk>');
+        currentDecInput.push(nextToken);
       }
+
+      encTensor.dispose();
+      return generatedTokens.join(' ');
+    }
+
+    async function createSeq2SeqModel(vocabSize, maxLen, embedDim, lstmUnits) {
+      const inputEncoder = tf.input({ shape: [maxLen], name: 'encoder_input' });
+      const encEmbedding = tf.layers.embedding({
+        inputDim: vocabSize,
+        outputDim: embedDim,
+        maskZero: true
+      }).apply(inputEncoder);
+      const [_, encStateH, encStateC] = tf.layers.lstm({
+        units: lstmUnits,
+        returnSequences: false,
+        returnState: true
+      }).apply(encEmbedding);
+
+      const inputDecoder = tf.input({ shape: [maxLen], name: 'decoder_input' });
+      const decEmbedding = tf.layers.embedding({
+        inputDim: vocabSize,
+        outputDim: embedDim,
+        maskZero: true
+      }).apply(inputDecoder);
+      const [decLSTMOut, _, __] = tf.layers.lstm({
+        units: lstmUnits,
+        returnSequences: true,
+        returnState: true
+      }).apply(decEmbedding, { initialState: [encStateH, encStateC] });
+
+      const decoderDense = tf.layers.dense({
+        units: vocabSize,
+        activation: null  // Linear for crossentropy
+      }).apply(decLSTMOut);
+
+      const model = tf.model({
+        inputs: [inputEncoder, inputDecoder],
+        outputs: decoderDense
+      });
+
       model.compile({
         optimizer: 'adam',
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy']
       });
 
-      // Set the trained weights
+      return model;
+    }
+
+    async function loadModelFromSaved(saved, vocabSize, maxLen, embedDim, lstmUnits) {
+      const model = await createSeq2SeqModel(vocabSize, maxLen, embedDim, lstmUnits);
       const weightTensors = saved.weights.map(arr => tf.tensor(arr));
       model.setWeights(weightTensors);
       weightTensors.forEach(t => t.dispose());
-
-      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType };
+      return model;
     }
 
     async function trainModel() {
-      if (Object.keys(trainingData).length < 10) {
-        showError('Need at least 10 training pairs for a basic model.');
+      if (Object.keys(trainingData).length < 15) {
+        showError('Need at least 15 training pairs for seq2seq generative model.');
         return;
       }
 
@@ -508,179 +541,123 @@
       elements.modelStatus.classList.add('hidden');
 
       try {
-        // Set backend for performance
         await tf.setBackend('webgl');
         await tf.ready();
 
-        // Prepare common data
         const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
-        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];  // Distinct answers
-        const modelType = document.querySelector('input[name="model-type"]:checked').value;
         const retrain = document.getElementById('retrain-toggle').checked;
-        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
+        const maxLen = 20;
+        const embedDim = 64;
+        const lstmUnits = 128;
+        let model, vocab, wordToIdx, sosIdx, eosIdx, padIdx, unkIdx, isLoaded = false;
 
         const modelRef = ref(db, 'models/current-model');
 
+        const { vocab: vocabList, wordToIdx: vocabMap } = await buildVocab(pairs);
+        vocab = vocabList;
+        wordToIdx = vocabMap;
+        padIdx = wordToIdx.get('<pad>');
+        sosIdx = wordToIdx.get('<sos>');
+        eosIdx = wordToIdx.get('<eos>');
+        unkIdx = wordToIdx.get('<unk>');
+        const vocabSize = vocab.length;
+
         if (retrain) {
           const snap = await get(modelRef);
-          if (snap.exists() && snap.val().modelType === modelType) {
+          if (snap.exists() && snap.val().modelType === 'seq2seq') {
             const saved = snap.val();
-            isLoaded = true;
-            let savedVocab;
-            if (modelType === 'classifier') {
-              savedVocab = saved.vocab;
-              const qs = pairs.map(p => textToVector(p.q, savedVocab));
-              xs = tf.tensor2d(qs);
-              sampleInput = tf.tensor2d([textToVector('hello', savedVocab)]);
-              vocabSize = savedVocab.length;
-            } else { // lstm
-              savedVocab = saved.vocab;
-              const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
-              savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
-              maxLen = saved.maxLen;
-              const sequences = pairs.map(p => {
-                const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-                let seq = words.map(w => wordToIdx.get(w) || 1);
-                seq = seq.concat(Array(maxLen - seq.length).fill(0));
-                return seq.slice(0, maxLen);
-              });
-              xs = tf.tensor2d(sequences);
-              const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-              let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
-              sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
-              sampleSeq = sampleSeq.slice(0, maxLen);
-              sampleInput = tf.tensor2d([sampleSeq]);
-              vocabSize = saved.vocabSize;
+            if (saved.vocabSize === vocabSize && saved.maxLen === maxLen) {
+              isLoaded = true;
+              model = await loadModelFromSaved(saved, vocabSize, maxLen, embedDim, lstmUnits);
+              elements.trainStatus.innerHTML += '<p>Loaded existing seq2seq model for retraining.</p>';
             }
-            const loadedStuff = await loadModelFromSaved(saved);
-            model = loadedStuff.model;
-            vocab = savedVocab;
-            elements.trainStatus.innerHTML += '<p>Loaded existing model for retraining.</p>';
           }
         }
 
         if (!isLoaded) {
-          if (modelType === 'classifier') {
-            vocab = buildVocab(pairs);
-            const qs = pairs.map(p => textToVector(p.q, vocab));
-            xs = tf.tensor2d(qs);
-            sampleInput = tf.tensor2d([textToVector('hello', vocab)]);
-            vocabSize = vocab.length;
-            model = tf.sequential({
-              layers: [
-                tf.layers.dense({ inputShape: [vocabSize], units: 64, activation: 'relu' }),
-                tf.layers.dropout({ rate: 0.2 }),
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
-              ]
-            });
-          } else { // lstm
-            vocab = buildVocab(pairs);
-            const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
-            vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
-            vocabSize = vocab.length + 2;
-            maxLen = Math.max(20, ...pairs.map(p => p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length));
-            const sequences = pairs.map(p => {
-              const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-              let seq = words.map(w => wordToIdx.get(w) || 1);
-              seq = seq.concat(Array(maxLen - seq.length).fill(0));
-              return seq.slice(0, maxLen);
-            });
-            xs = tf.tensor2d(sequences);
-            const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-            let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
-            sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
-            sampleSeq = sampleSeq.slice(0, maxLen);
-            sampleInput = tf.tensor2d([sampleSeq]);
-            model = tf.sequential({
-              layers: [
-                tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: maxLen }),
-                tf.layers.lstm({ units: 64, dropout: 0.2 }),
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
-              ]
-            });
-          }
-          model.compile({
-            optimizer: 'adam',
-            loss: 'categoricalCrossentropy',
-            metrics: ['accuracy']
-          });
+          model = await createSeq2SeqModel(vocabSize, maxLen, embedDim, lstmUnits);
         }
 
-        const answerIndices = encodeAnswers(pairs, uniqueAnswers);
-        const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
+        // Prepare data
+        const encoderInputs = [];
+        const decoderInputs = [];
+        const decoderTargets = [];
 
-        let lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
+        pairs.forEach(pair => {
+          let qTokens = tokenize(pair.q, wordToIdx, unkIdx, sosIdx, eosIdx, maxLen);
+          qTokens = qTokens.concat(Array(maxLen - qTokens.length).fill(padIdx));
+          encoderInputs.push(qTokens);
 
-        let finalAcc = 0;
-        // Train
-        await model.fit(xs, ys, {
-          epochs: retrain ? 10 : 30,
-          batchSize: Math.min(8, pairs.length),
+          let aTokens = tokenize(pair.a, wordToIdx, unkIdx, sosIdx, eosIdx, maxLen);
+          const decInTokens = [sosIdx, ...aTokens.slice(0, maxLen - 1)];
+          decInTokens.concat(Array(maxLen - decInTokens.length).fill(padIdx));
+          decoderInputs.push(decInTokens);
+
+          const decTargTokens = [...aTokens, eosIdx].slice(0, maxLen);
+          decTargTokens.concat(Array(maxLen - decTargTokens.length).fill(padIdx));
+          decoderTargets.push(decTargTokens);
+        });
+
+        const encX = tf.tensor2d(encoderInputs);
+        const decX = tf.tensor2d(decoderInputs);
+        const decY = tf.oneHot(tf.tensor2d(decoderTargets), vocabSize);
+
+        elements.trainStatus.innerHTML += `<p>Seq2Seq Model | Vocab: ${vocabSize} | Max Len: ${maxLen} | Embed: ${embedDim} | LSTM: ${lstmUnits}</p>`;
+
+        const epochs = retrain ? 20 : 50;
+        const batchSize = Math.min(8, pairs.length);
+
+        await model.fit([encX, decX], decY, {
+          epochs,
+          batchSize,
           validationSplit: 0.2,
           callbacks: {
             onEpochEnd: (epoch, logs) => {
-              finalAcc = logs.acc;
               elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)}, Acc=${logs.acc.toFixed(4)}</p>`;
             }
           }
         });
 
-        // Quick test
-        const pred = model.predict(sampleInput);
-        const predIdx = pred.argMax(-1).dataSync()[0];
-        const predictedA = uniqueAnswers[predIdx];
-        elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
+        // Test generation
+        const predictedA = await generateResponse(model, 'hello', vocab, wordToIdx, maxLen, sosIdx, eosIdx, padIdx, embedDim, lstmUnits);
+        elements.trainStatus.innerHTML += `<p>Test ("hello"): Generated "${predictedA}"</p>`;
 
-        // Get weights for saving
+        // Save weights
         const weights = model.getWeights().map(w => w.arraySync());
 
-        // Save to RTDB
         const saveData = {
-          modelType,
+          modelType: 'seq2seq',
           version: '1.0',
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
-          uniqueAnswers,
-          numClasses: uniqueAnswers.length,
+          maxLen,
+          vocabSize,
+          embedDim,
+          lstmUnits,
           weights
         };
-        if (modelType === 'classifier') {
-          saveData.inputDim = vocabSize;
-        } else {
-          saveData.vocabSize = vocabSize;
-          saveData.maxLen = maxLen;
-          saveData.embedDim = 32;
-          saveData.lstmUnits = 64;
-        }
         await set(modelRef, saveData);
 
-        // Verify by loading back and testing
-        elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
+        // Verify by loading back
+        elements.trainStatus.innerHTML += '<p>Verification: Reloading model...</p>';
         const savedSnapshot = await get(modelRef);
         const saved = savedSnapshot.val();
-        const loadedStuff = await loadModelFromSaved(saved);
-        const loadedModel = loadedStuff.model;
-        const loadedUnique = loadedStuff.uniqueAnswers;
+        const loadedModel = await loadModelFromSaved(saved, vocabSize, maxLen, embedDim, lstmUnits);
+        const loadedPredictedA = await generateResponse(loadedModel, 'hello', vocab, wordToIdx, maxLen, sosIdx, eosIdx, padIdx, embedDim, lstmUnits);
+        elements.trainStatus.innerHTML += `<p>Loaded model ("hello"): "${loadedPredictedA}"</p>`;
 
-        const loadedPred = loadedModel.predict(sampleInput);
-        const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
-        const loadedPredictedA = loadedUnique[loadedPredIdx];
-        elements.trainStatus.innerHTML += `<p>Verification ("hello"): Loaded model predicts "${loadedPredictedA}"</p>`;
+        loadedModel.dispose();
 
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom (reconstructs via fixed architecture + weights). Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.modelStatus.innerHTML = `<p class="success">Seq2Seq model trained & saved! Use in chat UI with autoregressive generation loop.</p>`;
         elements.modelStatus.classList.remove('hidden');
-        showSuccess('Training complete—model ready for your chat UI.');
+        showSuccess('Generative training complete—your AI can now create responses!');
 
         // Cleanup
-        xs.dispose();
-        ys.dispose();
-        pred.dispose();
-        loadedPred.dispose();
+        encX.dispose();
+        decX.dispose();
+        decY.dispose();
         model.dispose();
-        loadedModel.dispose();
-        sampleInput.dispose();
 
       } catch (error) {
         elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
@@ -704,16 +681,13 @@
             <section class="train-section">
               <div class="model-options">
                 <label>
-                  <input type="checkbox" id="retrain-toggle"> Retrain existing model (no delete)
+                  <input type="checkbox" id="retrain-toggle"> Retrain existing model (fine-tune)
                 </label>
                 <label>
-                  <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
-                </label>
-                <label>
-                  <input type="radio" name="model-type" value="lstm"> LSTM (generative, experimental)
+                  <input type="radio" name="model-type" value="seq2seq" checked> Seq2Seq (Generative)
                 </label>
               </div>
-              <button id="train-btn" class="btn">Train AI Model</button>
+              <button id="train-btn" class="btn">Train Generative AI Model</button>
             </section>
           `;
           document.getElementById('train-btn').addEventListener('click', trainModel);
