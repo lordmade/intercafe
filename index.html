@@ -217,15 +217,25 @@
     .model-options {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 12px;
+      margin-bottom: 16px;
       align-items: center;
     }
     .model-options label {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
+      font-size: 15px;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .slider-container input[type="range"] {
+      flex: 1;
     }
   </style>
 </head>
@@ -328,7 +338,12 @@
 
     let currentUser;
     let trainingData = {};
-    let dataKeys = [];  // To track push keys
+    let dataKeys = [];
+
+    // VOCAB SETTINGS
+    let MAX_VOCAB = 1000;
+    const MAX_SEQ_LEN = 50;
+    const STOPWORDS = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','is','are','was','were','i','you','he','she','it','we','they','this','that','what','how','why','when','where','my','your','his','her','its','our','their','me','him','us','them','be','have','do','does','did','will','would','can','could','should','may','might','must']);
 
     function showError(msg) {
       elements.errorMessage.textContent = msg;
@@ -399,11 +414,9 @@
         const pairRef = ref(db, `training_data/${key}`);
         await update(pairRef, { q: qInput, a: aInput, timestamp: Date.now() });
         showSuccess('Pair updated successfully!');
-        console.log('Updated pair:', { key, q: qInput, a: aInput });
         btn.textContent = 'Update';
       } catch (error) {
         showError('Failed to update pair: ' + error.message);
-        console.error('Update pair error:', error);
         btn.textContent = 'Update';
       }
     };
@@ -417,25 +430,21 @@
         const pairRef = ref(db, `training_data/${key}`);
         await remove(pairRef);
         showSuccess('Pair deleted successfully!');
-        console.log('Deleted pair:', key);
         btn.textContent = 'Delete';
       } catch (error) {
         showError('Failed to delete pair: ' + error.message);
-        console.error('Delete pair error:', error);
         btn.textContent = 'Delete';
       }
     };
 
     async function triggerRetrain() {
-      // Since main app listens in real-time, just save any pending changes and notify
       showSuccess('Training data saved! Vynix will retrain automatically in connected apps.');
-      // Optionally, could add a Firebase flag to force retrain, but for now, rely on data change
     }
 
     // TF.js Helpers
     function textToVector(text, vocab) {
       const vec = new Array(vocab.length).fill(0);
-      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);  // Ignore short words
+      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
       words.forEach(word => {
         const idx = vocab.indexOf(word);
         if (idx > -1) vec[idx] = 1;
@@ -443,12 +452,27 @@
       return vec;
     }
 
+    function questionToSequence(text, wordToIdx, maxLen) {
+      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      let seq = words.map(w => wordToIdx.get(w) || 1);
+      seq = seq.concat(Array(maxLen - seq.length).fill(0));
+      return seq.slice(0, maxLen);
+    }
+
     function buildVocab(pairs) {
-      const vocabSet = new Set();
+      const wordCount = {};
       pairs.forEach(pair => {
-        pair.q.split(/\s+/).filter(w => w.length > 1).forEach(word => vocabSet.add(word.toLowerCase()));
+        pair.q.toLowerCase().split(/\s+/).forEach(word => {
+          if (word.length > 2 && !STOPWORDS.has(word)) {
+            wordCount[word] = (wordCount[word] || 0) + 1;
+          }
+        });
       });
-      return Array.from(vocabSet).slice(0, 200);  // Limit vocab size
+
+      return Object.keys(wordCount)
+        .filter(w => wordCount[w] >= 2)
+        .sort()
+        .slice(0, MAX_VOCAB);
     }
 
     function encodeAnswers(pairs, uniqueAnswers) {
@@ -467,7 +491,7 @@
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
         });
-      } else { // lstm
+      } else {
         model = tf.sequential({
           layers: [
             tf.layers.embedding({
@@ -489,7 +513,6 @@
         metrics: ['accuracy']
       });
 
-      // Set the trained weights
       const weightTensors = saved.weights.map(arr => tf.tensor(arr));
       model.setWeights(weightTensors);
       weightTensors.forEach(t => t.dispose());
@@ -508,13 +531,11 @@
       elements.modelStatus.classList.add('hidden');
 
       try {
-        // Set backend for performance
         await tf.setBackend('webgl');
         await tf.ready();
 
-        // Prepare common data
         const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
-        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];  // Distinct answers
+        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];
         const modelType = document.querySelector('input[name="model-type"]:checked').value;
         const retrain = document.getElementById('retrain-toggle').checked;
         let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
@@ -531,25 +552,16 @@
               savedVocab = saved.vocab;
               const qs = pairs.map(p => textToVector(p.q, savedVocab));
               xs = tf.tensor2d(qs);
-              sampleInput = tf.tensor2d([textToVector('hello', savedVocab)]);
+              sampleInput = tf.tensor2d([textToVector('hello how are you today', savedVocab)]);
               vocabSize = savedVocab.length;
-            } else { // lstm
+            } else {
               savedVocab = saved.vocab;
               const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
               savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
               maxLen = saved.maxLen;
-              const sequences = pairs.map(p => {
-                const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-                let seq = words.map(w => wordToIdx.get(w) || 1);
-                seq = seq.concat(Array(maxLen - seq.length).fill(0));
-                return seq.slice(0, maxLen);
-              });
+              const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
               xs = tf.tensor2d(sequences);
-              const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-              let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
-              sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
-              sampleSeq = sampleSeq.slice(0, maxLen);
-              sampleInput = tf.tensor2d([sampleSeq]);
+              sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
               vocabSize = saved.vocabSize;
             }
             const loadedStuff = await loadModelFromSaved(saved);
@@ -560,12 +572,13 @@
         }
 
         if (!isLoaded) {
+          vocab = buildVocab(pairs);
+          vocabSize = vocab.length;
+
           if (modelType === 'classifier') {
-            vocab = buildVocab(pairs);
             const qs = pairs.map(p => textToVector(p.q, vocab));
             xs = tf.tensor2d(qs);
-            sampleInput = tf.tensor2d([textToVector('hello', vocab)]);
-            vocabSize = vocab.length;
+            sampleInput = tf.tensor2d([textToVector('hello how are you today', vocab)]);
             model = tf.sequential({
               layers: [
                 tf.layers.dense({ inputShape: [vocabSize], units: 64, activation: 'relu' }),
@@ -573,24 +586,16 @@
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
-          } else { // lstm
-            vocab = buildVocab(pairs);
+          } else {
             const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
             vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
             vocabSize = vocab.length + 2;
-            maxLen = Math.max(20, ...pairs.map(p => p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length));
-            const sequences = pairs.map(p => {
-              const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-              let seq = words.map(w => wordToIdx.get(w) || 1);
-              seq = seq.concat(Array(maxLen - seq.length).fill(0));
-              return seq.slice(0, maxLen);
-            });
+            maxLen = Math.min(MAX_SEQ_LEN, Math.max(10, ...pairs.map(p => 
+              p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length
+            )));
+            const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
             xs = tf.tensor2d(sequences);
-            const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-            let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
-            sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
-            sampleSeq = sampleSeq.slice(0, maxLen);
-            sampleInput = tf.tensor2d([sampleSeq]);
+            sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
             model = tf.sequential({
               layers: [
                 tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: maxLen }),
@@ -609,14 +614,13 @@
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
 
-        let lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
+        const lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
         elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
 
         let finalAcc = 0;
-        // Train
         await model.fit(xs, ys, {
-          epochs: retrain ? 10 : 30,
-          batchSize: Math.min(8, pairs.length),
+          epochs: retrain ? 12 : 35,
+          batchSize: Math.min(16, pairs.length),
           validationSplit: 0.2,
           callbacks: {
             onEpochEnd: (epoch, logs) => {
@@ -626,19 +630,16 @@
           }
         });
 
-        // Quick test
         const pred = model.predict(sampleInput);
         const predIdx = pred.argMax(-1).dataSync()[0];
         const predictedA = uniqueAnswers[predIdx];
-        elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
+        elements.trainStatus.innerHTML += `<p>Test ("hello how are you today"): Predicted "${predictedA}"</p>`;
 
-        // Get weights for saving
         const weights = model.getWeights().map(w => w.arraySync());
 
-        // Save to RTDB
         const saveData = {
           modelType,
-          version: '1.0',
+          version: '1.1',
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
@@ -656,7 +657,6 @@
         }
         await set(modelRef, saveData);
 
-        // Verify by loading back and testing
         elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
         const savedSnapshot = await get(modelRef);
         const saved = savedSnapshot.val();
@@ -667,13 +667,12 @@
         const loadedPred = loadedModel.predict(sampleInput);
         const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
         const loadedPredictedA = loadedUnique[loadedPredIdx];
-        elements.trainStatus.innerHTML += `<p>Verification ("hello"): Loaded model predicts "${loadedPredictedA}"</p>`;
+        elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredictedA}"</p>`;
 
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom (reconstructs via fixed architecture + weights). Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
 
-        // Cleanup
         xs.dispose();
         ys.dispose();
         pred.dispose();
@@ -698,7 +697,6 @@
         renderPairs();
         elements.loading.classList.add('hidden');
 
-        // Add Train section if not added
         if (elements.trainSection.children.length === 0) {
           elements.trainSection.innerHTML = `
             <section class="train-section">
@@ -712,17 +710,30 @@
                 <label>
                   <input type="radio" name="model-type" value="lstm"> LSTM (generative, experimental)
                 </label>
+                <div class="slider-container">
+                  <span>Max Vocab:</span>
+                  <input type="range" id="vocab-slider" min="200" max="2000" value="1000" step="100">
+                  <span id="vocab-value">1000</span>
+                </div>
               </div>
               <button id="train-btn" class="btn">Train AI Model</button>
             </section>
           `;
+
+          // Init slider
+          const slider = document.getElementById('vocab-slider');
+          const value = document.getElementById('vocab-value');
+          slider.addEventListener('input', () => {
+            MAX_VOCAB = parseInt(slider.value);
+            value.textContent = MAX_VOCAB;
+          });
+
           document.getElementById('train-btn').addEventListener('click', trainModel);
         }
         elements.trainSection.classList.remove('hidden');
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
-        console.error('Load data error:', error);
       });
     }
 
@@ -730,14 +741,12 @@
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
-        // Simple CSV parser assuming first line is header, and comma-separated
         lines = content.split('\n').slice(1).filter(line => line.trim());
         return lines.map(line => {
           const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
           return { q, a };
         }).filter(pair => pair.q && pair.a);
       } else {
-        // Text mode: q|a per line
         lines = content.split('\n').filter(line => line.trim());
         return lines.map(line => {
           const [q, a] = line.split('|').map(s => s.trim());
@@ -794,7 +803,6 @@
           errors++;
           console.error(`Failed to add pair ${i + 1}:`, error);
         }
-        // Update progress
         const progress = ((i + 1) / pairs.length) * 100;
         elements.progressFill.style.width = `${progress}%`;
       }
@@ -831,7 +839,6 @@
 
     elements.retrainBtn.addEventListener('click', triggerRetrain);
 
-    // Bulk form listeners
     elements.bulkForm.addEventListener('submit', handleBulkSubmit);
 
     const modeRadios = document.querySelectorAll('input[name="bulk-mode"]');
@@ -895,7 +902,6 @@
       }
     };
 
-    // Initial load
     elements.loading.classList.remove('hidden');
   </script>
 </body>
