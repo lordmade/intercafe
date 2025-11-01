@@ -458,15 +458,31 @@
     }
 
     async function loadModelFromSaved(saved) {
-      // Recreate the model architecture (fixed structure)
-      const model = tf.sequential({
-        layers: [
-          tf.layers.dense({ inputShape: [saved.inputDim], units: 64, activation: 'relu' }),
-          tf.layers.dropout({ rate: 0.2 }),
-          tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
-        ]
-      });
-
+      let model;
+      if (saved.modelType === 'classifier') {
+        model = tf.sequential({
+          layers: [
+            tf.layers.dense({ inputShape: [saved.inputDim], units: 64, activation: 'relu' }),
+            tf.layers.dropout({ rate: 0.2 }),
+            tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
+          ]
+        });
+      } else { // lstm
+        model = tf.sequential({
+          layers: [
+            tf.layers.embedding({
+              inputDim: saved.vocabSize,
+              outputDim: saved.embedDim || 32,
+              inputLength: saved.maxLen
+            }),
+            tf.layers.lstm({
+              units: saved.lstmUnits || 64,
+              dropout: 0.2
+            }),
+            tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
+          ]
+        });
+      }
       model.compile({
         optimizer: 'adam',
         loss: 'categoricalCrossentropy',
@@ -478,7 +494,7 @@
       model.setWeights(weightTensors);
       weightTensors.forEach(t => t.dispose());
 
-      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers };
+      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType };
     }
 
     async function trainModel() {
@@ -496,36 +512,110 @@
         await tf.setBackend('webgl');
         await tf.ready();
 
-        // Prepare data
+        // Prepare common data
         const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
         const uniqueAnswers = [...new Set(pairs.map(p => p.a))];  // Distinct answers
-        const vocab = buildVocab(pairs);
-        const qs = pairs.map(p => textToVector(p.q, vocab));
+        const modelType = document.querySelector('input[name="model-type"]:checked').value;
+        const retrain = document.getElementById('retrain-toggle').checked;
+        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
+
+        const modelRef = ref(db, 'models/current-model');
+
+        if (retrain) {
+          const snap = await get(modelRef);
+          if (snap.exists() && snap.val().modelType === modelType) {
+            const saved = snap.val();
+            isLoaded = true;
+            let savedVocab;
+            if (modelType === 'classifier') {
+              savedVocab = saved.vocab;
+              const qs = pairs.map(p => textToVector(p.q, savedVocab));
+              xs = tf.tensor2d(qs);
+              sampleInput = tf.tensor2d([textToVector('hello', savedVocab)]);
+              vocabSize = savedVocab.length;
+            } else { // lstm
+              savedVocab = saved.vocab;
+              const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+              savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
+              maxLen = saved.maxLen;
+              const sequences = pairs.map(p => {
+                const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+                let seq = words.map(w => wordToIdx.get(w) || 1);
+                seq = seq.concat(Array(maxLen - seq.length).fill(0));
+                return seq.slice(0, maxLen);
+              });
+              xs = tf.tensor2d(sequences);
+              const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+              let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
+              sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
+              sampleSeq = sampleSeq.slice(0, maxLen);
+              sampleInput = tf.tensor2d([sampleSeq]);
+              vocabSize = saved.vocabSize;
+            }
+            const loadedStuff = await loadModelFromSaved(saved);
+            model = loadedStuff.model;
+            vocab = savedVocab;
+            elements.trainStatus.innerHTML += '<p>Loaded existing model for retraining.</p>';
+          }
+        }
+
+        if (!isLoaded) {
+          if (modelType === 'classifier') {
+            vocab = buildVocab(pairs);
+            const qs = pairs.map(p => textToVector(p.q, vocab));
+            xs = tf.tensor2d(qs);
+            sampleInput = tf.tensor2d([textToVector('hello', vocab)]);
+            vocabSize = vocab.length;
+            model = tf.sequential({
+              layers: [
+                tf.layers.dense({ inputShape: [vocabSize], units: 64, activation: 'relu' }),
+                tf.layers.dropout({ rate: 0.2 }),
+                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+              ]
+            });
+          } else { // lstm
+            vocab = buildVocab(pairs);
+            const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+            vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
+            vocabSize = vocab.length + 2;
+            maxLen = Math.max(20, ...pairs.map(p => p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length));
+            const sequences = pairs.map(p => {
+              const words = p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+              let seq = words.map(w => wordToIdx.get(w) || 1);
+              seq = seq.concat(Array(maxLen - seq.length).fill(0));
+              return seq.slice(0, maxLen);
+            });
+            xs = tf.tensor2d(sequences);
+            const sampleWords = 'hello'.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+            let sampleSeq = sampleWords.map(w => wordToIdx.get(w) || 1);
+            sampleSeq = sampleSeq.concat(Array(maxLen - sampleSeq.length).fill(0));
+            sampleSeq = sampleSeq.slice(0, maxLen);
+            sampleInput = tf.tensor2d([sampleSeq]);
+            model = tf.sequential({
+              layers: [
+                tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: maxLen }),
+                tf.layers.lstm({ units: 64, dropout: 0.2 }),
+                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+              ]
+            });
+          }
+          model.compile({
+            optimizer: 'adam',
+            loss: 'categoricalCrossentropy',
+            metrics: ['accuracy']
+          });
+        }
+
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
-        const xs = tf.tensor2d(qs);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
 
-        elements.trainStatus.innerHTML += `<p>Vocab size: ${vocab.length} | Answer classes: ${uniqueAnswers.length}</p>`;
-
-        // Create model (simple classifier: q-vector -> answer index)
-        const model = tf.sequential({
-          layers: [
-            tf.layers.dense({ inputShape: [vocab.length], units: 64, activation: 'relu' }),
-            tf.layers.dropout({ rate: 0.2 }),
-            tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
-          ]
-        });
-
-        model.compile({
-          optimizer: 'adam',
-          loss: 'categoricalCrossentropy',
-          metrics: ['accuracy']
-        });
+        let lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
+        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
 
         let finalAcc = 0;
-        // Train (shuffle data implicitly via batching)
+        // Train
         await model.fit(xs, ys, {
-          epochs: 30,  // Adjust based on data size
+          epochs: retrain ? 10 : 30,
           batchSize: Math.min(8, pairs.length),
           validationSplit: 0.2,
           callbacks: {
@@ -537,39 +627,49 @@
         });
 
         // Quick test
-        const sampleQ = textToVector('hello', vocab);
-        const pred = model.predict(tf.tensor2d([sampleQ]));
-        const predIdx = (await pred.argMax(-1).data())[0];
+        const pred = model.predict(sampleInput);
+        const predIdx = pred.argMax(-1).dataSync()[0];
         const predictedA = uniqueAnswers[predIdx];
         elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
 
-        // Get weights for saving (no topology needed, since architecture is fixed)
-        const weights = await Promise.all(model.getWeights().map(async (w) => await w.array()));
+        // Get weights for saving
+        const weights = model.getWeights().map(w => w.arraySync());
 
-        // Save to RTDB (custom format: weights as arrays, plus metadata)
-        const modelRef = ref(db, 'models/current-model');
-        await set(modelRef, {
+        // Save to RTDB
+        const saveData = {
+          modelType,
+          version: '1.0',
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
           uniqueAnswers,
-          inputDim: vocab.length,
           numClasses: uniqueAnswers.length,
-          weights  // Embed weights as arrays (small model OK)
-        });
+          weights
+        };
+        if (modelType === 'classifier') {
+          saveData.inputDim = vocabSize;
+        } else {
+          saveData.vocabSize = vocabSize;
+          saveData.maxLen = maxLen;
+          saveData.embedDim = 32;
+          saveData.lstmUnits = 64;
+        }
+        await set(modelRef, saveData);
 
         // Verify by loading back and testing
         elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
         const savedSnapshot = await get(modelRef);
         const saved = savedSnapshot.val();
-        const { model: loadedModel, vocab: loadedVocab, uniqueAnswers: loadedUnique } = await loadModelFromSaved(saved);
+        const loadedStuff = await loadModelFromSaved(saved);
+        const loadedModel = loadedStuff.model;
+        const loadedUnique = loadedStuff.uniqueAnswers;
 
-        const loadedPred = loadedModel.predict(tf.tensor2d([sampleQ]));
-        const loadedPredIdx = (await loadedPred.argMax(-1).data())[0];
+        const loadedPred = loadedModel.predict(sampleInput);
+        const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
         const loadedPredictedA = loadedUnique[loadedPredIdx];
         elements.trainStatus.innerHTML += `<p>Verification ("hello"): Loaded model predicts "${loadedPredictedA}"</p>`;
 
-        elements.modelStatus.innerHTML = `<p class="success">Model trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom (reconstructs via fixed architecture + weights). Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom (reconstructs via fixed architecture + weights). Use in chat UI with loadModelFromSaved function.</p>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
 
@@ -580,6 +680,7 @@
         loadedPred.dispose();
         model.dispose();
         loadedModel.dispose();
+        sampleInput.dispose();
 
       } catch (error) {
         elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
