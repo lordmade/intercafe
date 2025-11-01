@@ -272,7 +272,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -444,6 +444,30 @@
       return pairs.map(pair => answerToIdx[pair.a]);
     }
 
+    async function loadModelFromSaved(saved) {
+      // Recreate the model architecture (fixed structure)
+      const model = tf.sequential({
+        layers: [
+          tf.layers.dense({ inputShape: [saved.inputDim], units: 64, activation: 'relu' }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
+        ]
+      });
+
+      model.compile({
+        optimizer: 'adam',
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy']
+      });
+
+      // Set the trained weights
+      const weightTensors = saved.weights.map(arr => tf.tensor(arr));
+      model.setWeights(weightTensors);
+      weightTensors.forEach(t => t.dispose());
+
+      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers };
+    }
+
     async function trainModel() {
       if (Object.keys(trainingData).length < 10) {
         showError('Need at least 10 training pairs for a basic model.');
@@ -506,24 +530,33 @@
         const predictedA = uniqueAnswers[predIdx];
         elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
 
-        // Get topology and weights for saving
-        const savedModel = model.toJSON();  // Topology only
-        const weights = await Promise.all(model.getWeights().map(async (w) => await w.array()));  // Weights as arrays
+        // Get weights for saving (no topology needed, since architecture is fixed)
+        const weights = await Promise.all(model.getWeights().map(async (w) => await w.array()));
 
-        // Save to RTDB with embedded weights
+        // Save to RTDB (custom format: weights as arrays, plus metadata)
         const modelRef = ref(db, 'models/current-model');
         await set(modelRef, {
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
           uniqueAnswers,
-          model: {
-            ...savedModel,  // Topology
-            weights  // Embed weights as arrays (small model OK)
-          }
+          inputDim: vocab.length,
+          numClasses: uniqueAnswers.length,
+          weights  // Embed weights as arrays (small model OK)
         });
 
-        elements.modelStatus.innerHTML = `<p class="success">Model trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p>`;
+        // Verify by loading back and testing
+        elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
+        const savedSnapshot = await get(modelRef);
+        const saved = savedSnapshot.val();
+        const { model: loadedModel, vocab: loadedVocab, uniqueAnswers: loadedUnique } = await loadModelFromSaved(saved);
+
+        const loadedPred = loadedModel.predict(tf.tensor2d([sampleQ]));
+        const loadedPredIdx = (await loadedPred.argMax(-1).data())[0];
+        const loadedPredictedA = loadedUnique[loadedPredIdx];
+        elements.trainStatus.innerHTML += `<p>Verification ("hello"): Loaded model predicts "${loadedPredictedA}"</p>`;
+
+        elements.modelStatus.innerHTML = `<p class="success">Model trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom (reconstructs via fixed architecture + weights). Use in chat UI with loadModelFromSaved function.</p>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
 
@@ -531,7 +564,9 @@
         xs.dispose();
         ys.dispose();
         pred.dispose();
+        loadedPred.dispose();
         model.dispose();
+        loadedModel.dispose();
 
       } catch (error) {
         elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
