@@ -214,6 +214,19 @@
       max-height: 300px;
       overflow-y: auto;
     }
+    .model-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .model-options label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -588,6 +601,17 @@
         if (elements.trainSection.children.length === 0) {
           elements.trainSection.innerHTML = `
             <section class="train-section">
+              <div class="model-options">
+                <label>
+                  <input type="checkbox" id="retrain-toggle"> Retrain existing model (no delete)
+                </label>
+                <label>
+                  <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
+                </label>
+                <label>
+                  <input type="radio" name="model-type" value="lstm"> LSTM (generative, experimental)
+                </label>
+              </div>
               <button id="train-btn" class="btn">Train AI Model</button>
             </section>
           `;
