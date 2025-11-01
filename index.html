@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
@@ -196,6 +197,23 @@
       transition: width 0.3s ease;
       width: 0%;
     }
+    .train-section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin: 20px 0;
+      text-align: center;
+    }
+    .train-status, .model-status {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -244,6 +262,11 @@
     <div id="pairs-list"></div>
 
     <button id="retrain-btn" class="btn hidden" style="display: block; margin: 20px auto;">Trigger Retrain (Saves & Notifies)</button>
+
+    <!-- Dynamic Train Section -->
+    <div id="train-section"></div>
+    <div id="train-status" class="train-status hidden"></div>
+    <div id="model-status" class="model-status hidden"></div>
   </div>
 
   <script type="module">
@@ -266,6 +289,7 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
+    const container = document.querySelector('.container');
     const elements = {
       authStatus: document.getElementById('auth-status'),
       stats: document.getElementById('stats'),
@@ -283,7 +307,10 @@
       progressFill: document.getElementById('progress-fill'),
       loading: document.getElementById('loading'),
       pairsList: document.getElementById('pairs-list'),
-      retrainBtn: document.getElementById('retrain-btn')
+      retrainBtn: document.getElementById('retrain-btn'),
+      trainSection: document.getElementById('train-section'),
+      trainStatus: document.getElementById('train-status'),
+      modelStatus: document.getElementById('model-status')
     };
 
     let currentUser;
@@ -324,8 +351,8 @@
           <input type="text" value="${pair.q}" data-key="${key}" data-field="q" placeholder="Question">
           <input type="text" value="${pair.a}" data-key="${key}" data-field="a" placeholder="Answer">
           <div class="pair-actions">
-            <button class="btn" onclick="updatePair('${key}')">Update</button>
-            <button class="btn btn-danger" onclick="deletePair('${key}')">Delete</button>
+            <button class="btn btn-secondary" onclick="updatePair('${key}', this)">Update</button>
+            <button class="btn btn-danger" onclick="deletePair('${key}', this)">Delete</button>
           </div>
         `;
         elements.pairsList.appendChild(pairDiv);
@@ -344,7 +371,7 @@
       return newPair;
     }
 
-    window.updatePair = async function(key) {
+    window.updatePair = async function(key, btn) {
       if (!currentUser) return;
       const inputs = document.querySelectorAll(`[data-key="${key}"]`);
       const qInput = inputs[0].value.trim().toLowerCase();
@@ -355,28 +382,34 @@
       }
       try {
         hideMessages();
+        btn.textContent = 'Updating...';
         const pairRef = ref(db, `training_data/${key}`);
         await update(pairRef, { q: qInput, a: aInput, timestamp: Date.now() });
         showSuccess('Pair updated successfully!');
         console.log('Updated pair:', { key, q: qInput, a: aInput });
+        btn.textContent = 'Update';
       } catch (error) {
         showError('Failed to update pair: ' + error.message);
         console.error('Update pair error:', error);
+        btn.textContent = 'Update';
       }
     };
 
-    window.deletePair = async function(key) {
+    window.deletePair = async function(key, btn) {
       if (!currentUser) return;
       if (!confirm('Delete this training pair?')) return;
       try {
         hideMessages();
+        btn.textContent = 'Deleting...';
         const pairRef = ref(db, `training_data/${key}`);
         await remove(pairRef);
         showSuccess('Pair deleted successfully!');
         console.log('Deleted pair:', key);
+        btn.textContent = 'Delete';
       } catch (error) {
         showError('Failed to delete pair: ' + error.message);
         console.error('Delete pair error:', error);
+        btn.textContent = 'Delete';
       }
     };
 
@@ -384,6 +417,121 @@
       // Since main app listens in real-time, just save any pending changes and notify
       showSuccess('Training data saved! Vynix will retrain automatically in connected apps.');
       // Optionally, could add a Firebase flag to force retrain, but for now, rely on data change
+    }
+
+    // TF.js Helpers
+    function textToVector(text, vocab) {
+      const vec = new Array(vocab.length).fill(0);
+      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);  // Ignore short words
+      words.forEach(word => {
+        const idx = vocab.indexOf(word);
+        if (idx > -1) vec[idx] = 1;
+      });
+      return vec;
+    }
+
+    function buildVocab(pairs) {
+      const vocabSet = new Set();
+      pairs.forEach(pair => {
+        pair.q.split(/\s+/).filter(w => w.length > 1).forEach(word => vocabSet.add(word.toLowerCase()));
+      });
+      return Array.from(vocabSet).slice(0, 200);  // Limit vocab size
+    }
+
+    function encodeAnswers(pairs, uniqueAnswers) {
+      const answerToIdx = {};
+      uniqueAnswers.forEach((ans, idx) => { answerToIdx[ans] = idx; });
+      return pairs.map(pair => answerToIdx[pair.a]);
+    }
+
+    async function trainModel() {
+      if (Object.keys(trainingData).length < 10) {
+        showError('Need at least 10 training pairs for a basic model.');
+        return;
+      }
+
+      elements.trainStatus.classList.remove('hidden');
+      elements.trainStatus.innerHTML = '<p class="loading">Preparing data... (Enable WebGL for faster training)</p>';
+      elements.modelStatus.classList.add('hidden');
+
+      try {
+        // Set backend for performance
+        await tf.setBackend('webgl');
+        await tf.ready();
+
+        // Prepare data
+        const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
+        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];  // Distinct answers
+        const vocab = buildVocab(pairs);
+        const qs = pairs.map(p => textToVector(p.q, vocab));
+        const answerIndices = encodeAnswers(pairs, uniqueAnswers);
+        const xs = tf.tensor2d(qs);
+        const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
+
+        elements.trainStatus.innerHTML += `<p>Vocab size: ${vocab.length} | Answer classes: ${uniqueAnswers.length}</p>`;
+
+        // Create model (simple classifier: q-vector -> answer index)
+        const model = tf.sequential({
+          layers: [
+            tf.layers.dense({ inputShape: [vocab.length], units: 64, activation: 'relu' }),
+            tf.layers.dropout({ rate: 0.2 }),
+            tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+          ]
+        });
+
+        model.compile({
+          optimizer: 'adam',
+          loss: 'categoricalCrossentropy',
+          metrics: ['accuracy']
+        });
+
+        let finalAcc = 0;
+        // Train (shuffle data implicitly via batching)
+        await model.fit(xs, ys, {
+          epochs: 30,  // Adjust based on data size
+          batchSize: Math.min(8, pairs.length),
+          validationSplit: 0.2,
+          callbacks: {
+            onEpochEnd: (epoch, logs) => {
+              finalAcc = logs.acc;
+              elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)}, Acc=${logs.acc.toFixed(4)}</p>`;
+            }
+          }
+        });
+
+        // Quick test
+        const sampleQ = textToVector('hello', vocab);
+        const pred = model.predict(tf.tensor2d([sampleQ]));
+        const predIdx = (await pred.argMax(-1).data())[0];
+        const predictedA = uniqueAnswers[predIdx];
+        elements.trainStatus.innerHTML += `<p>Test ("hello"): Predicted "${predictedA}"</p>`;
+
+        // Save to RTDB
+        const modelJson = model.toJSON(true);  // Include weights
+        const modelRef = ref(db, 'models/current-model');
+        await set(modelRef, {
+          userId: currentUser.uid,
+          timestamp: Date.now(),
+          vocab,
+          uniqueAnswers,
+          model: modelJson
+        });
+
+        elements.modelStatus.innerHTML = `<p class="success">Model trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p>`;
+        elements.modelStatus.classList.remove('hidden');
+        showSuccess('Training complete—model ready for your chat UI.');
+
+        // Cleanup
+        xs.dispose();
+        ys.dispose();
+        pred.dispose();
+        model.dispose();
+
+      } catch (error) {
+        elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
+        showError('Training error: ' + error.message);
+        console.error('Training error:', error);
+      }
     }
 
     function loadTrainingData() {
@@ -394,6 +542,16 @@
         dataKeys = Object.keys(trainingData);
         renderPairs();
         elements.loading.classList.add('hidden');
+
+        // Add Train section if not added
+        if (elements.trainSection.children.length === 0) {
+          elements.trainSection.innerHTML = `
+            <section class="train-section">
+              <button id="train-btn" class="btn">Train AI Model</button>
+            </section>
+          `;
+          document.getElementById('train-btn').addEventListener('click', trainModel);
+        }
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
@@ -541,12 +699,14 @@
         elements.addForm.classList.remove('hidden');
         elements.bulkForm.classList.remove('hidden');
         elements.retrainBtn.classList.remove('hidden');
+        elements.trainSection.classList.remove('hidden');
         loadTrainingData();
       } else {
         elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
         elements.addForm.classList.add('hidden');
         elements.bulkForm.classList.add('hidden');
         elements.retrainBtn.classList.add('hidden');
+        elements.trainSection.classList.add('hidden');
         elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
       }
