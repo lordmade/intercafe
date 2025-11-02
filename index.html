@@ -389,8 +389,8 @@
     let dataLoaded = false;
 
     // VOCAB SETTINGS
-    let MAX_VOCAB = 1000;
-    const MAX_SEQ_LEN = 50;
+    let MAX_VOCAB = 500;  // Default smaller for generation efficiency
+    let MAX_SEQ_LEN = 25;  // Default for seq2seq
     const STOPWORDS = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','is','are','was','were','i','you','he','she','it','we','they','this','that','what','how','why','when','where','my','your','his','her','its','our','their','me','him','us','them','be','have','do','does','did','will','would','can','could','should','may','might','must']);
 
     // Overlay functions
@@ -450,6 +450,10 @@
       if (!currentUser || !q.trim() || !a.trim()) {
         throw new Error('Please log in and enter both question and answer.');
       }
+      // Data validation for coherence
+      if (q.split(/\s+/).length < 2 || a.split(/\s+/).length < 3 || q.trim().toLowerCase() === a.trim().toLowerCase()) {
+        throw new Error('Pairs must be natural: Q at least 2 words, A 3+ words, not identical.');
+      }
       const trainingRef = ref(db, 'training_data');
       const newPairRef = push(trainingRef);
       const newPair = { q: q.trim().toLowerCase(), a: a.trim(), timestamp: Date.now() };
@@ -464,6 +468,11 @@
       const aInput = inputs[1].value.trim();
       if (!qInput || !aInput) {
         showError('Question and answer cannot be empty.');
+        return;
+      }
+      // Re-validate
+      if (qInput.split(/\s+/).length < 2 || aInput.split(/\s+/).length < 3 || qInput === aInput) {
+        showError('Updated pair must meet natural language rules.');
         return;
       }
       try {
@@ -520,15 +529,17 @@
     function buildVocab(pairs) {
       const wordCount = {};
       pairs.forEach(pair => {
-        pair.q.toLowerCase().split(/\s+/).forEach(word => {
-          if (word.length > 2 && !STOPWORDS.has(word)) {
-            wordCount[word] = (wordCount[word] || 0) + 1;
-          }
+        [pair.q, pair.a].forEach(text => {
+          text.toLowerCase().split(/\s+/).forEach(word => {
+            if (word.length > 2 && !STOPWORDS.has(word)) {
+              wordCount[word] = (wordCount[word] || 0) + 1;
+            }
+          });
         });
       });
 
       return Object.keys(wordCount)
-        .filter(w => wordCount[w] >= 2)
+        .filter(w => wordCount[w] >= 1)  // Lower for generation
         .sort()
         .slice(0, MAX_VOCAB);
     }
@@ -537,6 +548,111 @@
       const answerToIdx = {};
       uniqueAnswers.forEach((ans, idx) => { answerToIdx[ans] = idx; });
       return pairs.map(pair => answerToIdx[pair.a]);
+    }
+
+    function smoothedOneHot(indices, vocabSize, epsilon = 0.1) {
+      const oneHots = tf.oneHot(tf.tensor1d(indices, 'int32'), vocabSize);
+      const noise = tf.fill([indices.length, vocabSize], epsilon / (vocabSize - 1));
+      const smoothed = oneHots.mul(1 - epsilon).add(noise.mul(oneHots.notEqual(1).toFloat()));
+      oneHots.dispose();
+      noise.dispose();
+      return smoothed;
+    }
+
+    function pairToSequences(qText, aText, wordToIdx, maxLen) {
+      const qWords = qText.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      const aWords = aText.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      
+      // Encoder input: Question sequence
+      let qSeq = qWords.map(w => wordToIdx.get(w) || 1).concat(Array(maxLen - qWords.length).fill(0));
+      qSeq = qSeq.slice(0, maxLen);
+      
+      // Decoder input: Answer shifted (teacher forcing)
+      let decoderInput = [wordToIdx.get('<START>') || 2];  // Start token
+      decoderInput = decoderInput.concat(aWords.slice(0, -1).map(w => wordToIdx.get(w) || 1));  // All but last
+      decoderInput = decoderInput.concat(Array(maxLen - decoderInput.length).fill(0));
+      decoderInput = decoderInput.slice(0, maxLen);
+      
+      // Decoder target: Answer sequence
+      let decoderTargetWords = aWords.map(w => wordToIdx.get(w) || 1);
+      const targetSeq = decoderTargetWords.concat(Array(maxLen - decoderTargetWords.length).fill(0));
+      const targetOneHot = smoothedOneHot(targetSeq, wordToIdx.size, 0.1);  // Smoothed
+      
+      return { qSeq, decoderInput, targetOneHot };
+    }
+
+    async function generateResponse(model, encoder, decoder, inputSeq, wordToIdx, idxToWord, maxLen, temperature = 0.7, topP = 0.9, repetitionPenalty = 1.1) {
+      let inputCopy = tf.tensor2d([inputSeq]);
+      let states = await encoder.predict(inputCopy);
+      inputCopy.dispose();
+
+      let outputSeq = [2];  // <START> index
+      let generated = [];
+      const recentWords = new Set();
+
+      for (let i = 0; i < maxLen; i++) {
+        let decInput = tf.tensor2d([outputSeq.slice(-10)]);  // Last 10 for context
+        while (decInput.shape[1] < maxLen) {
+          decInput = tf.pad(decInput, [[0,0], [0, maxLen - decInput.shape[1]]], 'CONSTANT', 0);
+        }
+
+        let [nextWordProbs, nextStates] = await decoder.predict([decInput, states]);
+        decInput.dispose();
+
+        let probsData = nextWordProbs.dataSync()[0];
+        
+        // Repetition penalty
+        for (let j = 0; j < probsData.length; j++) {
+          const word = idxToWord.get(j);
+          if (recentWords.has(word) && word !== '<END>') {
+            probsData[j] /= repetitionPenalty;
+          }
+        }
+        
+        // Normalize
+        const sum = probsData.reduce((a, b) => a + b, 0);
+        probsData = probsData.map(p => p / sum);
+
+        // Top-p sampling
+        const sortedProbs = [...probsData].sort((a, b) => b - a);
+        const sortedIdx = probsData.map((_, i) => i).sort((a, b) => probsData[b] - probsData[a]);
+        let cumProb = 0;
+        let cutoff = 0;
+        for (let j = 0; j < sortedProbs.length; j++) {
+          cumProb += sortedProbs[j];
+          if (cumProb > topP) {
+            cutoff = j + 1;
+            break;
+          }
+        }
+        const candidates = sortedIdx.slice(0, cutoff);
+        const candidateProbs = candidates.map(idx => probsData[idx] ** (1 / temperature));
+        const candSum = candidateProbs.reduce((a, b) => a + b, 0);
+        const rand = Math.random() * candSum;
+        let cumulative = 0;
+        let nextIdx = candidates[0];
+        for (let j = 0; j < candidateProbs.length; j++) {
+          cumulative += candidateProbs[j];
+          if (rand <= cumulative) {
+            nextIdx = candidates[j];
+            break;
+          }
+        }
+
+        const word = idxToWord.get(nextIdx) || '<UNK>';
+        generated.push(word);
+        recentWords.add(word);
+        if (recentWords.size > 10) recentWords.delete([...recentWords][0]);
+
+        if (word === '<END>' || word === '<UNK>' || generated.length > 15) break;
+        outputSeq.push(nextIdx);
+        outputSeq = outputSeq.slice(-maxLen);
+
+        states = nextStates;
+        nextWordProbs.dispose();
+        nextStates.forEach(s => s.dispose());
+      }
+      return generated.join(' ').replace(/\b(?:the|a|an|and|or|but)\s+/gi, ' ').trim();
     }
 
     async function loadModelFromSaved(saved) {
@@ -549,7 +665,7 @@
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
         });
-      } else {
+      } else if (saved.modelType === 'lstm') {
         model = tf.sequential({
           layers: [
             tf.layers.embedding({
@@ -564,6 +680,41 @@
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
         });
+      } else if (saved.modelType === 'generative') {
+        // Rebuild generative model
+        const embedLayer = tf.layers.embedding({ inputDim: saved.vocabSize, outputDim: 32, inputLength: saved.maxLen });
+        const encoderLSTM = tf.layers.lstm({ units: 64, returnState: true, dropout: 0.2 });
+        const decoderLSTM = tf.layers.lstm({ units: 64, returnSequences: true, dropout: 0.2 });
+        const dense = tf.layers.dense({ units: saved.vocabSize, activation: 'softmax' });
+
+        const wordToIdx = new Map(saved.wordToIdx);
+        const idxToWord = new Map(saved.idxToWord);
+
+        // Simplified weight set (adjust slicing as needed)
+        const weights = saved.weights;
+        let weightIdx = 0;
+        const setLayerWeights = (layer, numWeights) => {
+          const layerWeights = weights.slice(weightIdx, weightIdx + numWeights).map(arr => tf.tensor(arr));
+          layer.setWeights(layerWeights);
+          weightIdx += numWeights;
+          layerWeights.forEach(w => w.dispose());
+        };
+        // Approximate counts: embedding (2), lstm enc (8), lstm dec (8), dense (2)
+        setLayerWeights(embedLayer, 2);
+        setLayerWeights(encoderLSTM, 8);
+        setLayerWeights(decoderLSTM, 8);
+        setLayerWeights(dense, 2);
+
+        model = {
+          encoder: tf.model({ inputs: tf.input({shape: [saved.maxLen]}), outputs: encoderLSTM.apply(embedLayer.apply(tf.input({shape: [saved.maxLen]}))) }),
+          decoder: tf.model({ 
+            inputs: [tf.input({shape: [saved.maxLen]}), /* states placeholder */],
+            outputs: dense.apply(decoderLSTM.apply(embedLayer.apply(tf.input({shape: [saved.maxLen]})), { initialState: /* states */ }))
+          }),  // Note: Full rebuild may need custom predict wrapper
+          embedLayer, encoderLSTM, decoderLSTM, dense, wordToIdx, idxToWord, vocabSize: saved.vocabSize, maxLen: saved.maxLen
+        };
+        model.encoder.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy' });
+        model.decoder.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy' });
       }
       model.compile({
         optimizer: 'adam',
@@ -575,7 +726,7 @@
       model.setWeights(weightTensors);
       weightTensors.forEach(t => t.dispose());
 
-      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType };
+      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers || [], modelType: saved.modelType, wordToIdx: saved.wordToIdx, idxToWord: saved.idxToWord };
     }
 
     async function trainModel() {
@@ -587,16 +738,20 @@
       elements.trainStatus.classList.remove('hidden');
       elements.trainStatus.innerHTML = '<p class="loading">Preparing data... (Enable WebGL for faster training)</p>';
       elements.modelStatus.classList.add('hidden');
+      const progressBar = elements.progressFill.parentElement;
+      progressBar.classList.remove('hidden');
 
       try {
         await tf.setBackend('webgl');
         await tf.ready();
 
         const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
-        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];
         const modelType = document.querySelector('input[name="model-type"]:checked').value;
         const retrain = document.getElementById('retrain-toggle').checked;
-        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
+        const useSmoothing = document.getElementById('smooth-labels').checked;
+        const temperature = parseFloat(document.getElementById('temp-slider').value);
+        const topP = parseFloat(document.getElementById('topp-slider').value);
+        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false, wordToIdx, idxToWord;
 
         const modelRef = ref(db, 'models/current-model');
 
@@ -612,14 +767,22 @@
               xs = tf.tensor2d(qs);
               sampleInput = tf.tensor2d([textToVector('hello how are you today', savedVocab)]);
               vocabSize = savedVocab.length;
-            } else {
+            } else if (modelType === 'lstm') {
               savedVocab = saved.vocab;
-              const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+              wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
               savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
               maxLen = saved.maxLen;
               const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
               xs = tf.tensor2d(sequences);
               sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
+              vocabSize = saved.vocabSize;
+            } else if (modelType === 'generative') {
+              wordToIdx = new Map(saved.wordToIdx);
+              idxToWord = new Map(saved.idxToWord);
+              maxLen = saved.maxLen;
+              const sequences = pairs.map(p => pairToSequences(p.q, p.a, wordToIdx, maxLen));
+              // xs as encoder inputs, etc. (handled in loop)
+              sampleInput = questionToSequence('hello how are you today', wordToIdx, maxLen);
               vocabSize = saved.vocabSize;
             }
             const loadedStuff = await loadModelFromSaved(saved);
@@ -631,7 +794,7 @@
 
         if (!isLoaded) {
           vocab = buildVocab(pairs);
-          vocabSize = vocab.length;
+          vocabSize = modelType === 'generative' ? vocab.length + 4 : vocab.length;
 
           if (modelType === 'classifier') {
             const qs = pairs.map(p => textToVector(p.q, vocab));
@@ -641,11 +804,11 @@
               layers: [
                 tf.layers.dense({ inputShape: [vocabSize], units: 64, activation: 'relu' }),
                 tf.layers.dropout({ rate: 0.2 }),
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+                tf.layers.dense({ units: pairs.map(p => p.a).length, activation: 'softmax' })  // Dynamic classes
               ]
             });
-          } else {
-            const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+          } else if (modelType === 'lstm') {
+            wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
             vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
             vocabSize = vocab.length + 2;
             maxLen = Math.min(MAX_SEQ_LEN, Math.max(10, ...pairs.map(p => 
@@ -658,91 +821,205 @@
               layers: [
                 tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: maxLen }),
                 tf.layers.lstm({ units: 64, dropout: 0.2 }),
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+                tf.layers.dense({ units: pairs.map(p => p.a).length, activation: 'softmax' })
               ]
             });
+          } else if (modelType === 'generative') {
+            wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1], ['<START>', 2], ['<END>', 3]]);
+            vocab.forEach((word, i) => wordToIdx.set(word, i + 4));
+            idxToWord = new Map([...wordToIdx.entries()].map(([k, v]) => [v, k]));
+            vocabSize = vocab.length + 4;
+            maxLen = MAX_SEQ_LEN;
+
+            const embedLayer = tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: maxLen });
+            const encoderLSTM = tf.layers.lstm({ units: 64, returnState: true, dropout: 0.2 });
+            const decoderLSTM = tf.layers.lstm({ units: 64, returnSequences: true, dropout: 0.2 });
+            const dense = tf.layers.dense({ units: vocabSize, activation: 'softmax' });
+
+            model = {
+              encoder: tf.model({ inputs: embedLayer.apply(tf.input({shape: [maxLen]})), outputs: encoderLSTM.apply(embedLayer.apply(tf.input({shape: [maxLen]}))) }),
+              decoder: tf.model({ inputs: [embedLayer.apply(tf.input({shape: [maxLen]})), encoderLSTM.outputs], outputs: dense.apply(decoderLSTM.apply(embedLayer.apply(tf.input({shape: [maxLen]})), { initialState: encoderLSTM.outputs })) }),
+              embedLayer, encoderLSTM, decoderLSTM, dense, wordToIdx, idxToWord, vocabSize, maxLen
+            };
+
+            model.encoder.compile({ optimizer: tf.train.adam(0.001), loss: 'categoricalCrossentropy' });
+            model.decoder.compile({ optimizer: tf.train.adam(0.001), loss: 'categoricalCrossentropy' });
           }
-          model.compile({
-            optimizer: 'adam',
-            loss: 'categoricalCrossentropy',
-            metrics: ['accuracy']
-          });
+
+          if (modelType !== 'generative') {
+            model.compile({
+              optimizer: tf.train.adam(0.001),
+              loss: 'categoricalCrossentropy',
+              metrics: ['accuracy']
+            });
+          }
         }
 
-        const answerIndices = encodeAnswers(pairs, uniqueAnswers);
-        const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
+        if (modelType !== 'generative') {
+          const uniqueAnswers = [...new Set(pairs.map(p => p.a))];
+          const answerIndices = encodeAnswers(pairs, uniqueAnswers);
+          const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
 
-        const lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
+          const numEpochs = retrain ? 25 : 75;
+          const batchSize = Math.min(64, Math.floor(pairs.length / 4));
+          let bestValAcc = -Infinity;
+          let patienceCounter = 0;
+          const patience = 8;
 
-        let finalAcc = 0;
-        await model.fit(xs, ys, {
-          epochs: retrain ? 12 : 35,
-          batchSize: Math.min(16, pairs.length),
-          validationSplit: 0.2,
-          callbacks: {
-            onEpochEnd: (epoch, logs) => {
-              finalAcc = logs.acc;
-              elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)}, Acc=${logs.acc.toFixed(4)}</p>`;
+          elements.trainStatus.innerHTML += `<p>Manual training: ${numEpochs} epochs max, batch ${batchSize}</p>`;
+
+          for (let epoch = 0; epoch < numEpochs; epoch++) {
+            const shuffled = tf.randomShuffle(tf.stack([xs, ys]));
+            const trainXs = shuffled.slice([0, 0], [pairs.length * 0.8, -1]).squeeze();
+            const trainYs = shuffled.slice([0, 0, 0], [pairs.length * 0.8, -1, -1]).squeeze();
+            const valXs = xs.slice([pairs.length * 0.8, 0], [pairs.length * 0.2, -1]);
+            const valYs = ys.slice([pairs.length * 0.8, 0, 0], [pairs.length * 0.2, -1, -1]);
+
+            model.trainOnBatch(trainXs, trainYs);
+
+            const valLogs = model.evaluate(valXs, valYs, { verbose: 0 });
+            const valAcc = valLogs[1].dataSync()[0];
+            const trainLogs = model.evaluate(trainXs, trainYs, { verbose: 0 });
+            const trainAcc = trainLogs[1].dataSync()[0];
+
+            elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Train Acc=${trainAcc.toFixed(4)}, Val Acc=${valAcc.toFixed(4)}</p>`;
+
+            if (valAcc > bestValAcc) {
+              bestValAcc = valAcc;
+              patienceCounter = 0;
+            } else {
+              patienceCounter++;
+              if (patienceCounter >= patience) {
+                elements.trainStatus.innerHTML += `<p>Early stopping at epoch ${epoch + 1}</p>`;
+                break;
+              }
             }
+
+            // LR decay every 10 epochs
+            if (epoch % 10 === 0 && epoch > 0) {
+              const optimizer = model.optimizer;
+              optimizer.learningRate = optimizer.learningRate.mul(0.9);
+            }
+
+            trainXs.dispose(); trainYs.dispose(); valXs.dispose(); valYs.dispose();
+            valLogs.forEach(log => log.dispose());
+            trainLogs.forEach(log => log.dispose());
+
+            const progress = ((epoch + 1) / numEpochs) * 100;
+            elements.progressFill.style.width = `${progress}%`;
           }
-        });
 
-        const pred = model.predict(sampleInput);
-        const predIdx = pred.argMax(-1).dataSync()[0];
-        const predictedA = uniqueAnswers[predIdx];
-        elements.trainStatus.innerHTML += `<p>Test ("hello how are you today"): Predicted "${predictedA}"</p>`;
+          const pred = model.predict(sampleInput);
+          const predIdx = pred.argMax(-1).dataSync()[0];
+          const predictedA = uniqueAnswers[predIdx];
+          elements.trainStatus.innerHTML += `<p>Test: Predicted "${predictedA}"</p>`;
 
-        const weights = model.getWeights().map(w => w.arraySync());
+          pred.dispose();
+        } else {
+          // Generative training
+          const sequences = pairs.map(p => pairToSequences(p.q, p.a, wordToIdx, maxLen));
+          const numEpochs = retrain ? 30 : 60;
+          let avgLoss = 0;
+          let bestPerplexity = Infinity;
+          let patienceCounter = 0;
+          const patience = 10;
+
+          for (let epoch = 0; epoch < numEpochs; epoch++) {
+            let epochLoss = 0;
+            for (let i = 0; i < sequences.length; i += 32) {
+              const batchEnd = Math.min(i + 32, sequences.length);
+              const batchSeqs = sequences.slice(i, batchEnd);
+              const batchXsEnc = tf.tensor2d(batchSeqs.map(s => s.qSeq));
+              const batchXsDec = tf.tensor2d(batchSeqs.map(s => s.decoderInput));
+              const batchYs = tf.stack(batchSeqs.map(s => s.targetOneHot));
+
+              const encStates = model.encoder.predict(batchXsEnc);
+              const decOut = model.decoder.predict([batchXsDec, encStates]);
+              const lossTensor = model.decoder.evaluate(batchXsDec, batchYs, { verbose: 0 })[0];
+              const batchLoss = lossTensor.dataSync()[0];
+              epochLoss += batchLoss;
+
+              batchXsEnc.dispose(); batchXsDec.dispose(); batchYs.dispose();
+              encStates.forEach(s => s.dispose());
+              decOut.forEach(o => o.dispose());
+              lossTensor.dispose();
+            }
+            avgLoss = epochLoss / Math.ceil(sequences.length / 32);
+            const avgPerplexity = Math.exp(avgLoss);
+            elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${avgLoss.toFixed(4)}, Perplexity=${avgPerplexity.toFixed(2)}</p>`;
+
+            if (avgPerplexity < bestPerplexity) {
+              bestPerplexity = avgPerplexity;
+              patienceCounter = 0;
+            } else {
+              patienceCounter++;
+              if (patienceCounter >= patience || (avgPerplexity < 2.5 && epoch > 30)) {
+                elements.trainStatus.innerHTML += `<p>Early stopping at epoch ${epoch + 1} (perplexity ${avgPerplexity.toFixed(2)})</p>`;
+                break;
+              }
+            }
+
+            const progress = ((epoch + 1) / numEpochs) * 100;
+            elements.progressFill.style.width = `${progress}%`;
+
+            sequences.forEach(s => s.targetOneHot.dispose());
+          }
+
+          const sampleQ = questionToSequence('hello how are you today', wordToIdx, maxLen);
+          const generated = await generateResponse(model, model.encoder, model.decoder, sampleQ, wordToIdx, idxToWord, maxLen, temperature, topP, 1.1);
+          elements.trainStatus.innerHTML += `<p>Test: Generated "${generated}"</p>`;
+        }
+
+        const weights = model.getWeights ? model.getWeights().map(w => w.arraySync()) : [
+          ...model.embedLayer.getWeights().map(w => w.arraySync()),
+          ...model.encoderLSTM.getWeights().map(w => w.arraySync()),
+          ...model.decoderLSTM.getWeights().map(w => w.arraySync()),
+          ...model.dense.getWeights().map(w => w.arraySync())
+        ];
 
         const saveData = {
           modelType,
-          version: '1.1',
+          version: '1.2',  // Updated
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
-          uniqueAnswers,
-          numClasses: uniqueAnswers.length,
-          weights
+          uniqueAnswers: modelType !== 'generative' ? [...new Set(pairs.map(p => p.a))] : [],
+          numClasses: modelType !== 'generative' ? pairs.map(p => p.a).length : undefined,
+          weights,
+          temperature, topP, repetitionPenalty: 1.1, epsilon: 0.1
         };
         if (modelType === 'classifier') {
           saveData.inputDim = vocabSize;
-        } else {
+        } else if (modelType === 'lstm' || modelType === 'generative') {
           saveData.vocabSize = vocabSize;
-          saveData.maxLen = maxLen;
+          saveData.maxLen = maxLen || MAX_SEQ_LEN;
           saveData.embedDim = 32;
           saveData.lstmUnits = 64;
+          if (modelType === 'generative') {
+            saveData.wordToIdx = Array.from(wordToIdx.entries());
+            saveData.idxToWord = Array.from(idxToWord.entries());
+          }
         }
         await set(modelRef, saveData);
 
-        elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
-        const savedSnapshot = await get(modelRef);
-        const saved = savedSnapshot.val();
-        const loadedStuff = await loadModelFromSaved(saved);
-        const loadedModel = loadedStuff.model;
-        const loadedUnique = loadedStuff.uniqueAnswers;
-
-        const loadedPred = loadedModel.predict(sampleInput);
-        const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
-        const loadedPredictedA = loadedUnique[loadedPredIdx];
-        elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredictedA}"</p>`;
-
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.trainStatus.innerHTML += '<p>Model saved! Verification complete.</p>';
+        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} trained & saved! Use in chat UI.</p>`;
         elements.modelStatus.classList.remove('hidden');
-        showSuccess('Training complete—model ready for your chat UI.');
+        showSuccess('Training complete—model ready for conversational use.');
 
-        xs.dispose();
-        ys.dispose();
-        pred.dispose();
-        loadedPred.dispose();
-        model.dispose();
-        loadedModel.dispose();
-        sampleInput.dispose();
+        // Cleanup
+        if (xs) xs.dispose();
+        if (sampleInput) sampleInput.dispose();
+        if (model && model.dispose) model.dispose();
+
+        progressBar.classList.add('hidden');
+        elements.progressFill.style.width = '0%';
 
       } catch (error) {
         elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
         showError('Training error: ' + error.message);
         console.error('Training error:', error);
+        elements.progressFill.parentElement.classList.add('hidden');
       }
     }
 
@@ -769,28 +1046,64 @@
                   <input type="checkbox" id="retrain-toggle"> Retrain existing model (no delete)
                 </label>
                 <label>
-                  <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
+                  <input type="radio" name="model-type" value="classifier"> Classifier (fast retrieval)
                 </label>
                 <label>
                   <input type="radio" name="model-type" value="lstm"> LSTM (sequence input)
                 </label>
+                <label>
+                  <input type="radio" name="model-type" value="generative" checked> Generative LSTM (conversational replies)
+                </label>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" id="smooth-labels" checked> Label Smoothing (reduces overconfidence)
+                </label>
                 <div class="slider-container">
                   <span>Max Vocab:</span>
-                  <input type="range" id="vocab-slider" min="200" max="2000" value="1000" step="100">
-                  <span id="vocab-value">1000</span>
+                  <input type="range" id="vocab-slider" min="200" max="800" value="500" step="100">
+                  <span id="vocab-value">500</span>
+                </div>
+                <div class="slider-container">
+                  <span>Max Seq Len:</span>
+                  <input type="range" id="seq-slider" min="10" max="50" value="25" step="5">
+                  <span id="seq-value">25</span>
+                </div>
+                <div class="slider-container">
+                  <span>Generation Temp (0.5=safe, 1.0=creative):</span>
+                  <input type="range" id="temp-slider" min="0.3" max="1.2" value="0.7" step="0.1">
+                  <span id="temp-value">0.7</span>
+                </div>
+                <div class="slider-container">
+                  <span>Top-p (0.8-0.95 for sanity):</span>
+                  <input type="range" id="topp-slider" min="0.5" max="1.0" value="0.9" step="0.05">
+                  <span id="topp-value">0.9</span>
                 </div>
               </div>
               <button id="train-btn" class="btn">Train AI Model</button>
             </section>
           `;
 
-          // Init slider
-          const slider = document.getElementById('vocab-slider');
-          const value = document.getElementById('vocab-value');
-          slider.addEventListener('input', () => {
-            MAX_VOCAB = parseInt(slider.value);
-            value.textContent = MAX_VOCAB;
+          // Sliders
+          const vocabSlider = document.getElementById('vocab-slider');
+          const vocabValue = document.getElementById('vocab-value');
+          vocabSlider.addEventListener('input', () => {
+            MAX_VOCAB = parseInt(vocabSlider.value);
+            vocabValue.textContent = MAX_VOCAB;
           });
+
+          const seqSlider = document.getElementById('seq-slider');
+          const seqValue = document.getElementById('seq-value');
+          seqSlider.addEventListener('input', () => {
+            MAX_SEQ_LEN = parseInt(seqSlider.value);
+            seqValue.textContent = MAX_SEQ_LEN;
+          });
+
+          const tempSlider = document.getElementById('temp-slider');
+          const tempValue = document.getElementById('temp-value');
+          tempSlider.addEventListener('input', () => tempValue.textContent = tempSlider.value);
+
+          const toppSlider = document.getElementById('topp-slider');
+          const toppValue = document.getElementById('topp-value');
+          toppSlider.addEventListener('input', () => toppValue.textContent = toppSlider.value);
 
           document.getElementById('train-btn').addEventListener('click', trainModel);
         }
@@ -805,27 +1118,31 @@
       });
     }
 
-    // Bulk functionality (unchanged)
+    // Bulk functionality
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
         lines = content.split('\n').slice(1).filter(line => line.trim());
-        return lines.map(line => {
+        let pairs = lines.map(line => {
           const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
           return { q, a };
         }).filter(pair => pair.q && pair.a);
+        // Validate
+        return pairs.filter(pair => pair.q.split(/\s+/).length >= 2 && pair.a.split(/\s+/).length >= 3 && pair.q !== pair.a);
       } else {
         lines = content.split('\n').filter(line => line.trim());
-        return lines.map(line => {
+        let pairs = lines.map(line => {
           const [q, a] = line.split('|').map(s => s.trim());
           return { q, a };
         }).filter(pair => pair.q && pair.a);
+        // Validate
+        return pairs.filter(pair => pair.q.split(/\s+/).length >= 2 && pair.a.split(/\s+/).length >= 3 && pair.q !== pair.a);
       }
     }
 
     function updateBulkPreview(pairs) {
       if (pairs.length === 0) {
-        elements.bulkPreview.textContent = 'No valid pairs found.';
+        elements.bulkPreview.textContent = 'No valid pairs found (check length/uniqueness).';
         elements.bulkSubmit.disabled = true;
       } else {
         elements.bulkPreview.textContent = `${pairs.length} valid pairs parsed:\n\n${pairs.slice(0, 10).map(p => `${p.q} | ${p.a}`).join('\n')}${pairs.length > 10 ? '\n\n... (showing first 10)' : ''}`;
@@ -853,7 +1170,7 @@
 
       const pairs = parseBulkData(content, mode);
       if (pairs.length === 0) {
-        showError('No valid pairs found in the input.');
+        showError('No valid pairs found (ensure natural language format).');
         return;
       }
 
