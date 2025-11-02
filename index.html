@@ -376,6 +376,8 @@
     let trainingData = {};
     let dataKeys = [];
     let dataLoaded = false;
+    let models = {};
+    let currentModelId = null;
 
     // VOCAB SETTINGS - Further reduced for efficiency
     let MAX_VOCAB = 200;
@@ -549,13 +551,30 @@
         const retrain = document.getElementById('retrain-toggle').checked;
         let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
 
-        const modelRef = ref(db, 'models/current-model');
+        const modelNameInput = document.getElementById('model-name');
+        let modelName = modelNameInput ? modelNameInput.value.trim() : '';
 
-        if (retrain) {
+        // Compute next version
+        const modelsSnap = await get(ref(db, 'models'));
+        const allModels = modelsSnap.val() || {};
+        let nextVersion = 1;
+        Object.values(allModels).forEach(m => {
+          if (m.version) {
+            const v = parseInt(m.version);
+            if (!isNaN(v) && v >= nextVersion) nextVersion = v + 1;
+          }
+        });
+
+        const currentIdRef = ref(db, 'currentModelId');
+        const currentSnap = await get(currentIdRef);
+        let modelRef;
+
+        if (retrain && currentSnap.exists()) {
+          const currentId = currentSnap.val();
+          modelRef = ref(db, `models/${currentId}`);
           const snap = await get(modelRef);
           if (snap.exists() && snap.val().modelType === modelType) {
             const saved = snap.val();
-            isLoaded = true;
             let savedVocab;
             if (modelType === 'classifier') {
               savedVocab = saved.vocab;
@@ -577,7 +596,12 @@
             model = loadedStuff.model;
             vocab = savedVocab;
             elements.trainStatus.innerHTML += '<p>Loaded existing model for retraining.</p>';
+            isLoaded = true;
+          } else {
+            elements.trainStatus.innerHTML += '<p>Current model incompatible or not found. Training new model from scratch.</p>';
           }
+        } else if (retrain) {
+          elements.trainStatus.innerHTML += '<p>No current model found. Training new model from scratch.</p>';
         }
 
         if (!isLoaded) {
@@ -623,8 +647,9 @@
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
 
-        const lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
+        const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
+        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${gruInfo}</p>`;
+        elements.trainStatus.innerHTML += `<p>Creating version ${nextVersion}</p>`;
 
         let finalAcc = 0;
         let bestValAcc = 0;
@@ -662,9 +687,14 @@
 
         const weights = model.getWeights().map(w => w.arraySync());
 
+        if (!modelName) {
+          modelName = `vinaq v${nextVersion}`;
+        }
+
         const saveData = {
           modelType,
-          version: '1.2',
+          version: nextVersion,
+          modelName,
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
@@ -680,7 +710,12 @@
           saveData.embedDim = 8;
           saveData.gruUnits = 16; // Updated to GRU
         }
+
+        // Always save as new version
+        const modelsRef = ref(db, 'models');
+        modelRef = push(modelsRef);
         await set(modelRef, saveData);
+        await set(ref(db, 'currentModelId'), modelRef.key);
 
         elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
         const savedSnapshot = await get(modelRef);
@@ -694,7 +729,7 @@
         const loadedPredictedA = loadedUnique[loadedPredIdx];
         elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredictedA}"</p>`;
 
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} v${saved.version} trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
 
@@ -741,13 +776,17 @@
                   <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
                 </label>
                 <label>
-                  <input type="radio" name="model-type" value="lstm"> GRU (efficient sequence input)
+                  <input type="radio" name="model-type" value="gru"> GRU (efficient sequence input)
                 </label>
                 <div class="slider-container">
                   <span>Max Vocab:</span>
                   <input type="range" id="vocab-slider" min="50" max="500" value="200" step="50">
                   <span id="vocab-value">200</span>
                 </div>
+                <label class="block w-full">
+                  <span class="text-sm font-medium">Model Name (optional)</span>
+                  <input type="text" id="model-name" placeholder="e.g., vinaq v2" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
+                </label>
               </div>
               <button id="train-btn" class="btn">Train AI Model</button>
             </section>
@@ -762,8 +801,28 @@
           });
 
           document.getElementById('train-btn').addEventListener('click', trainModel);
+
+          // Insert models management
+          const modelsHTML = `
+            <div id="models-management" class="train-section hidden">
+              <h3 class="text-lg font-bold mb-4 text-center">Available Models</h3>
+              <div id="models-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto"></div>
+              <div class="btn-group">
+                <button id="delete-selected-btn" class="btn btn-danger" disabled>Delete Selected</button>
+              </div>
+            </div>
+          `;
+          elements.trainSection.insertAdjacentHTML('afterend', modelsHTML);
+
+          elements.modelsManagement = document.getElementById('models-management');
+          elements.modelsList = document.getElementById('models-list');
+          elements.deleteSelectedBtn = document.getElementById('delete-selected-btn');
+          elements.deleteSelectedBtn.addEventListener('click', deleteSelectedModels);
+
+          loadModels();
         }
         elements.trainSection.classList.remove('hidden');
+        elements.modelsManagement?.classList.remove('hidden');
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
@@ -772,6 +831,107 @@
           hideOverlay();
         }
       });
+    }
+
+    function loadModels() {
+      const modelsRef = ref(db, 'models');
+      onValue(modelsRef, (snapshot) => {
+        models = snapshot.val() || {};
+        renderModels();
+      }, (error) => {
+        console.error('Failed to load models:', error);
+      });
+
+      const currentRef = ref(db, 'currentModelId');
+      onValue(currentRef, (snapshot) => {
+        currentModelId = snapshot.val();
+        renderModels();
+      }, (error) => {
+        console.error('Failed to load current model ID:', error);
+      });
+    }
+
+    function renderModels() {
+      const list = elements.modelsList;
+      if (!list) return;
+      list.innerHTML = '';
+      const modelEntries = Object.entries(models);
+      if (modelEntries.length === 0) {
+        list.innerHTML = '<p class="text-center text-gray-500 py-4">No models available. Train your first model!</p>';
+        return;
+      }
+      modelEntries.forEach(([id, m]) => {
+        const isCurrent = currentModelId === id;
+        const div = document.createElement('div');
+        div.className = `flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border ${isCurrent ? 'border-blue-500' : 'border-gray-200'}`;
+        const name = m.modelName || `vinaq v${m.version}`;
+        const status = isCurrent ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Current</span>' : '';
+        div.innerHTML = `
+          <div class="flex items-center space-x-3 flex-1">
+            <input type="checkbox" class="form-checkbox h-5 w-5 text-red-600" value="${id}" onchange="toggleDeleteBtn()">
+            <div>
+              <div class="font-medium">${name} ${status}</div>
+              <div class="text-sm text-gray-600">
+                Type: ${m.modelType} | Classes: ${m.numClasses || 'N/A'} | 
+                ${new Date(m.timestamp).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+          <div class="flex space-x-2">
+            ${!isCurrent ? `<button onclick="setCurrentModel('${id}')" class="btn btn-secondary text-sm px-3 py-1">Set Current</button>` : ''}
+            <button onclick="deleteSingleModel('${id}')" class="btn btn-danger text-sm px-3 py-1">Delete</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+      toggleDeleteBtn();
+    }
+
+    window.toggleDeleteBtn = function() {
+      const checked = document.querySelectorAll('#models-list input[type="checkbox"]:checked');
+      const btn = elements.deleteSelectedBtn;
+      if (btn) {
+        btn.disabled = checked.length === 0;
+        btn.textContent = checked.length > 0 ? `Delete Selected (${checked.length})` : 'Delete Selected';
+      }
+    };
+
+    window.setCurrentModel = async function(id) {
+      if (!currentUser) return;
+      try {
+        await set(ref(db, 'currentModelId'), id);
+        showSuccess('Model set as current.');
+      } catch (error) {
+        showError('Failed to set current model: ' + error.message);
+      }
+    };
+
+    window.deleteSingleModel = async function(id) {
+      if (!currentUser || !confirm('Delete this model? This cannot be undone.')) return;
+      try {
+        await remove(ref(db, `models/${id}`));
+        if (currentModelId === id) {
+          await set(ref(db, 'currentModelId'), null);
+        }
+        showSuccess('Model deleted successfully.');
+      } catch (error) {
+        showError('Failed to delete model: ' + error.message);
+      }
+    };
+
+    async function deleteSelectedModels() {
+      if (!currentUser) return;
+      const selected = Array.from(document.querySelectorAll('#models-list input:checked')).map(cb => cb.value);
+      if (selected.length === 0 || !confirm(`Delete ${selected.length} model(s)? This cannot be undone.`)) return;
+      try {
+        await Promise.all(selected.map(id => remove(ref(db, `models/${id}`))));
+        if (selected.includes(currentModelId)) {
+          await set(ref(db, 'currentModelId'), null);
+        }
+        showSuccess(`${selected.length} model(s) deleted successfully.`);
+      } catch (error) {
+        showError('Failed to delete models: ' + error.message);
+      }
     }
 
     // Bulk functionality (unchanged)
@@ -913,6 +1073,7 @@
         elements.bulkForm.classList.remove('hidden');
         elements.btnGroup.classList.remove('hidden');
         elements.trainSection.classList.remove('hidden');
+        elements.modelsManagement?.classList.remove('hidden');
         loadTrainingData();
       } else {
         hideOverlay();
@@ -921,6 +1082,7 @@
         elements.bulkForm.classList.add('hidden');
         elements.btnGroup.classList.add('hidden');
         elements.trainSection.classList.add('hidden');
+        elements.modelsManagement?.classList.add('hidden');
         elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
       }
