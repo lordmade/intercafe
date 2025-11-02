@@ -237,9 +237,54 @@
     .slider-container input[type="range"] {
       flex: 1;
     }
+    /* Overlay Spinner Styles */
+    .overlay-spinner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(248, 248, 248, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.3s ease;
+    }
+    .overlay-spinner.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .spinner {
+      border: 4px solid var(--border);
+      border-top: 4px solid var(--bbm-red);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .spinner-text {
+      margin-top: 20px;
+      font-family: 'Orbitron', monospace;
+      color: var(--bbm-red);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
+  <!-- Overlay Spinner -->
+  <div id="overlay-spinner" class="overlay-spinner">
+    <div class="spinner"></div>
+    <div class="spinner-text" id="spinner-text">Initializing Vynix Dashboard...</div>
+  </div>
+
   <header class="header">
     <h1>Vynix AI Training Dashboard</h1>
     <p>Manage training data for your AI companion</p>
@@ -281,7 +326,7 @@
       <button type="submit" class="btn" id="bulk-submit" disabled>Bulk Add Pairs</button>
     </form>
 
-    <div id="loading" class="loading">Loading training data...</div>
+    <div id="loading" class="loading hidden">Loading training data...</div>
     <div id="pairs-list"></div>
 
     <button id="retrain-btn" class="btn hidden" style="display: block; margin: 20px auto;">Trigger Retrain (Saves & Notifies)</button>
@@ -314,6 +359,8 @@
 
     const container = document.querySelector('.container');
     const elements = {
+      overlaySpinner: document.getElementById('overlay-spinner'),
+      spinnerText: document.getElementById('spinner-text'),
       authStatus: document.getElementById('auth-status'),
       stats: document.getElementById('stats'),
       pairCount: document.getElementById('pair-count'),
@@ -339,6 +386,7 @@
     let currentUser;
     let trainingData = {};
     let dataKeys = [];
+    let dataLoaded = false;
 
     // VOCAB SETTINGS
     let MAX_VOCAB = 1000;
@@ -347,6 +395,16 @@
 
     // Seq2Seq tokens
     const SPECIAL_TOKENS = { PAD: '<PAD>', SOS: '<SOS>', EOS: '<EOS>', UNK: '<UNK>' };
+
+    // Overlay functions
+    function showOverlay(text = 'Loading...') {
+      elements.spinnerText.textContent = text;
+      elements.overlaySpinner.classList.remove('hidden');
+    }
+
+    function hideOverlay() {
+      elements.overlaySpinner.classList.add('hidden');
+    }
 
     function showError(msg) {
       elements.errorMessage.textContent = msg;
@@ -774,6 +832,7 @@
     }
 
     function loadTrainingData() {
+      showOverlay('Fetching training data...');
       const trainingRef = ref(db, 'training_data');
       onValue(trainingRef, (snapshot) => {
         const data = snapshot.val();
@@ -781,6 +840,11 @@
         dataKeys = Object.keys(trainingData);
         renderPairs();
         elements.loading.classList.add('hidden');
+
+        if (!dataLoaded) {
+          dataLoaded = true;
+          hideOverlay();
+        }
 
         if (elements.trainSection.children.length === 0) {
           elements.trainSection.innerHTML = `
@@ -822,6 +886,10 @@
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
+        if (!dataLoaded) {
+          dataLoaded = true;
+          hideOverlay();
+        }
       });
     }
 
@@ -957,6 +1025,7 @@
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
+        showOverlay('Authenticating...');
         elements.authStatus.innerHTML = `Logged in as: ${user.displayName || user.email || 'User'} <button class="btn btn-secondary" onclick="signOutUser()" style="font-size: 12px; padding: 4px 8px; margin-left: 10px;">Sign Out</button>`;
         elements.addForm.classList.remove('hidden');
         elements.bulkForm.classList.remove('hidden');
@@ -964,6 +1033,7 @@
         elements.trainSection.classList.remove('hidden');
         loadTrainingData();
       } else {
+        hideOverlay();
         elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
         elements.addForm.classList.add('hidden');
         elements.bulkForm.classList.add('hidden');
@@ -976,9 +1046,11 @@
 
     window.signInAnonymously = async function() {
       try {
+        showOverlay('Signing in...');
         await signInAnonymously(auth);
       } catch (error) {
         showError('Sign in failed: ' + error.message);
+        hideOverlay();
       }
     };
 
@@ -990,7 +1062,9 @@
       }
     };
 
-    elements.loading.classList.remove('hidden');
+    // Initial load
+    showOverlay('Connecting to Firebase...');
+    elements.loading.classList.add('hidden');
   </script>
 </body>
 </html>
