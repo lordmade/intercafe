@@ -426,8 +426,16 @@
         throw new Error('Please log in and enter both question and answer.');
       }
       const trainingRef = ref(db, 'training_data');
+      // Check for duplicate question (case-insensitive)
+      const snapshot = await get(trainingRef);
+      const existingData = snapshot.val() || {};
+      const normalizedQ = q.trim().toLowerCase();
+      const existing = Object.values(existingData).some(pair => pair.q.toLowerCase() === normalizedQ);
+      if (existing) {
+        throw new Error('Duplicate question already exists. Please use a different question.');
+      }
       const newPairRef = push(trainingRef);
-      const newPair = { q: q.trim().toLowerCase(), a: a.trim(), timestamp: Date.now() };
+      const newPair = { q: normalizedQ, a: a.trim(), timestamp: Date.now() };
       await set(newPairRef, newPair);
       return newPair;
     }
@@ -934,7 +942,7 @@
       }
     }
 
-    // Bulk functionality (unchanged)
+    // Bulk functionality (updated to skip duplicates)
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
@@ -991,10 +999,22 @@
       hideMessages();
 
       let added = 0;
+      let skipped = 0;
       let errors = 0;
+      const trainingRef = ref(db, 'training_data');
+      const snapshot = await get(trainingRef);
+      const existingData = snapshot.val() || {};
+      const existingQs = new Set(Object.values(existingData).map(pair => pair.q.toLowerCase()));
+
       for (let i = 0; i < pairs.length; i++) {
         try {
+          const normalizedQ = pairs[i].q.trim().toLowerCase();
+          if (existingQs.has(normalizedQ)) {
+            skipped++;
+            continue;
+          }
           await addPair(pairs[i].q, pairs[i].a);
+          existingQs.add(normalizedQ); // Update set for efficiency
           added++;
         } catch (error) {
           errors++;
@@ -1007,17 +1027,17 @@
       progressBar.classList.add('hidden');
       elements.progressFill.style.width = '0%';
 
-      if (added > 0) {
-        showSuccess(`Bulk upload complete: ${added} pairs added, ${errors} errors.`);
-        if (mode === 'text') {
-          elements.bulkText.value = '';
-        } else {
-          elements.bulkInput.value = '';
-        }
-        elements.bulkPreview.classList.add('hidden');
+      let message = `Bulk upload complete: ${added} pairs added`;
+      if (skipped > 0) message += `, ${skipped} duplicates skipped`;
+      if (errors > 0) message += `, ${errors} errors`;
+      message += '.';
+      showSuccess(message);
+      if (mode === 'text') {
+        elements.bulkText.value = '';
       } else {
-        showError('Bulk upload failed: No pairs added.');
+        elements.bulkInput.value = '';
       }
+      elements.bulkPreview.classList.add('hidden');
     }
 
     // Event listeners
