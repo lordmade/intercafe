@@ -664,7 +664,7 @@
         let patience = 3;
         let wait = 0;
         await model.fit(xs, ys, {
-          epochs: retrain ? 8 : 15,
+          epochs: 50,
           batchSize: Math.min(64, pairs.length),
           validationSplit: 0.2,
           callbacks: {
