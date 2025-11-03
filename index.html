@@ -661,10 +661,8 @@
 
         let finalAcc = 0;
         let bestValAcc = 0;
-        let patience = 5;
-        let wait = 0;
         await model.fit(xs, ys, {
-          epochs: retrain ? 25 : 50,
+          epochs: 50,
           batchSize: Math.min(64, pairs.length),
           validationSplit: 0.2,
           callbacks: {
@@ -674,18 +672,9 @@
               elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)}, Acc=${logs.acc.toFixed(4)}, Val Acc=${valAcc.toFixed(4)}</p>`;
               if (valAcc > bestValAcc) {
                 bestValAcc = valAcc;
-                wait = 0;
-              } else {
-                wait++;
-                if (wait >= patience) {
-                  elements.trainStatus.innerHTML += `<p>Early stopping at epoch ${epoch + 1}</p>`;
-                  throw new Error('Early stopping');
-                }
               }
             }
           }
-        }).catch(err => {
-          if (err.message !== 'Early stopping') throw err;
         });
 
         const pred = model.predict(sampleInput);
@@ -750,11 +739,9 @@
         sampleInput.dispose();
 
       } catch (error) {
-        if (error.message !== 'Early stopping') {
-          elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
-          showError('Training error: ' + error.message);
-          console.error('Training error:', error);
-        }
+        elements.trainStatus.innerHTML += `<p class="error">Training failed: ${error.message}</p>`;
+        showError('Training error: ' + error.message);
+        console.error('Training error:', error);
       }
     }
 
