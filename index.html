@@ -277,15 +277,15 @@
 
   <div class="container">
     <div id="auth-status" class="stats">Loading...</div>
-    <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
+    <div id="stats" class="stats hidden">Total texts: <span id="text-count">0</span></div>
 
     <div id="error-message" class="error hidden"></div>
     <div id="success-message" class="success hidden"></div>
 
     <form id="add-form" class="add-form hidden">
-      <input type="text" id="new-q" placeholder="Question (e.g., 'hello')" required>
-      <input type="text" id="new-a" placeholder="Answer (e.g., 'Hi! What's up?')" required>
-      <button type="submit" class="btn">Add Pair</button>
+      <input type="text" id="new-text" placeholder="Text (e.g., 'The quick brown fox jumps.')" required>
+      <input type="number" id="new-label" placeholder="Label (optional, e.g., 1 for positive)" min="0">
+      <button type="submit" class="btn">Add Text</button>
     </form>
 
     <form id="bulk-form" class="bulk-form hidden">
@@ -294,25 +294,25 @@
         <div class="flex gap-4 mb-4">
           <label class="flex items-center">
             <input type="radio" name="bulk-mode" value="csv" checked class="mr-2">
-            CSV File (q,a per line)
+            CSV File (text,label per line)
           </label>
           <label class="flex items-center">
             <input type="radio" name="bulk-mode" value="text" class="mr-2">
-            Text (q|a per line)
+            Text (text|label per line)
           </label>
         </div>
       </div>
       <input type="file" id="bulk-input" accept=".csv,.txt" placeholder="Upload CSV or TXT file">
-      <textarea id="bulk-text" placeholder="Or paste bulk data here (one pair per line: question|answer)" style="display: none;"></textarea>
+      <textarea id="bulk-text" placeholder="Or paste bulk data here (one entry per line: text|label)" style="display: none;"></textarea>
       <div id="bulk-preview" class="bulk-preview hidden">Preview will appear here...</div>
       <div class="progress-bar hidden">
         <div id="progress-fill" class="progress-fill"></div>
       </div>
-      <button type="submit" class="btn" id="bulk-submit" disabled>Bulk Add Pairs</button>
+      <button type="submit" class="btn" id="bulk-submit" disabled>Bulk Add Texts</button>
     </form>
 
     <div id="loading" class="loading hidden">Loading training data...</div>
-    <div id="pairs-list" class="hidden"></div>
+    <div id="texts-list" class="hidden"></div>
 
     <div class="btn-group hidden">
       <button id="clear-all-btn" class="btn btn-danger">Clear All Training Data</button>
@@ -350,6 +350,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -372,12 +373,12 @@
       spinnerText: document.getElementById('spinner-text'),
       authStatus: document.getElementById('auth-status'),
       stats: document.getElementById('stats'),
-      pairCount: document.getElementById('pair-count'),
+      textCount: document.getElementById('text-count'),
       errorMessage: document.getElementById('error-message'),
       successMessage: document.getElementById('success-message'),
       addForm: document.getElementById('add-form'),
-      newQ: document.getElementById('new-q'),
-      newA: document.getElementById('new-a'),
+      newText: document.getElementById('new-text'),
+      newLabel: document.getElementById('new-label'),
       bulkForm: document.getElementById('bulk-form'),
       bulkInput: document.getElementById('bulk-input'),
       bulkText: document.getElementById('bulk-text'),
@@ -385,7 +386,7 @@
       bulkSubmit: document.getElementById('bulk-submit'),
       progressFill: document.getElementById('progress-fill'),
       loading: document.getElementById('loading'),
-      pairsList: document.getElementById('pairs-list'),
+      textsList: document.getElementById('texts-list'),
       clearAllBtn: document.getElementById('clear-all-btn'),
       retrainBtn: document.getElementById('retrain-btn'),
       btnGroup: container.querySelector('.btn-group'),
@@ -396,8 +397,7 @@
     };
 
     let currentUser;
-    let trainingData = {};
-    let dataKeys = [];
+    let trainingData = [];
     let dataLoaded = false;
     let models = {};
     let currentModelId = null;
@@ -438,32 +438,32 @@
     }
 
     function updateStats() {
-      elements.pairCount.textContent = Object.keys(trainingData).length;
+      elements.textCount.textContent = trainingData.length;
       elements.stats.classList.remove('hidden');
     }
 
-    function renderPairs() {
-      // No longer rendering the list of pairs to avoid clutter
+    function renderTexts() {
+      // No longer rendering the list of texts to avoid clutter
       updateStats();
     }
 
-    async function addPair(q, a) {
-      if (!currentUser || !q.trim() || !a.trim()) {
-        throw new Error('Please log in and enter both question and answer.');
+    async function addText(text, label = null) {
+      if (!currentUser || !text.trim()) {
+        throw new Error('Please log in and enter text.');
       }
-      const trainingRef = ref(db, 'training_data');
-      // Check for duplicate question (case-insensitive)
-      const snapshot = await get(trainingRef);
-      const existingData = snapshot.val() || {};
-      const normalizedQ = q.trim().toLowerCase();
-      const existing = Object.values(existingData).some(pair => pair.q.toLowerCase() === normalizedQ);
+      const rawTextRef = ref(db, 'raw_text_data');
+      // Check for duplicate text (case-insensitive)
+      const snapshot = await get(rawTextRef);
+      const existingData = snapshot.val() || [];
+      const normalizedText = text.trim().toLowerCase();
+      const existing = existingData.some(item => item.text.toLowerCase() === normalizedText);
       if (existing) {
-        throw new Error('Duplicate question already exists. Please use a different question.');
+        throw new Error('Duplicate text already exists. Please use different text.');
       }
-      const newPairRef = push(trainingRef);
-      const newPair = { q: normalizedQ, a: a.trim(), timestamp: Date.now() };
-      await set(newPairRef, newPair);
-      return newPair;
+      const newTextRef = push(rawTextRef);
+      const newItem = { text: text.trim(), label: label ? parseInt(label) : null, timestamp: Date.now() };
+      await set(newTextRef, newItem);
+      return newItem;
     }
 
     window.clearAllData = async function() {
@@ -472,8 +472,8 @@
       try {
         hideMessages();
         elements.clearAllBtn.textContent = 'Clearing...';
-        const trainingRef = ref(db, 'training_data');
-        await remove(trainingRef);
+        const rawTextRef = ref(db, 'raw_text_data');
+        await remove(rawTextRef);
         showSuccess('All training data cleared successfully!');
         elements.clearAllBtn.textContent = 'Clear All Training Data';
       } catch (error) {
@@ -504,10 +504,10 @@
       return seq.slice(0, maxLen);
     }
 
-    function buildVocab(pairs) {
+    function buildVocabFromTexts(texts) {
       const wordCount = {};
-      pairs.forEach(pair => {
-        pair.q.toLowerCase().split(/\s+/).forEach(word => {
+      texts.forEach(text => {
+        text.toLowerCase().split(/\s+/).forEach(word => {
           if (word.length > 2 && !STOPWORDS.has(word)) {
             wordCount[word] = (wordCount[word] || 0) + 1;
           }
@@ -520,15 +520,15 @@
         .slice(0, MAX_VOCAB);
     }
 
-    function encodeAnswers(pairs, uniqueAnswers) {
-      const answerToIdx = {};
-      uniqueAnswers.forEach((ans, idx) => { answerToIdx[ans] = idx; });
-      return pairs.map(pair => answerToIdx[pair.a]);
+    function encodeLabels(items, uniqueLabels) {
+      const labelToIdx = {};
+      uniqueLabels.forEach((lbl, idx) => { labelToIdx[lbl] = idx; });
+      return items.map(item => labelToIdx[item.label]);
     }
 
     async function loadModelFromSaved(saved) {
       let model;
-      if (saved.modelType === 'classifier') {
+      if (saved.taskType === 'classifier') {
         model = tf.sequential({
           layers: [
             tf.layers.dense({ inputShape: [saved.inputDim], units: 16, activation: 'relu' }),
@@ -562,12 +562,12 @@
       model.setWeights(weightTensors);
       weightTensors.forEach(t => t.dispose());
 
-      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType };
+      return { model, vocab: saved.vocab, uniqueLabels: saved.uniqueLabels, taskType: saved.taskType };
     }
 
     async function trainModel() {
-      if (Object.keys(trainingData).length < 10) {
-        showError('Need at least 10 training pairs for a basic model.');
+      if (trainingData.length < 5) {
+        showError('Need at least 5 training texts for a basic model.');
         return;
       }
 
@@ -579,11 +579,11 @@
         await tf.setBackend('webgl');
         await tf.ready();
 
-        const pairs = dataKeys.map(key => ({ q: trainingData[key].q, a: trainingData[key].a }));
-        const uniqueAnswers = [...new Set(pairs.map(p => p.a))];
-        const modelType = document.querySelector('input[name="model-type"]:checked').value;
+        const texts = trainingData.map(item => item.text);
+        const hasLabels = trainingData.some(item => item.label !== null);
+        const taskType = document.querySelector('input[name="task-type"]:checked').value;
         const retrain = document.getElementById('retrain-toggle').checked;
-        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
+        let model, xs, ys, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
 
         const modelNameInput = document.getElementById('model-name');
         let modelName = modelNameInput ? modelNameInput.value.trim() : '';
@@ -607,13 +607,13 @@
           const currentId = currentSnap.val();
           modelRef = ref(db, `models/${currentId}`);
           const snap = await get(modelRef);
-          if (snap.exists() && snap.val().modelType === modelType) {
+          if (snap.exists() && snap.val().taskType === taskType) {
             const saved = snap.val();
             let savedVocab;
-            if (modelType === 'classifier') {
+            if (taskType === 'classifier') {
               savedVocab = saved.vocab;
-              const qs = pairs.map(p => textToVector(p.q, savedVocab));
-              xs = tf.tensor2d(qs);
+              const textVecs = texts.map(t => textToVector(t, savedVocab));
+              xs = tf.tensor2d(textVecs);
               sampleInput = tf.tensor2d([textToVector('hello how are you today', savedVocab)]);
               vocabSize = savedVocab.length;
             } else {
@@ -621,7 +621,7 @@
               const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
               savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
               maxLen = saved.maxLen;
-              const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
+              const sequences = texts.map(t => questionToSequence(t, wordToIdx, maxLen));
               xs = tf.tensor2d(sequences);
               sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
               vocabSize = saved.vocabSize;
@@ -639,38 +639,59 @@
         }
 
         if (!isLoaded) {
-          vocab = buildVocab(pairs);
-          vocabSize = vocab.length;
+          vocab = buildVocabFromTexts(texts);
+          vocabSize = vocab.length + 2; // + <PAD>, <UNK>
 
-          if (modelType === 'classifier') {
-            const qs = pairs.map(p => textToVector(p.q, vocab));
-            xs = tf.tensor2d(qs);
-            sampleInput = tf.tensor2d([textToVector('hello how are you today', vocab)]);
-            model = tf.sequential({
-              layers: [
-                tf.layers.dense({ inputShape: [vocabSize], units: 16, activation: 'relu' }),
-                tf.layers.dropout({ rate: 0.3 }),
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
-              ]
-            });
-          } else {
-            const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
-            vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
-            vocabSize = vocab.length + 2;
-            maxLen = Math.min(MAX_SEQ_LEN, Math.max(10, ...pairs.map(p => 
-              p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length
-            )));
-            const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
+          const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+          vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
+          maxLen = Math.min(MAX_SEQ_LEN, Math.max(10, ...texts.map(t => 
+            t.toLowerCase().split(/\s+/).filter(w => w.length > 1).length
+          )));
+
+          if (taskType === 'classifier' && hasLabels) {
+            const uniqueLabels = [...new Set(trainingData.map(item => item.label).filter(l => l !== null))];
+            const labelIndices = encodeLabels(trainingData, uniqueLabels);
+            ys = tf.oneHot(tf.tensor1d(labelIndices, 'int32'), uniqueLabels.length);
+            const sequences = texts.map(t => questionToSequence(t, wordToIdx, maxLen));
             xs = tf.tensor2d(sequences);
             sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
             model = tf.sequential({
               layers: [
                 tf.layers.embedding({ inputDim: vocabSize, outputDim: 8, inputLength: maxLen }),
-                tf.layers.gru({ units: 16, dropout: 0.3 }), // GRU for faster training
-                tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
+                tf.layers.gru({ units: 16, dropout: 0.3 }),
+                tf.layers.dense({ units: uniqueLabels.length, activation: 'softmax' })
+              ]
+            });
+          } else {
+            // Language Model (next-word prediction, no labels needed)
+            const sequences = texts.map(text => {
+              const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+              return words.map(w => wordToIdx.get(w) || 1);
+            }).filter(seq => seq.length >= 2);
+
+            const inputSeqs = [], targetSeqs = [];
+            sequences.forEach(seq => {
+              for (let i = 0; i < seq.length - 1; i++) {
+                const inputSlice = seq.slice(i, Math.min(i + maxLen, seq.length)).concat(Array(maxLen - Math.min(i + maxLen, seq.length) + i).fill(0));
+                inputSeqs.push(inputSlice);
+                const targetSlice = seq.slice(i + 1, Math.min(i + 1 + maxLen, seq.length)).concat(Array(maxLen - Math.min(i + 1 + maxLen, seq.length) + (i + 1)).fill(0));
+                targetSeqs.push(targetSlice);
+              }
+            });
+
+            xs = tf.tensor2d(inputSeqs);
+            ys = tf.oneHot(tf.tensor2d(targetSeqs), vocabSize);
+            sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
+            model = tf.sequential({
+              layers: [
+                tf.layers.embedding({ inputDim: vocabSize, outputDim: 16, inputLength: maxLen }),
+                tf.layers.gru({ units: 32, dropout: 0.3, returnSequences: true }),
+                tf.layers.globalAveragePooling1d(),
+                tf.layers.dense({ units: vocabSize, activation: 'softmax' })
               ]
             });
           }
+
           model.compile({
             optimizer: tf.train.adam(0.001),
             loss: 'categoricalCrossentropy',
@@ -678,11 +699,8 @@
           });
         }
 
-        const answerIndices = encodeAnswers(pairs, uniqueAnswers);
-        const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
-
-        const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${gruInfo}</p>`;
+        const gruInfo = taskType === 'lm' ? ` | Max len: ${maxLen} | Task: Next-word prediction` : ` | Labels: ${hasLabels ? trainingData.filter(item => item.label !== null).length : 0}`;
+        elements.trainStatus.innerHTML += `<p>Model type: ${taskType} | Vocab size: ${vocabSize}${gruInfo}</p>`;
         elements.trainStatus.innerHTML += `<p>Creating version ${nextVersion}</p>`;
 
         let finalAcc = 0;
@@ -691,7 +709,7 @@
         let wait = 0;
         await model.fit(xs, ys, {
           epochs: retrain ? 8 : 15,
-          batchSize: Math.min(64, pairs.length),
+          batchSize: Math.min(64, Math.max(xs.shape[0], 1)),
           validationSplit: 0.2,
           callbacks: {
             onEpochEnd: (epoch, logs) => {
@@ -716,8 +734,16 @@
 
         const pred = model.predict(sampleInput);
         const predIdx = pred.argMax(-1).dataSync()[0];
-        const predictedA = uniqueAnswers[predIdx];
-        elements.trainStatus.innerHTML += `<p>Test ("hello how are you today"): Predicted "${predictedA}"</p>`;
+        let predicted;
+        if (taskType === 'lm') {
+          const vocabList = ['<PAD>', '<UNK>', ...vocab];
+          predicted = vocabList[predIdx];
+        } else {
+          // For classifier, assume uniqueLabels from saved or compute
+          const uniqueLabels = [...new Set(trainingData.map(item => item.label).filter(l => l !== null))];
+          predicted = uniqueLabels[predIdx] || 'N/A';
+        }
+        elements.trainStatus.innerHTML += `<p>Test ("hello how are you today"): Predicted "${predicted}"</p>`;
 
         const weights = model.getWeights().map(w => w.arraySync());
 
@@ -726,23 +752,23 @@
         }
 
         const saveData = {
-          modelType,
+          taskType,
           version: nextVersion,
           modelName,
           userId: currentUser.uid,
           timestamp: Date.now(),
           vocab,
-          uniqueAnswers,
-          numClasses: uniqueAnswers.length,
+          numClasses: taskType === 'lm' ? vocabSize : (hasLabels ? [...new Set(trainingData.map(item => item.label).filter(l => l !== null))].length : 0),
           weights
         };
-        if (modelType === 'classifier') {
+        if (taskType === 'classifier') {
           saveData.inputDim = vocabSize;
+          saveData.uniqueLabels = hasLabels ? [...new Set(trainingData.map(item => item.label).filter(l => l !== null))] : [];
         } else {
           saveData.vocabSize = vocabSize;
           saveData.maxLen = maxLen;
-          saveData.embedDim = 8;
-          saveData.gruUnits = 16; // Updated to GRU
+          saveData.embedDim = taskType === 'lm' ? 16 : 8;
+          saveData.gruUnits = taskType === 'lm' ? 32 : 16;
         }
 
         // Always save as new version
@@ -756,14 +782,19 @@
         const saved = savedSnapshot.val();
         const loadedStuff = await loadModelFromSaved(saved);
         const loadedModel = loadedStuff.model;
-        const loadedUnique = loadedStuff.uniqueAnswers;
 
         const loadedPred = loadedModel.predict(sampleInput);
         const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
-        const loadedPredictedA = loadedUnique[loadedPredIdx];
-        elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredictedA}"</p>`;
+        let loadedPredicted;
+        if (taskType === 'lm') {
+          const vocabList = ['<PAD>', '<UNK>', ...saved.vocab];
+          loadedPredicted = vocabList[loadedPredIdx];
+        } else {
+          loadedPredicted = saved.uniqueLabels[loadedPredIdx] || 'N/A';
+        }
+        elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredicted}"</p>`;
 
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.modelStatus.innerHTML = `<p class="success">Model: ${taskType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
 
@@ -836,12 +867,11 @@
 
     function loadTrainingData() {
       showOverlay('Fetching training data...');
-      const trainingRef = ref(db, 'training_data');
-      onValue(trainingRef, (snapshot) => {
-        const data = snapshot.val();
-        trainingData = data || {};
-        dataKeys = Object.keys(trainingData);
-        renderPairs();
+      const rawTextRef = ref(db, 'raw_text_data');
+      onValue(rawTextRef, (snapshot) => {
+        const data = snapshot.val() || [];
+        trainingData = Array.isArray(data) ? data : [];
+        renderTexts();
         elements.loading.classList.add('hidden');
 
         if (!dataLoaded) {
@@ -857,10 +887,10 @@
                   <input type="checkbox" id="retrain-toggle"> Retrain existing model (no delete)
                 </label>
                 <label>
-                  <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
+                  <input type="radio" name="task-type" value="lm" checked> Language Model (from raw text, next-word prediction)
                 </label>
                 <label>
-                  <input type="radio" name="model-type" value="gru"> GRU (efficient sequence input)
+                  <input type="radio" name="task-type" value="classifier"> Classifier (needs labels)
                 </label>
                 <div class="slider-container">
                   <span>Max Vocab:</span>
@@ -957,7 +987,7 @@
             <div>
               <div class="font-medium">${name} ${status}</div>
               <div class="text-sm text-gray-600">
-                Type: ${m.modelType} | Classes: ${m.numClasses || 'N/A'} | 
+                Type: ${m.taskType} | Classes: ${m.numClasses || 'N/A'} | 
                 ${new Date(m.timestamp).toLocaleDateString()}
               </div>
             </div>
@@ -1019,30 +1049,33 @@
       }
     }
 
-    // Bulk functionality (updated to skip duplicates)
+    // Bulk functionality (updated for text|label)
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
         lines = content.split('\n').slice(1).filter(line => line.trim());
         return lines.map(line => {
-          const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          return { q, a };
-        }).filter(pair => pair.q && pair.a);
+          const parts = line.split(',').map(s => s.trim().replace(/"/g, ''));
+          const text = parts[0];
+          const label = parts[1] ? parseInt(parts[1]) : null;
+          return { text, label };
+        }).filter(item => item.text);
       } else {
         lines = content.split('\n').filter(line => line.trim());
         return lines.map(line => {
-          const [q, a] = line.split('|').map(s => s.trim());
-          return { q, a };
-        }).filter(pair => pair.q && pair.a);
+          const [text, labelStr] = line.split('|').map(s => s.trim());
+          const label = labelStr ? parseInt(labelStr) : null;
+          return { text, label };
+        }).filter(item => item.text);
       }
     }
 
-    function updateBulkPreview(pairs) {
-      if (pairs.length === 0) {
-        elements.bulkPreview.textContent = 'No valid pairs found.';
+    function updateBulkPreview(items) {
+      if (items.length === 0) {
+        elements.bulkPreview.textContent = 'No valid texts found.';
         elements.bulkSubmit.disabled = true;
       } else {
-        elements.bulkPreview.textContent = `${pairs.length} valid pairs parsed:\n\n${pairs.slice(0, 10).map(p => `${p.q} | ${p.a}`).join('\n')}${pairs.length > 10 ? '\n\n... (showing first 10)' : ''}`;
+        elements.bulkPreview.textContent = `${items.length} valid texts parsed:\n\n${items.slice(0, 10).map(item => `${item.text} | ${item.label || 'N/A'}`).join('\n')}${items.length > 10 ? '\n\n... (showing first 10)' : ''}`;
         elements.bulkSubmit.disabled = false;
       }
       elements.bulkPreview.classList.remove('hidden');
@@ -1065,9 +1098,9 @@
         content = text;
       }
 
-      const pairs = parseBulkData(content, mode);
-      if (pairs.length === 0) {
-        showError('No valid pairs found in the input.');
+      const items = parseBulkData(content, mode);
+      if (items.length === 0) {
+        showError('No valid texts found in the input.');
         return;
       }
 
@@ -1078,33 +1111,33 @@
       let added = 0;
       let skipped = 0;
       let errors = 0;
-      const trainingRef = ref(db, 'training_data');
-      const snapshot = await get(trainingRef);
-      const existingData = snapshot.val() || {};
-      const existingQs = new Set(Object.values(existingData).map(pair => pair.q.toLowerCase()));
+      const rawTextRef = ref(db, 'raw_text_data');
+      const snapshot = await get(rawTextRef);
+      const existingData = snapshot.val() || [];
+      const existingTexts = new Set(existingData.map(item => item.text.toLowerCase()));
 
-      for (let i = 0; i < pairs.length; i++) {
+      for (let i = 0; i < items.length; i++) {
         try {
-          const normalizedQ = pairs[i].q.trim().toLowerCase();
-          if (existingQs.has(normalizedQ)) {
+          const normalizedText = items[i].text.trim().toLowerCase();
+          if (existingTexts.has(normalizedText)) {
             skipped++;
             continue;
           }
-          await addPair(pairs[i].q, pairs[i].a);
-          existingQs.add(normalizedQ); // Update set for efficiency
+          await addText(items[i].text, items[i].label);
+          existingTexts.add(normalizedText); // Update set for efficiency
           added++;
         } catch (error) {
           errors++;
-          console.error(`Failed to add pair ${i + 1}:`, error);
+          console.error(`Failed to add text ${i + 1}:`, error);
         }
-        const progress = ((i + 1) / pairs.length) * 100;
+        const progress = ((i + 1) / items.length) * 100;
         elements.progressFill.style.width = `${progress}%`;
       }
 
       progressBar.classList.add('hidden');
       elements.progressFill.style.width = '0%';
 
-      let message = `Bulk upload complete: ${added} pairs added`;
+      let message = `Bulk upload complete: ${added} texts added`;
       if (skipped > 0) message += `, ${skipped} duplicates skipped`;
       if (errors > 0) message += `, ${errors} errors`;
       message += '.';
@@ -1120,12 +1153,12 @@
     // Event listeners
     elements.addForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const q = elements.newQ.value;
-      const a = elements.newA.value;
-      addPair(q, a).then(() => {
-        elements.newQ.value = '';
-        elements.newA.value = '';
-        showSuccess('Pair added successfully!');
+      const text = elements.newText.value;
+      const label = elements.newLabel.value ? parseInt(elements.newLabel.value) : null;
+      addText(text, label).then(() => {
+        elements.newText.value = '';
+        elements.newLabel.value = '';
+        showSuccess('Text added successfully!');
       }).catch(error => {
         showError(error.message);
       });
@@ -1151,14 +1184,14 @@
       const file = e.target.files[0];
       if (!file) return;
       const content = await file.text();
-      const pairs = parseBulkData(content, 'csv');
-      updateBulkPreview(pairs);
+      const items = parseBulkData(content, 'csv');
+      updateBulkPreview(items);
     });
 
     elements.bulkText.addEventListener('input', (e) => {
       const content = e.target.value;
-      const pairs = parseBulkData(content, 'text');
-      updateBulkPreview(pairs);
+      const items = parseBulkData(content, 'text');
+      updateBulkPreview(items);
     });
 
     // HF Event Listeners
@@ -1219,7 +1252,7 @@
         elements.trainSection.classList.add('hidden');
         elements.hfInference.classList.add('hidden');
         elements.modelsManagement?.classList.add('hidden');
-        elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
+        elements.textsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
       }
     });
