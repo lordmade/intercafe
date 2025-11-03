@@ -661,10 +661,10 @@
 
         let finalAcc = 0;
         let bestValAcc = 0;
-        let patience = 3;
+        let patience = 5;
         let wait = 0;
         await model.fit(xs, ys, {
-          epochs: retrain ? 8 : 15,
+          epochs: retrain ? 25 : 50,
           batchSize: Math.min(64, pairs.length),
           validationSplit: 0.2,
           callbacks: {
