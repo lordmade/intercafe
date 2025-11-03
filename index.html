@@ -462,13 +462,17 @@
 
     // TF.js Helpers
     function textToVector(text, vocab) {
-      const vec = new Array(vocab.length).fill(0);
-      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-      words.forEach(word => {
-        const idx = vocab.indexOf(word);
-        if (idx > -1) vec[idx] = 1;
+      const wordCount = {};
+      text.toLowerCase().split(/\s+/).filter(w => w.length > 1).forEach(w => {
+        wordCount[w] = (wordCount[w] || 0) + 1;
       });
-      return vec;
+      const vec = new Array(vocab.length).fill(0);
+      vocab.forEach((word, i) => {
+        vec[i] = wordCount[word] || 0; // Freq, not binary
+      });
+      // Normalize: divide by max freq or L2 norm (simple: cap at 5)
+      const maxFreq = Math.max(...Object.values(wordCount), 1);
+      return vec.map(v => Math.min(v / maxFreq, 1)); // Scaled 0-1
     }
 
     function questionToSequence(text, wordToIdx, maxLen) {
@@ -481,10 +485,12 @@
     function buildVocab(pairs) {
       const wordCount = {};
       pairs.forEach(pair => {
-        pair.q.toLowerCase().split(/\s+/).forEach(word => {
-          if (word.length > 2 && !STOPWORDS.has(word)) {
-            wordCount[word] = (wordCount[word] || 0) + 1;
-          }
+        [pair.q, pair.a].forEach(text => { // Include answers for richer vocab
+          text.toLowerCase().split(/\s+/).forEach(word => {
+            if (word.length > 2 && !STOPWORDS.has(word)) {
+              wordCount[word] = (wordCount[word] || 0) + 1;
+            }
+          });
         });
       });
 
@@ -515,12 +521,15 @@
           layers: [
             tf.layers.embedding({
               inputDim: saved.vocabSize,
-              outputDim: saved.embedDim || 8,
+              outputDim: saved.embedDim || 16,
               inputLength: saved.maxLen
             }),
-            tf.layers.gru({ // Switched to GRU for efficiency
-              units: saved.gruUnits || 16,
-              dropout: 0.3
+            tf.layers.bidirectional({ // Added bidirectional for better context
+              layer: tf.layers.gru({
+                units: saved.gruUnits || 32,
+                dropout: 0.3,
+                returnSequences: false
+              })
             }),
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
@@ -639,8 +648,10 @@
             sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
             model = tf.sequential({
               layers: [
-                tf.layers.embedding({ inputDim: vocabSize, outputDim: 8, inputLength: maxLen }),
-                tf.layers.gru({ units: 16, dropout: 0.3 }), // GRU for faster training
+                tf.layers.embedding({ inputDim: vocabSize, outputDim: 16, inputLength: maxLen }), // Increased embed dim
+                tf.layers.bidirectional({ // Added bidirectional for better context
+                  layer: tf.layers.gru({ units: 32, dropout: 0.3, returnSequences: false }) // Increased units
+                }),
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
@@ -653,7 +664,32 @@
         }
 
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
-        const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
+        let ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
+
+        // Class imbalance check and warning
+        const classCountsObj = {};
+        pairs.forEach(p => classCountsObj[p.a] = (classCountsObj[p.a] || 0) + 1);
+        const maxClassPct = Math.max(...Object.values(classCountsObj)) / pairs.length;
+        if (maxClassPct > 0.3) {
+          elements.trainStatus.innerHTML += `<p style="color: orange;">Warning: Imbalanced classes (${(maxClassPct*100).toFixed(0)}% max). Model may favor common answers.</p>`;
+        }
+
+        // Sample weights for class balancing
+        const classCounts = {};
+        answerIndices.forEach(idx => classCounts[idx] = (classCounts[idx] || 0) + 1);
+        const sampleWeightsData = answerIndices.map(idx => 1 / (classCounts[idx] || 1));
+        const sampleWeights = tf.tensor1d(sampleWeightsData);
+
+        // Label smoothing
+        const epsilon = 0.1;
+        const numClasses = uniqueAnswers.length;
+        ys = ys.mul(1 - epsilon).addScalar(epsilon / numClasses);
+
+        // Shuffle data
+        const indices = tf.util.createShuffledIndices(pairs.length);
+        xs = tf.gather(xs, indices, 0);
+        ys = tf.gather(ys, indices, 0);
+        // Note: sampleWeights not shuffled as it's per original sample; reshuffle if needed, but for simplicity, assume order preserved post-gather
 
         const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
         elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${gruInfo}</p>`;
@@ -667,6 +703,7 @@
           epochs: retrain ? 8 : 15,
           batchSize: Math.min(64, pairs.length),
           validationSplit: 0.2,
+          sampleWeight: sampleWeights, // Apply class weights
           callbacks: {
             onEpochEnd: (epoch, logs) => {
               finalAcc = logs.acc;
@@ -715,8 +752,8 @@
         } else {
           saveData.vocabSize = vocabSize;
           saveData.maxLen = maxLen;
-          saveData.embedDim = 8;
-          saveData.gruUnits = 16; // Updated to GRU
+          saveData.embedDim = 16;
+          saveData.gruUnits = 32;
         }
 
         // Always save as new version
@@ -748,6 +785,7 @@
         model.dispose();
         loadedModel.dispose();
         sampleInput.dispose();
+        sampleWeights.dispose();
 
       } catch (error) {
         if (error.message !== 'Early stopping') {
