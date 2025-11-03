@@ -9,6 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
@@ -322,6 +323,35 @@
     <div id="train-section" class="hidden"></div>
     <div id="train-status" class="train-status hidden"></div>
     <div id="model-status" class="model-status hidden"></div>
+
+    <!-- HF Model Inference Section -->
+    <div id="hf-inference" class="train-section hidden">
+      <h3 class="text-lg font-bold mb-4 text-center">HF Pre-trained Chat Inference</h3>
+      <div class="model-options">
+        <label>
+          <input type="radio" name="hf-model" value="Xenova/DialoGPT-medium" checked> DialoGPT (Chat-Focused)
+        </label>
+        <label>
+          <input type="radio" name="hf-model" value="Xenova/distilgpt2"> DistilGPT-2 (General Text-Gen)
+        </label>
+        <label>
+          <input type="checkbox" id="custom-model-toggle"> Use Custom HF Model
+        </label>
+        <div id="custom-model-input" class="hidden w-full mt-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">HF Model ID (e.g., microsoft/DialoGPT-small):</label>
+          <input type="text" id="custom-model-id" placeholder="Enter your custom model repo ID" class="w-full p-2 border rounded">
+          <p class="text-xs text-gray-500 mt-1">Tip: Use models tagged for transformers.js on Hugging Face Hub.</p>
+        </div>
+        <div class="slider-container">
+          <span>Max Tokens:</span>
+          <input type="range" id="max-tokens" min="20" max="100" value="50" step="10">
+          <span id="tokens-value">50</span>
+        </div>
+      </div>
+      <textarea id="hf-prompt" placeholder="Enter a question or prompt (e.g., 'Hello, tell me a joke')" rows="3" class="w-full p-2 border rounded"></textarea>
+      <button id="hf-generate-btn" class="btn">Generate Response with HF Model</button>
+      <div id="hf-output" class="mt-4 p-4 bg-gray-100 rounded hidden"></div>
+    </div>
   </div>
 
   <script type="module">
@@ -369,7 +399,8 @@
       btnGroup: container.querySelector('.btn-group'),
       trainSection: document.getElementById('train-section'),
       trainStatus: document.getElementById('train-status'),
-      modelStatus: document.getElementById('model-status')
+      modelStatus: document.getElementById('model-status'),
+      hfInference: document.getElementById('hf-inference')
     };
 
     let currentUser;
@@ -383,6 +414,9 @@
     let MAX_VOCAB = 200;
     const MAX_SEQ_LEN = 30; // Reduced max sequence length
     const STOPWORDS = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','is','are','was','were','i','you','he','she','it','we','they','this','that','what','how','why','when','where','my','your','his','her','its','our','their','me','him','us','them','be','have','do','does','did','will','would','can','could','should','may','might','must']);
+
+    // HF Inference Setup
+    let hfPipeline = null;  // Cache the loaded model
 
     // Overlay functions
     function showOverlay(text = 'Loading...') {
@@ -758,6 +792,56 @@
       }
     }
 
+    async function loadHFPipeline(modelId = 'Xenova/DialoGPT-medium') {
+      if (!hfPipeline) {
+        elements.trainStatus.innerHTML += '<p>Loading HF model... (First time may take 30-60s)</p>';
+        try {
+          // Use WebGPU if supported for speed; fallback to WASM
+          const device = 'webgpu' in navigator ? 'webgpu' : 'wasm';
+          const dtype = 'fp16';  // Half-precision for balance (or 'q4' for quantized speed)
+          
+          hfPipeline = await pipeline('text-generation', modelId, {
+            device: device,
+            dtype: dtype,
+            progress_callback: (data) => {
+              elements.trainStatus.innerHTML += `<p>Model progress: ${data.loaded}/${data.total}</p>`;
+            }
+          });
+          elements.trainStatus.innerHTML += `<p>HF Model "${modelId}" loaded successfully!</p>`;
+          showSuccess('Ready to chat with pre-trained model!');
+        } catch (error) {
+          showError(`Failed to load HF model: ${error.message}. Ensure the model is compatible with transformers.js (e.g., ONNX-exported). Try a Xenova/* model.`);
+        }
+      }
+      return hfPipeline;
+    }
+
+    async function generateHFResponse(prompt, maxTokens = 50) {
+      if (!hfPipeline) {
+        showError('Load a model first!');
+        return;
+      }
+      
+      const outputEl = document.getElementById('hf-output');
+      outputEl.classList.remove('hidden');
+      outputEl.innerHTML = '<p class="loading">Generating... (Patience, it's thinking!)</p>';
+      
+      try {
+        const output = await hfPipeline(prompt, {
+          max_new_tokens: maxTokens,
+          temperature: 0.7,  // Creativity level (0.1=deterministic, 1.0=wild)
+          do_sample: true,   // Enable sampling for varied responses
+          pad_token_id: 50256  // For GPT-like models; adjust if needed
+        });
+        
+        const generatedText = output[0].generated_text.replace(prompt, '').trim();  // Strip prompt for clean response
+        outputEl.innerHTML = `<p><strong>Prompt:</strong> ${prompt}</p><p><strong>Response:</strong> ${generatedText}</p>`;
+        showSuccess('Response generated!');
+      } catch (error) {
+        outputEl.innerHTML = `<p class="error">Generation failed: ${error.message}</p>`;
+      }
+    }
+
     function loadTrainingData() {
       showOverlay('Fetching training data...');
       const trainingRef = ref(db, 'training_data');
@@ -830,6 +914,7 @@
           loadModels();
         }
         elements.trainSection.classList.remove('hidden');
+        elements.hfInference.classList.remove('hidden');
         elements.modelsManagement?.classList.remove('hidden');
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
@@ -1084,6 +1169,66 @@
       updateBulkPreview(pairs);
     });
 
+    // HF Event Listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      const generateBtn = document.getElementById('hf-generate-btn');
+      const modelRadios = document.querySelectorAll('input[name="hf-model"]');
+      const customToggle = document.getElementById('custom-model-toggle');
+      const customInputDiv = document.getElementById('custom-model-input');
+      const customModelIdInput = document.getElementById('custom-model-id');
+      const maxTokensSlider = document.getElementById('max-tokens');
+      const tokensValue = document.getElementById('tokens-value');
+      
+      // Slider update
+      maxTokensSlider.addEventListener('input', () => {
+        tokensValue.textContent = maxTokensSlider.value;
+      });
+      
+      // Custom toggle
+      customToggle.addEventListener('change', () => {
+        customInputDiv.classList.toggle('hidden', !customToggle.checked);
+        if (customToggle.checked) {
+          // Disable radios when custom is on
+          modelRadios.forEach(radio => radio.disabled = true);
+        } else {
+          modelRadios.forEach(radio => radio.disabled = false);
+        }
+        hfPipeline = null;  // Reset cache on change
+      });
+      
+      // Model radio change: Reload pipeline if switched (and custom off)
+      modelRadios.forEach(radio => {
+        radio.addEventListener('change', async () => {
+          if (radio.checked && !customToggle.checked) {
+            hfPipeline = null;  // Reset cache
+            await loadHFPipeline(radio.value);
+          }
+        });
+      });
+      
+      // Generate button
+      generateBtn.addEventListener('click', async () => {
+        const prompt = document.getElementById('hf-prompt').value.trim();
+        if (!prompt) {
+          showError('Enter a prompt first!');
+          return;
+        }
+        const maxTokens = parseInt(maxTokensSlider.value);
+        let modelId = document.querySelector('input[name="hf-model"]:checked')?.value || 'Xenova/DialoGPT-medium';
+        if (customToggle.checked) {
+          const customId = customModelIdInput.value.trim();
+          if (!customId) {
+            showError('Enter a custom model ID!');
+            return;
+          }
+          modelId = customId;
+        }
+        hfPipeline = null;  // Ensure reload for custom
+        await loadHFPipeline(modelId);
+        await generateHFResponse(prompt, maxTokens);
+      });
+    });
+
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
@@ -1093,8 +1238,12 @@
         elements.bulkForm.classList.remove('hidden');
         elements.btnGroup.classList.remove('hidden');
         elements.trainSection.classList.remove('hidden');
+        elements.hfInference.classList.remove('hidden');
         elements.modelsManagement?.classList.remove('hidden');
         loadTrainingData();
+        if (currentUser) {
+          loadHFPipeline();  // Pre-load default model
+        }
       } else {
         hideOverlay();
         elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
@@ -1102,6 +1251,7 @@
         elements.bulkForm.classList.add('hidden');
         elements.btnGroup.classList.add('hidden');
         elements.trainSection.classList.add('hidden');
+        elements.hfInference.classList.add('hidden');
         elements.modelsManagement?.classList.add('hidden');
         elements.pairsList.innerHTML = '<p class="loading">Please sign in to manage training data.</p>';
         elements.loading.classList.add('hidden');
