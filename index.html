@@ -334,14 +334,6 @@
         <label>
           <input type="radio" name="hf-model" value="Xenova/distilgpt2"> DistilGPT-2 (General Text-Gen)
         </label>
-        <label>
-          <input type="checkbox" id="custom-model-toggle"> Use Custom HF Model
-        </label>
-        <div id="custom-model-input" class="hidden w-full mt-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">HF Model ID (e.g., microsoft/DialoGPT-small):</label>
-          <input type="text" id="custom-model-id" placeholder="Enter your custom model repo ID" class="w-full p-2 border rounded">
-          <p class="text-xs text-gray-500 mt-1">Tip: Use models tagged for transformers.js on Hugging Face Hub.</p>
-        </div>
         <div class="slider-container">
           <span>Max Tokens:</span>
           <input type="range" id="max-tokens" min="20" max="100" value="50" step="10">
@@ -810,7 +802,7 @@
           elements.trainStatus.innerHTML += `<p>HF Model "${modelId}" loaded successfully!</p>`;
           showSuccess('Ready to chat with pre-trained model!');
         } catch (error) {
-          showError(`Failed to load HF model: ${error.message}. Ensure the model is compatible with transformers.js (e.g., ONNX-exported). Try a Xenova/* model.`);
+          showError(`Failed to load HF model: ${error.message}. Try a smaller model or check browser support.`);
         }
       }
       return hfPipeline;
@@ -1173,9 +1165,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       const generateBtn = document.getElementById('hf-generate-btn');
       const modelRadios = document.querySelectorAll('input[name="hf-model"]');
-      const customToggle = document.getElementById('custom-model-toggle');
-      const customInputDiv = document.getElementById('custom-model-input');
-      const customModelIdInput = document.getElementById('custom-model-id');
       const maxTokensSlider = document.getElementById('max-tokens');
       const tokensValue = document.getElementById('tokens-value');
       
@@ -1184,22 +1173,10 @@
         tokensValue.textContent = maxTokensSlider.value;
       });
       
-      // Custom toggle
-      customToggle.addEventListener('change', () => {
-        customInputDiv.classList.toggle('hidden', !customToggle.checked);
-        if (customToggle.checked) {
-          // Disable radios when custom is on
-          modelRadios.forEach(radio => radio.disabled = true);
-        } else {
-          modelRadios.forEach(radio => radio.disabled = false);
-        }
-        hfPipeline = null;  // Reset cache on change
-      });
-      
-      // Model radio change: Reload pipeline if switched (and custom off)
+      // Model radio change: Reload pipeline if switched
       modelRadios.forEach(radio => {
         radio.addEventListener('change', async () => {
-          if (radio.checked && !customToggle.checked) {
+          if (radio.checked) {
             hfPipeline = null;  // Reset cache
             await loadHFPipeline(radio.value);
           }
@@ -1214,17 +1191,6 @@
           return;
         }
         const maxTokens = parseInt(maxTokensSlider.value);
-        let modelId = document.querySelector('input[name="hf-model"]:checked')?.value || 'Xenova/DialoGPT-medium';
-        if (customToggle.checked) {
-          const customId = customModelIdInput.value.trim();
-          if (!customId) {
-            showError('Enter a custom model ID!');
-            return;
-          }
-          modelId = customId;
-        }
-        hfPipeline = null;  // Ensure reload for custom
-        await loadHFPipeline(modelId);
         await generateHFResponse(prompt, maxTokens);
       });
     });
