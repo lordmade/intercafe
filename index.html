@@ -318,6 +318,11 @@
       height: 250px;
       margin-top: 1rem;
     }
+    .training-chart-container {
+      position: relative;
+      height: 300px;
+      margin: 1rem 0;
+    }
     @media (max-width: 1024px) {
       .main-grid {
         grid-template-columns: 1fr;
@@ -345,7 +350,6 @@
     <div id="quality-metrics" class="metrics-grid hidden"></div>
     <div id="error-message" class="error hidden"></div>
     <div id="success-message" class="success hidden"></div>
-
     <div class="main-grid">
       <div class="main-content">
         <form id="add-form" class="add-form card hidden">
@@ -354,7 +358,6 @@
           <input type="text" id="new-a" placeholder="Answer (e.g., 'Hi! What's up?')" required>
           <button type="submit" class="btn"><i class="material-icons">add</i>Add Pair</button>
         </form>
-
         <form id="bulk-form" class="bulk-form card hidden">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold"><i class="material-icons mr-2 align-middle" style="font-size: 1.2em;">cloud_upload</i>Bulk Upload</h3>
@@ -380,20 +383,16 @@
           </div>
           <button type="submit" class="btn" id="bulk-submit" disabled><i class="material-icons">file_upload</i>Bulk Add Pairs</button>
         </form>
-
         <div id="loading" class="loading hidden card">Loading training data...</div>
-
         <div class="btn-group hidden">
           <button id="clear-all-btn" class="btn btn-danger"><i class="material-icons">delete_forever</i>Clear All Training Data</button>
           <button id="retrain-btn" class="btn"><i class="material-icons">refresh</i>Trigger Retrain (Saves & Notifies)</button>
         </div>
-
         <!-- Dynamic Train Section -->
         <div id="train-section" class="card hidden"></div>
         <div id="train-status" class="card train-status hidden"></div>
         <div id="model-status" class="card model-status hidden"></div>
       </div>
-
       <div class="sidebar">
         <div id="models-management" class="card hidden">
           <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
@@ -500,12 +499,10 @@
         elements.qualityMetrics.classList.add('hidden');
         return;
       }
-
       const qLens = pairs.map(p => p.q.split(/\s+/).filter(w => w.length > 0).length);
       const aLens = pairs.map(p => p.a.split(/\s+/).filter(w => w.length > 0).length);
       const avgQLen = qLens.reduce((a, b) => a + b, 0) / qLens.length;
       const avgALen = aLens.reduce((a, b) => a + b, 0) / aLens.length;
-
       const allWords = pairs.flatMap(p => [
         ...p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1 && !STOPWORDS.has(w)),
         ...p.a.toLowerCase().split(/\s+/).filter(w => w.length > 1 && !STOPWORDS.has(w))
@@ -513,7 +510,6 @@
       const uniqueWords = new Set(allWords);
       const vocabSize = Math.min(MAX_VOCAB, uniqueWords.size);
       const uniqueAnswers = new Set(pairs.map(p => p.a));
-
       // Update metrics grid
       let metricsHTML = `
         <div class="metric-card">
@@ -543,7 +539,6 @@
       `;
       elements.metrics.innerHTML = metricsHTML;
       elements.metrics.classList.remove('hidden');
-
       // Data Quality Metrics
       const shortQ = qLens.filter(len => len < 3).length / pairs.length * 100;
       const shortA = aLens.filter(len => len < 5).length / pairs.length * 100;
@@ -552,7 +547,6 @@
       const diversity = uniqueWords.size / allWords.length * 100;
       const balance = uniqueAnswers.size / pairs.length * 100;
       const qualityScore = Math.round((100 - shortQ - shortA + diversity + balance * 10) / 4); // Simple composite score
-
       let qualityHTML = `
         <div class="metric-card quality-score">
           <div class="metric-value">${qualityScore}%</div>
@@ -585,7 +579,6 @@
       `;
       elements.qualityMetrics.innerHTML = qualityHTML;
       elements.qualityMetrics.classList.remove('hidden');
-
       // Simple chart for answer length distribution
       const ctx = document.createElement('canvas');
       ctx.width = 300;
@@ -835,6 +828,66 @@
         const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
         elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${gruInfo}</p>`;
         elements.trainStatus.innerHTML += `<p><strong>Version:</strong> ${nextVersion}</p>`;
+        // Setup dynamic training chart
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'training-chart-container';
+        chartContainer.innerHTML = '<canvas id="training-chart"></canvas>';
+        elements.trainStatus.appendChild(chartContainer);
+        const ctx = document.getElementById('training-chart').getContext('2d');
+        const trainingChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'Loss',
+                data: [],
+                borderColor: 'red',
+                backgroundColor: 'rgba(212, 0, 0, 0.1)',
+                fill: false,
+                tension: 0.1
+              },
+              {
+                label: 'Accuracy',
+                data: [],
+                borderColor: 'green',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: false,
+                tension: 0.1
+              },
+              {
+                label: 'Val Accuracy',
+                data: [],
+                borderColor: 'blue',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: false,
+                tension: 0.1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top' },
+              title: { display: true, text: 'Training Progress' }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 1
+              },
+              x: {
+                title: { display: true, text: 'Epoch' }
+              }
+            },
+            animation: { duration: 0 } // Disable animation for faster updates
+          }
+        });
+        const epochInfo = document.createElement('div');
+        epochInfo.id = 'epoch-info';
+        epochInfo.style.marginTop = '1rem';
+        elements.trainStatus.appendChild(epochInfo);
         let finalAcc = 0;
         let bestValAcc = 0;
         let patience = 50;
@@ -846,15 +899,21 @@
           callbacks: {
             onEpochEnd: (epoch, logs) => {
               finalAcc = logs.acc;
-              const valAcc = logs.val_acc;
-              elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)} | Acc=${logs.acc.toFixed(4)} | Val=${valAcc.toFixed(4)}</p>`;
+              const valAcc = logs.val_acc || 0;
+              const currentEpoch = epoch + 1;
+              trainingChart.data.labels.push(currentEpoch);
+              trainingChart.data.datasets[0].data.push(logs.loss);
+              trainingChart.data.datasets[1].data.push(logs.acc);
+              trainingChart.data.datasets[2].data.push(valAcc);
+              trainingChart.update('none'); // Fast update without animation
+              epochInfo.innerHTML = `<p><strong>Epoch ${currentEpoch}:</strong> Loss=${logs.loss.toFixed(4)} | Acc=${logs.acc.toFixed(4)} | Val Acc=${valAcc.toFixed(4)}</p>`;
               if (valAcc > bestValAcc) {
                 bestValAcc = valAcc;
                 wait = 0;
               } else {
                 wait++;
                 if (wait >= patience) {
-                  elements.trainStatus.innerHTML += `<p class="text-blue-600">Early stopping at epoch ${epoch + 1}</p>`;
+                  epochInfo.innerHTML += `<p class="text-blue-600">Early stopping at epoch ${currentEpoch}</p>`;
                   throw new Error('Early stopping');
                 }
               }
@@ -944,15 +1003,15 @@
               </h3>
               <div class="model-options">
                 <label class="flex items-center gap-2">
-                  <input type="checkbox" id="retrain-toggle"> 
+                  <input type="checkbox" id="retrain-toggle">
                   <span>Retrain existing model (no delete)</span>
                 </label>
                 <label class="flex items-center gap-2">
-                  <input type="radio" name="model-type" value="classifier" checked> 
+                  <input type="radio" name="model-type" value="classifier" checked>
                   <span>Classifier (fast retrieval)</span>
                 </label>
                 <label class="flex items-center gap-2">
-                  <input type="radio" name="model-type" value="gru"> 
+                  <input type="radio" name="model-type" value="gru">
                   <span>GRU (efficient sequence input)</span>
                 </label>
                 <div class="slider-container">
