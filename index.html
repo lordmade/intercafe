@@ -9,22 +9,23 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #f8f8f8;
+      --bg: #f8f9fa;
       --card-bg: #ffffff;
-      --text-primary: #000000;
-      --text-secondary: #666666;
-      --border: #e0e0e0;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
       --accent: #d40000;
       --bbm-red: #d40000;
-      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
-      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+      --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
       --glow: 0 0 10px rgba(212, 0, 0, 0.3);
-      --sidebar-width: 72px;
     }
     body {
       font-family: 'Inter', sans-serif;
@@ -35,95 +36,113 @@
       line-height: 1.6;
     }
     .header {
-      background: var(--card-bg);
-      padding: 20px;
+      background: linear-gradient(135deg, var(--card-bg) 0%, #f8f9fa 100%);
+      padding: 2rem;
       text-align: center;
-      box-shadow: var(--shadow-sm);
+      box-shadow: var(--shadow-md);
       border-bottom: 1px solid var(--border);
     }
     .header h1 {
       font-family: 'Orbitron', monospace;
       color: var(--bbm-red);
       font-weight: 900;
-      font-size: 28px;
+      font-size: clamp(24px, 4vw, 32px);
       letter-spacing: 0.5px;
-      text-shadow: 0 0 10px rgba(212, 0, 0, 0.3);
+      text-shadow: var(--glow);
       margin: 0;
     }
     .container {
-      max-width: 800px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 2rem 1rem;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .card {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
     }
     .add-form, .bulk-form {
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 20px;
       display: flex;
-      gap: 12px;
+      gap: 1rem;
       flex-wrap: wrap;
       align-items: end;
     }
     .add-form input {
       flex: 1;
-      min-width: 200px;
-      padding: 12px;
+      min-width: 250px;
+      padding: 0.75rem;
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 16px;
     }
     .bulk-form {
       flex-direction: column;
-      gap: 12px;
+      gap: 1rem;
       align-items: stretch;
     }
-    .bulk-form input[type="file"] {
-      padding: 12px;
+    .bulk-form input[type="file"], .bulk-form textarea {
+      padding: 0.75rem;
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       background: white;
     }
     .bulk-form textarea {
-      flex: 1;
-      min-height: 100px;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
+      min-height: 120px;
+      font-family: 'Monaco', monospace;
       font-size: 14px;
-      resize: vertical;
-      font-family: monospace;
     }
     .bulk-preview {
-      background: #f0f0f0;
-      padding: 12px;
-      border-radius: 6px;
+      background: #f3f4f6;
+      padding: 1rem;
+      border-radius: 8px;
       max-height: 200px;
       overflow-y: auto;
       font-size: 12px;
-      font-family: monospace;
+      font-family: 'Monaco', monospace;
       white-space: pre-wrap;
+      border: 1px solid var(--border);
     }
     .btn {
       background: var(--bbm-red);
       color: white;
       border: none;
-      padding: 12px 20px;
-      border-radius: 6px;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
     .btn:hover {
       background: #b30000;
       box-shadow: var(--glow);
+      transform: translateY(-1px);
     }
     .btn-danger {
-      background: #ff4444;
+      background: #ef4444;
     }
     .btn-danger:hover {
-      background: #cc0000;
+      background: #dc2626;
     }
     .btn-secondary {
       background: #6b7280;
@@ -133,31 +152,54 @@
     }
     .stats {
       text-align: center;
-      margin-bottom: 20px;
       font-size: 18px;
+      color: var(--text-secondary);
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .metric-card {
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      text-align: center;
+      border-left: 4px solid var(--accent);
+    }
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+    .metric-label {
+      font-size: 0.875rem;
       color: var(--text-secondary);
     }
     .loading {
       text-align: center;
-      padding: 40px;
+      padding: 4rem 2rem;
       font-style: italic;
       color: var(--text-secondary);
     }
     .error {
-      background: #fee;
-      color: #c33;
-      padding: 12px;
-      border-radius: 6px;
-      margin: 20px 0;
-      border-left: 4px solid #c33;
+      background: #fef2f2;
+      color: #dc2626;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid #dc2626;
     }
     .success {
-      background: #efe;
-      color: #080;
-      padding: 12px;
-      border-radius: 6px;
-      margin: 20px 0;
-      border-left: 4px solid #080;
+      background: #f0fdf4;
+      color: #16a34a;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid #16a34a;
     }
     .hidden {
       display: none !important;
@@ -168,53 +210,46 @@
       background: var(--border);
       border-radius: 4px;
       overflow: hidden;
-      margin: 10px 0;
+      margin: 1rem 0;
     }
     .progress-fill {
       height: 100%;
-      background: var(--bbm-red);
+      background: linear-gradient(90deg, var(--bbm-red), #b30000);
       transition: width 0.3s ease;
       width: 0%;
     }
     .train-section {
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: var(--shadow-sm);
-      margin: 20px 0;
       text-align: center;
     }
     .train-status, .model-status {
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 20px;
-      max-height: 300px;
+      max-height: 400px;
       overflow-y: auto;
     }
     .model-options {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 1rem;
+      margin-bottom: 1rem;
       align-items: center;
     }
     .model-options label {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 0.5rem;
       font-size: 15px;
     }
     .slider-container {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 1rem;
       font-size: 14px;
       color: var(--text-secondary);
+      width: 100%;
+      justify-content: center;
     }
     .slider-container input[type="range"] {
       flex: 1;
+      max-width: 200px;
     }
     /* Overlay Spinner Styles */
     .overlay-spinner {
@@ -223,7 +258,8 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(248, 248, 248, 0.9);
+      background: rgba(248, 248, 248, 0.95);
+      backdrop-filter: blur(4px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -248,7 +284,7 @@
       100% { transform: rotate(360deg); }
     }
     .spinner-text {
-      margin-top: 20px;
+      margin-top: 1rem;
       font-family: 'Orbitron', monospace;
       color: var(--bbm-red);
       font-weight: 700;
@@ -257,152 +293,22 @@
     }
     .btn-group {
       display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin: 20px 0;
-    }
-    /* Desktop Sidebar */
-    .desktop-sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: var(--sidebar-width);
-      height: 100vh;
-      background: var(--card-bg);
-      border-right: 1px solid var(--border);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      padding: 1rem 0;
-      gap: 2rem;
-      z-index: 10;
-      transition: width 0.3s ease, padding 0.3s ease, align-items 0.3s ease;
-    }
-    .desktop-sidebar.expanded {
-      width: 240px;
-      padding: 1rem 0 1rem 1rem;
-      align-items: flex-start;
       gap: 1rem;
-    }
-    .desktop-sidebar.expanded .sidebar-icon-wrapper {
-      justify-content: flex-start;
-      padding-left: 1rem;
-    }
-    .desktop-sidebar.expanded .sidebar-icon-text {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    .sidebar-icon-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border-radius: 0.75rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-    .sidebar-icon-wrapper:hover {
-      background: rgba(212, 0, 0, 0.1);
-    }
-    .sidebar-icon-wrapper.active {
-      background: var(--bbm-red);
-      color: #FFFFFF;
-    }
-    .sidebar-icon-wrapper svg, .sidebar-icon-wrapper i {
-      width: 1.5rem;
-      height: 1.5rem;
-      flex-shrink: 0;
-      stroke: var(--text-primary);
-      color: var(--text-primary);
-    }
-    .sidebar-icon-wrapper.active svg, .sidebar-icon-wrapper.active i {
-      stroke: #FFFFFF;
-      color: #FFFFFF;
-    }
-    .sidebar-icon-text {
-      font-size: 0.875rem;
-      font-weight: 500;
-      opacity: 0;
-      transform: translateX(-10px);
-      transition: opacity 0.3s ease, transform 0.3s ease;
-      white-space: nowrap;
-    }
-    .sidebar-toggle {
-      position: absolute;
-      top: 1rem;
-      right: -1rem;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      width: 2rem;
-      height: 2rem;
-      display: flex;
-      align-items: center;
       justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      z-index: 11;
+      margin: 1.5rem 0;
+      flex-wrap: wrap;
     }
-    .sidebar-toggle:hover {
-      background: var(--bbm-red);
-      color: #FFFFFF;
+    .chart-container {
+      position: relative;
+      height: 250px;
+      margin-top: 1rem;
     }
-    .sidebar-toggle svg {
-      width: 1.25rem;
-      height: 1.25rem;
-      stroke: currentColor;
-    }
-    .main-content {
-      margin-left: 0;
-      transition: margin-left 0.3s ease;
-    }
-    .section {
-      display: none;
-    }
-    .section.active {
-      display: block;
-    }
-    @media (min-width: 1024px) {
-      .desktop-sidebar {
-        display: flex;
+    @media (max-width: 1024px) {
+      .main-grid {
+        grid-template-columns: 1fr;
       }
-      .main-content {
-        margin-left: var(--sidebar-width);
-      }
-      .container {
-        max-width: calc(800px + var(--sidebar-width));
-        padding: 20px var(--sidebar-width) 20px 20px;
-      }
-    }
-    @media (min-width: 1440px) {
-      :root {
-        --sidebar-width: 240px;
-      }
-      .desktop-sidebar {
-        width: var(--sidebar-width);
-        padding: 1rem 0 1rem 1rem;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-      .desktop-sidebar .sidebar-icon-wrapper {
-        justify-content: flex-start;
-        padding: 0.75rem 1rem;
-      }
-      .desktop-sidebar .sidebar-icon-text {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      .sidebar-toggle {
-        display: none;
-      }
-      .main-content {
-        margin-left: var(--sidebar-width);
-      }
-      .container {
-        max-width: calc(800px + var(--sidebar-width));
-        padding: 20px var(--sidebar-width) 20px 20px;
+      .sidebar {
+        order: -1;
       }
     }
   </style>
@@ -414,55 +320,31 @@
     <div class="spinner-text" id="spinner-text">Initializing Vynix Dashboard...</div>
   </div>
   <header class="header">
-    <h1>Vynix AI Training Dashboard</h1>
-    <p>Manage training data for your AI companion</p>
+    <h1><i class="material-icons align-middle" style="font-size: 0.8em; vertical-align: middle;">smart_toy</i> Vynix AI Training Dashboard</h1>
+    <p class="mt-2 text-gray-600">Manage and visualize training data for your AI companion</p>
   </header>
-  <!-- Desktop Sidebar -->
-  <nav class="desktop-sidebar" id="desktop-sidebar">
-    <div class="sidebar-icon-wrapper active" data-section="single-add">
-      <i class="material-icons">add_circle</i>
-      <span class="sidebar-icon-text">Add Single Pair</span>
-    </div>
-    <div class="sidebar-icon-wrapper" data-section="bulk-upload">
-      <i class="material-icons">cloud_upload</i>
-      <span class="sidebar-icon-text">Bulk Upload</span>
-    </div>
-    <div class="sidebar-icon-wrapper" data-section="train">
-      <i class="material-icons">build</i>
-      <span class="sidebar-icon-text">Train Model</span>
-    </div>
-    <div class="sidebar-icon-wrapper" data-section="models">
-      <i class="material-icons">list</i>
-      <span class="sidebar-icon-text">Manage Models</span>
-    </div>
-    <div class="flex-1"></div> <!-- Spacer -->
-    <button class="sidebar-toggle" id="sidebar-toggle">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-        <path d="M15 19l-7-7 7-7"/>
-      </svg>
-    </button>
-  </nav>
-  <main class="main-content">
-    <div class="container">
-      <div id="auth-status" class="stats">Loading...</div>
-      <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
-      <div id="error-message" class="error hidden"></div>
-      <div id="success-message" class="success hidden"></div>
-      
-      <!-- Single Add Section -->
-      <div id="single-add-section" class="section active">
-        <form id="add-form" class="add-form">
+  <div class="container">
+    <div id="auth-status" class="stats">Loading...</div>
+    <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
+    <div id="metrics" class="metrics-grid hidden"></div>
+    <div id="error-message" class="error hidden"></div>
+    <div id="success-message" class="success hidden"></div>
+
+    <div class="main-grid">
+      <div class="main-content">
+        <form id="add-form" class="add-form card hidden">
+          <i class="material-icons" style="font-size: 2rem; color: var(--accent);">add_circle</i>
           <input type="text" id="new-q" placeholder="Question (e.g., 'hello')" required>
           <input type="text" id="new-a" placeholder="Answer (e.g., 'Hi! What's up?')" required>
-          <button type="submit" class="btn">Add Pair</button>
+          <button type="submit" class="btn"><i class="material-icons">add</i>Add Pair</button>
         </form>
-      </div>
-      
-      <!-- Bulk Upload Section -->
-      <div id="bulk-upload-section" class="section hidden">
-        <form id="bulk-form" class="bulk-form">
+
+        <form id="bulk-form" class="bulk-form card hidden">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold"><i class="material-icons mr-2 align-middle" style="font-size: 1.2em;">cloud_upload</i>Bulk Upload</h3>
+          </div>
           <div>
-            <label for="bulk-input" class="block text-sm font-medium text-gray-700 mb-2">Bulk Upload Options</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Upload Options</label>
             <div class="flex gap-4 mb-4">
               <label class="flex items-center">
                 <input type="radio" name="bulk-mode" value="csv" checked class="mr-2">
@@ -474,63 +356,41 @@
               </label>
             </div>
           </div>
-          <input type="file" id="bulk-input" accept=".csv,.txt" placeholder="Upload CSV or TXT file">
+          <input type="file" id="bulk-input" accept=".csv,.txt" class="block w-full">
           <textarea id="bulk-text" placeholder="Or paste bulk data here (one pair per line: question|answer)" style="display: none;"></textarea>
           <div id="bulk-preview" class="bulk-preview hidden">Preview will appear here...</div>
           <div class="progress-bar hidden">
             <div id="progress-fill" class="progress-fill"></div>
           </div>
-          <button type="submit" class="btn" id="bulk-submit" disabled>Bulk Add Pairs</button>
+          <button type="submit" class="btn" id="bulk-submit" disabled><i class="material-icons">file_upload</i>Bulk Add Pairs</button>
         </form>
-      </div>
-      
-      <!-- Train Section -->
-      <div id="train-section" class="section hidden">
-        <div class="train-section">
-          <div class="model-options">
-            <label>
-              <input type="checkbox" id="retrain-toggle"> Retrain existing model (no delete)
-            </label>
-            <label>
-              <input type="radio" name="model-type" value="classifier" checked> Classifier (fast retrieval)
-            </label>
-            <label>
-              <input type="radio" name="model-type" value="gru"> GRU (efficient sequence input)
-            </label>
-            <div class="slider-container">
-              <span>Max Vocab:</span>
-              <input type="range" id="vocab-slider" min="50" max="500" value="200" step="50">
-              <span id="vocab-value">200</span>
-            </div>
-            <label class="block w-full">
-              <span class="text-sm font-medium">Model Name (optional)</span>
-              <input type="text" id="model-name" placeholder="e.g., vinaq v2" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
-            </label>
-          </div>
-          <button id="train-btn" class="btn">Train AI Model</button>
+
+        <div id="loading" class="loading hidden card">Loading training data...</div>
+
+        <div class="btn-group hidden">
+          <button id="clear-all-btn" class="btn btn-danger"><i class="material-icons">delete_forever</i>Clear All Training Data</button>
+          <button id="retrain-btn" class="btn"><i class="material-icons">refresh</i>Trigger Retrain (Saves & Notifies)</button>
         </div>
-        <div id="train-status" class="train-status hidden"></div>
+
+        <!-- Dynamic Train Section -->
+        <div id="train-section" class="card hidden"></div>
+        <div id="train-status" class="card train-status hidden"></div>
+        <div id="model-status" class="card model-status hidden"></div>
       </div>
-      
-      <!-- Models Management Section -->
-      <div id="models-section" class="section hidden">
-        <div id="models-management" class="train-section">
-          <h3 class="text-lg font-bold mb-4 text-center">Available Models</h3>
-          <div id="models-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto"></div>
+
+      <div class="sidebar">
+        <div id="models-management" class="card hidden">
+          <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
+            <i class="material-icons">model_training</i>Available Models
+          </h3>
+          <div id="models-list" class="space-y-2 mb-4 max-h-80 overflow-y-auto"></div>
           <div class="btn-group">
-            <button id="delete-selected-btn" class="btn btn-danger" disabled>Delete Selected</button>
+            <button id="delete-selected-btn" class="btn btn-danger w-full" disabled><i class="material-icons">delete</i>Delete Selected</button>
           </div>
         </div>
       </div>
-      
-      <div id="loading" class="loading hidden">Loading training data...</div>
-      <div class="btn-group hidden">
-        <button id="clear-all-btn" class="btn btn-danger">Clear All Training Data</button>
-        <button id="retrain-btn" class="btn">Trigger Retrain (Saves & Notifies)</button>
-      </div>
-      <div id="model-status" class="model-status hidden"></div>
     </div>
-  </main>
+  </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -549,13 +409,13 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
     const container = document.querySelector('.container');
-    const mainContent = document.querySelector('.main-content');
     const elements = {
       overlaySpinner: document.getElementById('overlay-spinner'),
       spinnerText: document.getElementById('spinner-text'),
       authStatus: document.getElementById('auth-status'),
       stats: document.getElementById('stats'),
       pairCount: document.getElementById('pair-count'),
+      metrics: document.getElementById('metrics'),
       errorMessage: document.getElementById('error-message'),
       successMessage: document.getElementById('success-message'),
       addForm: document.getElementById('add-form'),
@@ -568,22 +428,16 @@
       bulkSubmit: document.getElementById('bulk-submit'),
       progressFill: document.getElementById('progress-fill'),
       loading: document.getElementById('loading'),
+      pairsList: document.getElementById('pairs-list'),
       clearAllBtn: document.getElementById('clear-all-btn'),
       retrainBtn: document.getElementById('retrain-btn'),
       btnGroup: container.querySelector('.btn-group'),
-      trainBtn: document.getElementById('train-btn'),
+      trainSection: document.getElementById('train-section'),
       trainStatus: document.getElementById('train-status'),
       modelStatus: document.getElementById('model-status'),
+      modelsManagement: document.getElementById('models-management'),
       modelsList: document.getElementById('models-list'),
-      deleteSelectedBtn: document.getElementById('delete-selected-btn'),
-      // Sections
-      singleAddSection: document.getElementById('single-add-section'),
-      bulkUploadSection: document.getElementById('bulk-upload-section'),
-      trainSection: document.getElementById('train-section'),
-      modelsSection: document.getElementById('models-section'),
-      // Sidebar
-      desktopSidebar: document.getElementById('desktop-sidebar'),
-      sidebarToggle: document.getElementById('sidebar-toggle')
+      deleteSelectedBtn: document.getElementById('delete-selected-btn')
     };
     let currentUser;
     let trainingData = {};
@@ -591,6 +445,7 @@
     let dataLoaded = false;
     let models = {};
     let currentModelId = null;
+    let metricsChart = null;
     // VOCAB SETTINGS - Further reduced for efficiency
     let MAX_VOCAB = 200;
     const MAX_SEQ_LEN = 30; // Reduced max sequence length
@@ -621,52 +476,90 @@
       elements.pairCount.textContent = Object.keys(trainingData).length;
       elements.stats.classList.remove('hidden');
     }
-    // Section switching
-    function switchSection(sectionId) {
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      document.getElementById(`${sectionId}-section`).classList.add('active');
-      document.querySelectorAll('.sidebar-icon-wrapper').forEach(w => w.classList.remove('active'));
-      document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
+    function computeMetrics() {
+      const pairs = dataKeys.map(key => ({q: trainingData[key].q, a: trainingData[key].a}));
+      if (pairs.length === 0) {
+        elements.metrics.classList.add('hidden');
+        return;
+      }
+
+      const qLens = pairs.map(p => p.q.split(/\s+/).filter(w => w.length > 0).length);
+      const aLens = pairs.map(p => p.a.split(/\s+/).filter(w => w.length > 0).length);
+      const avgQLen = qLens.reduce((a, b) => a + b, 0) / qLens.length;
+      const avgALen = aLens.reduce((a, b) => a + b, 0) / aLens.length;
+
+      const allWords = pairs.flatMap(p => [
+        ...p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1 && !STOPWORDS.has(w)),
+        ...p.a.toLowerCase().split(/\s+/).filter(w => w.length > 1 && !STOPWORDS.has(w))
+      ]);
+      const uniqueWords = new Set(allWords);
+      const vocabSize = Math.min(MAX_VOCAB, uniqueWords.size);
+      const uniqueAnswers = new Set(pairs.map(p => p.a));
+
+      // Update metrics grid
+      let metricsHTML = `
+        <div class="metric-card">
+          <div class="metric-value" id="metric-pairs">${pairs.length}</div>
+          <div class="metric-label">Total Pairs</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">${avgQLen.toFixed(1)}</div>
+          <div class="metric-label">Avg Q Length (words)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">${avgALen.toFixed(1)}</div>
+          <div class="metric-label">Avg A Length (words)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">${vocabSize}</div>
+          <div class="metric-label">Est. Vocab Size</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">${uniqueAnswers.size}</div>
+          <div class="metric-label">Unique Answers</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">${allWords.length}</div>
+          <div class="metric-label">Total Words</div>
+        </div>
+      `;
+      elements.metrics.innerHTML = metricsHTML;
+      elements.metrics.classList.remove('hidden');
+
+      // Simple chart for answer length distribution
+      const ctx = document.createElement('canvas');
+      ctx.width = 300;
+      ctx.height = 150;
+      const chartContainer = document.createElement('div');
+      chartContainer.className = 'chart-container';
+      chartContainer.appendChild(ctx);
+      if (elements.metrics.parentNode) {
+        elements.metrics.parentNode.insertBefore(chartContainer, elements.metrics.nextSibling);
+      }
+      if (metricsChart) metricsChart.destroy();
+      const aLenBins = [0,5,10,15,20,30,50];
+      const binCounts = aLenBins.map((bin, i) => {
+        const nextBin = aLenBins[i+1] || Infinity;
+        return aLens.filter(len => len > bin && len <= nextBin).length;
+      });
+      metricsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: aLenBins.map(b => `${b}-${aLenBins[aLenBins.indexOf(b)+1] || '50+'}`),
+          datasets: [{ label: 'Answer Length Dist.', data: binCounts, backgroundColor: '#d40000' }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
     }
-    // Sidebar event listeners
-    elements.desktopSidebar.addEventListener('click', (e) => {
-      if (e.target.closest('.sidebar-icon-wrapper')) {
-        const wrapper = e.target.closest('.sidebar-icon-wrapper');
-        const section = wrapper.dataset.section;
-        switchSection(section);
-      }
-    });
-    elements.sidebarToggle.addEventListener('click', () => {
-      if (window.innerWidth >= 1440) return;
-      const isExpanded = elements.desktopSidebar.classList.contains('expanded');
-      const root = document.documentElement;
-      if (isExpanded) {
-        elements.desktopSidebar.classList.remove('expanded');
-        root.style.setProperty('--sidebar-width', '72px');
-        mainContent.style.marginLeft = '72px';
-      } else {
-        elements.desktopSidebar.classList.add('expanded');
-        root.style.setProperty('--sidebar-width', '240px');
-        mainContent.style.marginLeft = '240px';
-      }
-    });
-    function updateSidebarForScreenSize() {
-      const root = document.documentElement;
-      if (window.innerWidth >= 1440) {
-        root.style.setProperty('--sidebar-width', '240px');
-        elements.desktopSidebar.classList.add('expanded');
-        mainContent.style.marginLeft = '240px';
-        container.style.paddingLeft = '20px';
-        container.style.paddingRight = '240px';
-      } else {
-        root.style.setProperty('--sidebar-width', '72px');
-        elements.desktopSidebar.classList.remove('expanded');
-        mainContent.style.marginLeft = '72px';
-        container.style.paddingLeft = '20px';
-        container.style.paddingRight = '72px';
-      }
+    function renderPairs() {
+      updateStats();
+      computeMetrics();
     }
-    window.addEventListener('resize', updateSidebarForScreenSize);
     async function addPair(q, a) {
       if (!currentUser || !q.trim() || !a.trim()) {
         throw new Error('Please log in and enter both question and answer.');
@@ -691,13 +584,14 @@
       try {
         hideMessages();
         elements.clearAllBtn.textContent = 'Clearing...';
+        elements.clearAllBtn.innerHTML = '<i class="material-icons">hourglass_empty</i>Clearing...';
         const trainingRef = ref(db, 'training_data');
         await remove(trainingRef);
         showSuccess('All training data cleared successfully!');
-        elements.clearAllBtn.textContent = 'Clear All Training Data';
+        elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Training Data';
       } catch (error) {
         showError('Failed to clear data: ' + error.message);
-        elements.clearAllBtn.textContent = 'Clear All Training Data';
+        elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Training Data';
       }
     };
     async function triggerRetrain() {
@@ -780,7 +674,7 @@
         return;
       }
       elements.trainStatus.classList.remove('hidden');
-      elements.trainStatus.innerHTML = '<p class="loading">Preparing data... (Enable WebGL for faster training)</p>';
+      elements.trainStatus.innerHTML = '<p class="text-center py-4"><i class="material-icons" style="font-size: 2rem; color: var(--accent);">build</i><br>Preparing data... (Enable WebGL for faster training)</p>';
       elements.modelStatus.classList.add('hidden');
       try {
         await tf.setBackend('webgl');
@@ -831,13 +725,13 @@
             const loadedStuff = await loadModelFromSaved(saved);
             model = loadedStuff.model;
             vocab = savedVocab;
-            elements.trainStatus.innerHTML += '<p>Loaded existing model for retraining.</p>';
+            elements.trainStatus.innerHTML += '<p class="text-green-600">Loaded existing model for retraining.</p>';
             isLoaded = true;
           } else {
-            elements.trainStatus.innerHTML += '<p>Current model incompatible or not found. Training new model from scratch.</p>';
+            elements.trainStatus.innerHTML += '<p class="text-yellow-600">Current model incompatible or not found. Training new model from scratch.</p>';
           }
         } else if (retrain) {
-          elements.trainStatus.innerHTML += '<p>No current model found. Training new model from scratch.</p>';
+          elements.trainStatus.innerHTML += '<p class="text-yellow-600">No current model found. Training new model from scratch.</p>';
         }
         if (!isLoaded) {
           vocab = buildVocab(pairs);
@@ -880,8 +774,8 @@
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
         const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p>Model type: ${modelType} | Vocab size: ${vocabSize} | Answer classes: ${uniqueAnswers.length}${gruInfo}</p>`;
-        elements.trainStatus.innerHTML += `<p>Creating version ${nextVersion}</p>`;
+        elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${gruInfo}</p>`;
+        elements.trainStatus.innerHTML += `<p><strong>Version:</strong> ${nextVersion}</p>`;
         let finalAcc = 0;
         let bestValAcc = 0;
         let patience = 50;
@@ -894,14 +788,14 @@
             onEpochEnd: (epoch, logs) => {
               finalAcc = logs.acc;
               const valAcc = logs.val_acc;
-              elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)}, Acc=${logs.acc.toFixed(4)}, Val Acc=${valAcc.toFixed(4)}</p>`;
+              elements.trainStatus.innerHTML += `<p>Epoch ${epoch + 1}: Loss=${logs.loss.toFixed(4)} | Acc=${logs.acc.toFixed(4)} | Val=${valAcc.toFixed(4)}</p>`;
               if (valAcc > bestValAcc) {
                 bestValAcc = valAcc;
                 wait = 0;
               } else {
                 wait++;
                 if (wait >= patience) {
-                  elements.trainStatus.innerHTML += `<p>Early stopping at epoch ${epoch + 1}</p>`;
+                  elements.trainStatus.innerHTML += `<p class="text-blue-600">Early stopping at epoch ${epoch + 1}</p>`;
                   throw new Error('Early stopping');
                 }
               }
@@ -913,7 +807,7 @@
         const pred = model.predict(sampleInput);
         const predIdx = pred.argMax(-1).dataSync()[0];
         const predictedA = uniqueAnswers[predIdx];
-        elements.trainStatus.innerHTML += `<p>Test ("hello how are you today"): Predicted "${predictedA}"</p>`;
+        elements.trainStatus.innerHTML += `<p><strong>Test Input:</strong> "hello how are you today" → <em>"${predictedA}"</em></p>`;
         const weights = model.getWeights().map(w => w.arraySync());
         if (!modelName) {
           modelName = `vinaq v${nextVersion}`;
@@ -942,7 +836,7 @@
         modelRef = push(modelsRef);
         await set(modelRef, saveData);
         await set(ref(db, 'currentModelId'), modelRef.key);
-        elements.trainStatus.innerHTML += '<p>Loading saved model for verification...</p>';
+        elements.trainStatus.innerHTML += '<p class="text-blue-600">Loading saved model for verification...</p>';
         const savedSnapshot = await get(modelRef);
         const saved = savedSnapshot.val();
         const loadedStuff = await loadModelFromSaved(saved);
@@ -951,8 +845,8 @@
         const loadedPred = loadedModel.predict(sampleInput);
         const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
         const loadedPredictedA = loadedUnique[loadedPredIdx];
-        elements.trainStatus.innerHTML += `<p>Verification: Loaded model predicts "${loadedPredictedA}"</p>`;
-        elements.modelStatus.innerHTML = `<p class="success">Model: ${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved! Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p>Model format: Custom. Use in chat UI with loadModelFromSaved function.</p>`;
+        elements.trainStatus.innerHTML += `<p><strong>Verification:</strong> "${loadedPredictedA}"</p>`;
+        elements.modelStatus.innerHTML = `<div class="text-center"><i class="material-icons" style="font-size: 3rem; color: #16a34a;">check_circle</i><p class="text-lg font-bold mt-2">${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved!</p><p>Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p class="text-sm text-gray-600 mt-4">Model format: Custom. Use in chat UI with loadModelFromSaved function.</p></div>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
         xs.dispose();
@@ -977,24 +871,57 @@
         const data = snapshot.val();
         trainingData = data || {};
         dataKeys = Object.keys(trainingData);
-        updateStats();
+        renderPairs();
         elements.loading.classList.add('hidden');
         if (!dataLoaded) {
           dataLoaded = true;
           hideOverlay();
         }
-        // Init slider in train section
-        const slider = document.getElementById('vocab-slider');
-        const value = document.getElementById('vocab-value');
-        if (slider && value) {
+        if (elements.trainSection.children.length === 0) {
+          elements.trainSection.innerHTML = `
+            <div class="train-section">
+              <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
+                <i class="material-icons">tune</i>Model Training Options
+              </h3>
+              <div class="model-options">
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" id="retrain-toggle"> 
+                  <span>Retrain existing model (no delete)</span>
+                </label>
+                <label class="flex items-center gap-2">
+                  <input type="radio" name="model-type" value="classifier" checked> 
+                  <span>Classifier (fast retrieval)</span>
+                </label>
+                <label class="flex items-center gap-2">
+                  <input type="radio" name="model-type" value="gru"> 
+                  <span>GRU (efficient sequence input)</span>
+                </label>
+                <div class="slider-container">
+                  <span>Max Vocab:</span>
+                  <input type="range" id="vocab-slider" min="50" max="500" value="200" step="50">
+                  <span id="vocab-value">200</span>
+                </div>
+                <label class="block w-full">
+                  <span class="text-sm font-medium">Model Name (optional)</span>
+                  <input type="text" id="model-name" placeholder="e.g., vinaq v2" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
+                </label>
+              </div>
+              <button id="train-btn" class="btn w-full"><i class="material-icons">play_arrow</i>Train AI Model</button>
+            </div>
+          `;
+          // Init slider
+          const slider = document.getElementById('vocab-slider');
+          const value = document.getElementById('vocab-value');
           slider.addEventListener('input', () => {
             MAX_VOCAB = parseInt(slider.value);
             value.textContent = MAX_VOCAB;
           });
+          document.getElementById('train-btn').addEventListener('click', trainModel);
+          elements.deleteSelectedBtn.addEventListener('click', deleteSelectedModels);
+          loadModels();
         }
-        if (elements.trainBtn) {
-          elements.trainBtn.addEventListener('click', trainModel);
-        }
+        elements.trainSection.classList.remove('hidden');
+        elements.modelsManagement.classList.remove('hidden');
       }, (error) => {
         showError('Failed to load training data: ' + error.message);
         elements.loading.classList.add('hidden');
@@ -1032,23 +959,22 @@
       modelEntries.forEach(([id, m]) => {
         const isCurrent = currentModelId === id;
         const div = document.createElement('div');
-        div.className = `flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border ${isCurrent ? 'border-blue-500' : 'border-gray-200'}`;
+        div.className = `flex items-center justify-between p-3 rounded-lg shadow-sm border ${isCurrent ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`;
         const name = m.modelName || `vinaq v${m.version}`;
-        const status = isCurrent ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Current</span>' : '';
+        const status = isCurrent ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">Current</span>' : '';
         div.innerHTML = `
           <div class="flex items-center space-x-3 flex-1">
-            <input type="checkbox" class="form-checkbox h-5 w-5 text-red-600" value="${id}" onchange="toggleDeleteBtn()">
+            <input type="checkbox" class="form-checkbox h-4 w-4 text-red-600" value="${id}" onchange="toggleDeleteBtn()">
             <div>
               <div class="font-medium">${name} ${status}</div>
               <div class="text-sm text-gray-600">
-                Type: ${m.modelType} | Classes: ${m.numClasses || 'N/A'} |
-                ${new Date(m.timestamp).toLocaleDateString()}
+                Type: ${m.modelType} | Classes: ${m.numClasses || 'N/A'} | ${new Date(m.timestamp).toLocaleDateString()}
               </div>
             </div>
           </div>
           <div class="flex space-x-2">
-            ${!isCurrent ? `<button onclick="setCurrentModel('${id}')" class="btn btn-secondary text-sm px-3 py-1">Set Current</button>` : ''}
-            <button onclick="deleteSingleModel('${id}')" class="btn btn-danger text-sm px-3 py-1">Delete</button>
+            ${!isCurrent ? `<button onclick="setCurrentModel('${id}')" class="btn btn-secondary text-sm px-2 py-1"><i class="material-icons" style="font-size: 1rem;">star</i></button>` : ''}
+            <button onclick="deleteSingleModel('${id}')" class="btn btn-danger text-sm px-2 py-1"><i class="material-icons" style="font-size: 1rem;">delete</i></button>
           </div>
         `;
         list.appendChild(div);
@@ -1060,7 +986,8 @@
       const btn = elements.deleteSelectedBtn;
       if (btn) {
         btn.disabled = checked.length === 0;
-        btn.textContent = checked.length > 0 ? `Delete Selected (${checked.length})` : 'Delete Selected';
+        const icon = checked.length > 0 ? '<i class="material-icons">delete</i>' : '<i class="material-icons">delete</i>';
+        btn.innerHTML = checked.length > 0 ? `${icon}Delete Selected (${checked.length})` : `${icon}Delete Selected`;
       }
     };
     window.setCurrentModel = async function(id) {
@@ -1228,21 +1155,22 @@
       currentUser = user;
       if (user) {
         showOverlay('Authenticating...');
-        elements.authStatus.innerHTML = `Logged in as: ${user.displayName || user.email || 'User'} <button class="btn btn-secondary" onclick="signOutUser()" style="font-size: 12px; padding: 4px 8px; margin-left: 10px;">Sign Out</button>`;
+        elements.authStatus.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Logged in as: ${user.displayName || user.email || 'User'}</span><button class="btn btn-secondary text-sm px-3 py-1" onclick="signOutUser()"><i class="material-icons" style="font-size: 1rem;">logout</i>Sign Out</button></div>`;
         elements.addForm.classList.remove('hidden');
         elements.bulkForm.classList.remove('hidden');
         elements.btnGroup.classList.remove('hidden');
+        elements.trainSection.classList.remove('hidden');
+        elements.modelsManagement.classList.remove('hidden');
         loadTrainingData();
-        loadModels();
-        updateSidebarForScreenSize();
       } else {
         hideOverlay();
-        elements.authStatus.innerHTML = 'Not logged in. <button class="btn" onclick="signInAnonymously()">Sign In Anonymously</button>';
+        elements.authStatus.innerHTML = '<div class="flex items-center justify-center gap-2"><span>Not logged in.</span><button class="btn" onclick="signInAnonymously()"><i class="material-icons">login</i>Sign In Anonymously</button></div>';
         elements.addForm.classList.add('hidden');
         elements.bulkForm.classList.add('hidden');
         elements.btnGroup.classList.add('hidden');
+        elements.trainSection.classList.add('hidden');
+        elements.modelsManagement.classList.add('hidden');
         elements.loading.classList.add('hidden');
-        document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
       }
     });
     window.signInAnonymously = async function() {
@@ -1264,8 +1192,6 @@
     // Initial load
     showOverlay('Connecting to Firebase...');
     elements.loading.classList.add('hidden');
-    // Default to single add
-    switchSection('single-add');
   </script>
 </body>
 </html>
