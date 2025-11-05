@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-remote-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -345,6 +346,7 @@
   </header>
   <div class="container">
     <div id="auth-status" class="stats">Loading...</div>
+    <div id="api-status" class="stats hidden"></div>
     <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
     <div id="metrics" class="metrics-grid hidden"></div>
     <div id="quality-metrics" class="metrics-grid hidden"></div>
@@ -410,6 +412,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getRemoteConfig, fetchAndActivate, getString, setDefaults } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-remote-config.js";
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
       authDomain: "fire-b-a8878.firebaseapp.com",
@@ -423,11 +426,16 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
+    const remoteConfig = getRemoteConfig(app);
+    setDefaults(remoteConfig, {
+      xai_api_key: 'default_placeholder_key' // Fallback if not set in console
+    });
     const container = document.querySelector('.container');
     const elements = {
       overlaySpinner: document.getElementById('overlay-spinner'),
       spinnerText: document.getElementById('spinner-text'),
       authStatus: document.getElementById('auth-status'),
+      apiStatus: document.getElementById('api-status'),
       stats: document.getElementById('stats'),
       pairCount: document.getElementById('pair-count'),
       metrics: document.getElementById('metrics'),
@@ -462,6 +470,7 @@
     let models = {};
     let currentModelId = null;
     let metricsChart = null;
+    let xaiApiKey = null; // Global variable to pass xAI API key to UI
     // VOCAB SETTINGS - Further reduced for efficiency
     let MAX_VOCAB = 200;
     const MAX_SEQ_LEN = 30; // Reduced max sequence length
@@ -491,6 +500,31 @@
     function updateStats() {
       elements.pairCount.textContent = Object.keys(trainingData).length;
       elements.stats.classList.remove('hidden');
+    }
+    function fetchXaiApiFromRemoteConfig() {
+      showOverlay('Fetching xAI API config...');
+      fetchAndActivate(remoteConfig)
+        .then(() => {
+          xaiApiKey = getString(remoteConfig, 'xai_api_key');
+          if (xaiApiKey && xaiApiKey !== 'default_placeholder_key') {
+            elements.apiStatus.innerHTML = `<i class="material-icons" style="color: var(--success-green);">check_circle</i> xAI API Key fetched successfully! (Last updated: ${new Date().toLocaleTimeString()})`;
+            elements.apiStatus.classList.remove('hidden');
+            // Pass to UI: Expose globally for use in other scripts/functions
+            window.xaiApiKey = xaiApiKey;
+            console.log('xAI API Key available:', xaiApiKey.substring(0, 10) + '...'); // Log partial for security
+            hideOverlay();
+            return true;
+          } else {
+            throw new Error('xAI API key not configured in Remote Config (using default). Set "xai_api_key" in Firebase Console.');
+          }
+        })
+        .catch((error) => {
+          elements.apiStatus.innerHTML = `<i class="material-icons" style="color: var(--error-red);">error</i> Failed to fetch xAI API: ${error.message}`;
+          elements.apiStatus.classList.remove('hidden');
+          console.error('Remote Config fetch error:', error);
+          hideOverlay();
+          return false;
+        });
     }
     function computeMetrics() {
       const pairs = dataKeys.map(key => ({q: trainingData[key].q, a: trainingData[key].a}));
@@ -1279,7 +1313,10 @@
         elements.btnGroup.classList.remove('hidden');
         elements.trainSection.classList.remove('hidden');
         elements.modelsManagement.classList.remove('hidden');
-        loadTrainingData();
+        // Fetch xAI API after auth
+        fetchXaiApiFromRemoteConfig().then(() => {
+          loadTrainingData();
+        });
       } else {
         hideOverlay();
         elements.authStatus.innerHTML = '<div class="flex items-center justify-center gap-2"><span>Not logged in.</span><button class="btn" onclick="signInAnonymously()"><i class="material-icons">login</i>Sign In Anonymously</button></div>';
@@ -1289,6 +1326,7 @@
         elements.trainSection.classList.add('hidden');
         elements.modelsManagement.classList.add('hidden');
         elements.loading.classList.add('hidden');
+        elements.apiStatus.classList.add('hidden');
       }
     });
     window.signInAnonymously = async function() {
