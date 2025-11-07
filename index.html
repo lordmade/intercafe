@@ -216,6 +216,14 @@
       margin: 1rem 0;
       border-left: 4px solid #16a34a;
     }
+    .warning-msg {
+      background: #fffbeb;
+      color: #92400e;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid #f59e0b;
+    }
     .hidden {
       display: none !important;
     }
@@ -484,6 +492,12 @@
       elements.successMessage.classList.remove('hidden');
       elements.errorMessage.classList.add('hidden');
     }
+    function showWarning(msg) {
+      const warningDiv = document.createElement('div');
+      warningDiv.className = 'warning-msg';
+      warningDiv.textContent = msg;
+      if (elements.trainStatus) elements.trainStatus.appendChild(warningDiv);
+    }
     function hideMessages() {
       elements.errorMessage.classList.add('hidden');
       elements.successMessage.classList.add('hidden');
@@ -699,11 +713,11 @@
           layers: [
             tf.layers.embedding({
               inputDim: saved.vocabSize,
-              outputDim: saved.embedDim || 8,
+              outputDim: saved.embedDim || 16, // Increased embed dim
               inputLength: saved.maxLen
             }),
             tf.layers.lstm({ // Updated to LSTM for better sequence handling
-              units: saved.lstmUnits || 16,
+              units: saved.lstmUnits || 32, // Increased units
               dropout: 0.3,
               returnSequences: false
             }),
@@ -812,8 +826,8 @@
             sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
             model = tf.sequential({
               layers: [
-                tf.layers.embedding({ inputDim: vocabSize, outputDim: 8, inputLength: maxLen }),
-                tf.layers.lstm({ units: 16, dropout: 0.3, returnSequences: false }), // Updated to LSTM
+                tf.layers.embedding({ inputDim: vocabSize, outputDim: 16, inputLength: maxLen }), // Increased embed dim
+                tf.layers.lstm({ units: 32, dropout: 0.3, returnSequences: false }), // Increased units
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
@@ -828,6 +842,9 @@
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
         const lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
         elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
+        if (uniqueAnswers.length > 50) {
+          showWarning(`High number of unique answers (${uniqueAnswers.length}) detected. Classification accuracy may be low with current data. Consider merging similar answers or using a retrieval-based approach for better performance.`);
+        }
         elements.trainStatus.innerHTML += `<p><strong>Version:</strong> ${nextVersion}</p>`;
         // Setup dynamic training chart
         const chartContainer = document.createElement('div');
@@ -894,7 +911,7 @@
         let patience = 50;
         let wait = 0;
         await model.fit(xs, ys, {
-          epochs: 50,
+          epochs: 100, // Increased epochs
           batchSize: Math.min(64, pairs.length),
           validationSplit: 0.2,
           callbacks: {
@@ -947,8 +964,8 @@
         } else {
           saveData.vocabSize = vocabSize;
           saveData.maxLen = maxLen;
-          saveData.embedDim = 8;
-          saveData.lstmUnits = 16; // Updated to LSTM
+          saveData.embedDim = 16; // Updated
+          saveData.lstmUnits = 32; // Updated
         }
         // Always save as new version
         const modelsRef = ref(db, 'models');
@@ -965,7 +982,13 @@
         const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
         const loadedPredictedA = loadedUnique[loadedPredIdx];
         elements.trainStatus.innerHTML += `<p><strong>Verification:</strong> "${loadedPredictedA}"</p>`;
-        elements.modelStatus.innerHTML = `<div class="text-center"><i class="material-icons" style="font-size: 3rem; color: #16a34a;">check_circle</i><p class="text-lg font-bold mt-2">${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved!</p><p>Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p class="text-sm text-gray-600 mt-4">Model format: Custom. Use in chat UI with loadModelFromSaved function.</p></div>`;
+        let statusClass = 'text-green-600';
+        let accNote = '';
+        if (finalAcc < 0.7) {
+          statusClass = 'text-yellow-600';
+          accNote = '<p class="warning-msg mt-2">Note: Accuracy is below 70%. This model may underperform. Try adding more similar answers to reduce classes or use retrieval methods.</p>';
+        }
+        elements.modelStatus.innerHTML = `<div class="text-center"><i class="material-icons" style="font-size: 3rem; color: #16a34a;">check_circle</i><p class="text-lg font-bold mt-2">${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved!</p><p class="${statusClass}">Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p>${accNote}<p class="text-sm text-gray-600 mt-4">Model format: Custom. Use in chat UI with loadModelFromSaved function.</p></div>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
         xs.dispose();
@@ -1013,8 +1036,9 @@
                 </label>
                 <label class="flex items-center gap-2">
                   <input type="radio" name="model-type" value="lstm">
-                  <span>LSTM (sequence input with memory)</span>
+                  <span>LSTM (sequence input with memory) - Better for varied questions</span>
                 </label>
+                <p class="text-sm text-gray-600 text-center">Tip: For high unique answers (>50), accuracy may be low. Merge similar responses or consider retrieval.</p>
                 <div class="slider-container">
                   <span>Max Vocab:</span>
                   <input type="range" id="vocab-slider" min="50" max="500" value="200" step="50">
@@ -1022,7 +1046,7 @@
                 </div>
                 <label class="block w-full">
                   <span class="text-sm font-medium">Model Name (optional)</span>
-                  <input type="text" id="model-name" placeholder="e.g., vinaq v2" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
+                  <input type="text" id="model-name" placeholder="e.g., vinaq v3" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
                 </label>
               </div>
               <button id="train-btn" class="btn w-full"><i class="material-icons">play_arrow</i>Train AI Model</button>
