@@ -9,7 +9,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -411,8 +410,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-    import * as use from '@tensorflow-models/universal-sentence-encoder';
-
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
       authDomain: "fire-b-a8878.firebaseapp.com",
@@ -465,9 +462,9 @@
     let models = {};
     let currentModelId = null;
     let metricsChart = null;
-    // VOCAB SETTINGS - Optional for classifier only now
+    // VOCAB SETTINGS - Further reduced for efficiency
     let MAX_VOCAB = 200;
-    const MAX_SEQ_LEN = 30;
+    const MAX_SEQ_LEN = 30; // Reduced max sequence length
     const STOPWORDS = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','is','are','was','were','i','you','he','she','it','we','they','this','that','what','how','why','when','where','my','your','his','her','its','our','their','me','him','us','them','be','have','do','does','did','will','would','can','could','should','may','might','must']);
     // Overlay functions
     function showOverlay(text = 'Loading...') {
@@ -529,7 +526,7 @@
         </div>
         <div class="metric-card">
           <div class="metric-value">${vocabSize}</div>
-          <div class="metric-label">Est. Vocab Size (Classifier)</div>
+          <div class="metric-label">Est. Vocab Size</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">${uniqueAnswers.size}</div>
@@ -583,7 +580,6 @@
       elements.qualityMetrics.innerHTML = qualityHTML;
       elements.qualityMetrics.classList.remove('hidden');
       // Simple chart for answer length distribution
-      if (metricsChart) metricsChart.destroy();
       const ctx = document.createElement('canvas');
       ctx.width = 300;
       ctx.height = 150;
@@ -593,6 +589,7 @@
       if (elements.qualityMetrics.parentNode) {
         elements.qualityMetrics.parentNode.insertBefore(chartContainer, elements.qualityMetrics.nextSibling);
       }
+      if (metricsChart) metricsChart.destroy();
       const aLenBins = [0,5,10,15,20,30,50];
       const binCounts = aLenBins.map((bin, i) => {
         const nextBin = aLenBins[i+1] || Infinity;
@@ -652,7 +649,7 @@
     async function triggerRetrain() {
       showSuccess('Training data saved! Vynix will retrain automatically in connected apps.');
     }
-    // TF.js Helpers (Updated for USE)
+    // TF.js Helpers
     function textToVector(text, vocab) {
       const vec = new Array(vocab.length).fill(0);
       const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
@@ -661,6 +658,12 @@
         if (idx > -1) vec[idx] = 1;
       });
       return vec;
+    }
+    function questionToSequence(text, wordToIdx, maxLen) {
+      const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      let seq = words.map(w => wordToIdx.get(w) || 1);
+      seq = seq.concat(Array(maxLen - seq.length).fill(0));
+      return seq.slice(0, maxLen);
     }
     function buildVocab(pairs) {
       const wordCount = {};
@@ -671,9 +674,10 @@
           }
         });
       });
-      const commonWords = ['hello', 'hi', 'what', 'how', 'why', 'when', 'where', 'who', 'the', 'is', 'are', 'do', 'does', 'can', 'will', 'i', 'you', 'it', 'that', 'this', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'about', 'like', 'have', 'good', 'bad', 'yes', 'no', 'thanks', 'please', 'tell', 'me', 'your', 'my'];  // Seeded common words
-      const seeded = [...new Set([...commonWords, ...Object.keys(wordCount).filter(w => wordCount[w] >= 2)])].slice(0, MAX_VOCAB);
-      return seeded.sort();
+      return Object.keys(wordCount)
+        .filter(w => wordCount[w] >= 2)
+        .sort()
+        .slice(0, MAX_VOCAB);
     }
     function encodeAnswers(pairs, uniqueAnswers) {
       const answerToIdx = {};
@@ -682,7 +686,6 @@
     }
     async function loadModelFromSaved(saved) {
       let model;
-      const embedModel = await use.load();
       if (saved.modelType === 'classifier') {
         model = tf.sequential({
           layers: [
@@ -691,36 +694,37 @@
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
         });
-        const weightTensors = saved.weights.map(arr => tf.tensor(arr));
-        model.setWeights(weightTensors);
-        weightTensors.forEach(t => t.dispose());
       } else {
-        // GRU with USE: Load top layers
         model = tf.sequential({
           layers: [
-            tf.layers.reshape({ targetShape: [1, 512] }),
-            tf.layers.gru({ units: saved.gruUnits || 16, dropout: 0.3 }),
+            tf.layers.embedding({
+              inputDim: saved.vocabSize,
+              outputDim: saved.embedDim || 8,
+              inputLength: saved.maxLen
+            }),
+            tf.layers.gru({ // Switched to GRU for efficiency
+              units: saved.gruUnits || 16,
+              dropout: 0.3
+            }),
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
         });
-        const topWeightTensors = saved.topWeights.map(arr => tf.tensor(arr));
-        model.setWeights(topWeightTensors);
-        topWeightTensors.forEach(t => t.dispose());
       }
       model.compile({
-        optimizer: tf.train.adam(0.001),
+        optimizer: tf.train.adam(0.001), // Explicit learning rate
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy']
       });
-      embedModel.dispose();
-      return { model, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType, embedModel: null };
+      const weightTensors = saved.weights.map(arr => tf.tensor(arr));
+      model.setWeights(weightTensors);
+      weightTensors.forEach(t => t.dispose());
+      return { model, vocab: saved.vocab, uniqueAnswers: saved.uniqueAnswers, modelType: saved.modelType };
     }
     async function trainModel() {
       if (Object.keys(trainingData).length < 10) {
         showError('Need at least 10 training pairs for a basic model.');
         return;
       }
-      MAX_VOCAB = parseInt(document.getElementById('vocab-slider').value || 200);  // Explicitly set from slider
       elements.trainStatus.classList.remove('hidden');
       elements.trainStatus.innerHTML = '<p class="text-center py-4"><i class="material-icons" style="font-size: 2rem; color: var(--accent);">build</i><br>Preparing data... (Enable WebGL for faster training)</p>';
       elements.modelStatus.classList.add('hidden');
@@ -731,7 +735,7 @@
         const uniqueAnswers = [...new Set(pairs.map(p => p.a))];
         const modelType = document.querySelector('input[name="model-type"]:checked').value;
         const retrain = document.getElementById('retrain-toggle').checked;
-        let model, xs, sampleInput, isLoaded = false;
+        let model, xs, sampleInput, vocab, vocabSize, maxLen, isLoaded = false;
         const modelNameInput = document.getElementById('model-name');
         let modelName = modelNameInput ? modelNameInput.value.trim() : '';
         // Compute next version
@@ -753,15 +757,28 @@
           const snap = await get(modelRef);
           if (snap.exists() && snap.val().modelType === modelType) {
             const saved = snap.val();
-            const embedModel = await use.load();
-            const questions = pairs.map(p => p.q);
-            xs = await embedModel.embed(questions);
-            sampleInput = await embedModel.embed(['hello how are you today?']);
+            let savedVocab;
+            if (modelType === 'classifier') {
+              savedVocab = saved.vocab;
+              const qs = pairs.map(p => textToVector(p.q, savedVocab));
+              xs = tf.tensor2d(qs);
+              sampleInput = tf.tensor2d([textToVector('hello how are you today', savedVocab)]);
+              vocabSize = savedVocab.length;
+            } else {
+              savedVocab = saved.vocab;
+              const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+              savedVocab.forEach((word, i) => wordToIdx.set(word, i + 2));
+              maxLen = saved.maxLen;
+              const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
+              xs = tf.tensor2d(sequences);
+              sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
+              vocabSize = saved.vocabSize;
+            }
             const loadedStuff = await loadModelFromSaved(saved);
             model = loadedStuff.model;
+            vocab = savedVocab;
             elements.trainStatus.innerHTML += '<p class="text-green-600">Loaded existing model for retraining.</p>';
             isLoaded = true;
-            embedModel.dispose();
           } else {
             elements.trainStatus.innerHTML += '<p class="text-yellow-600">Current model incompatible or not found. Training new model from scratch.</p>';
           }
@@ -769,14 +786,9 @@
           elements.trainStatus.innerHTML += '<p class="text-yellow-600">No current model found. Training new model from scratch.</p>';
         }
         if (!isLoaded) {
-          const embedModel = await use.load();
-          const questions = pairs.map(p => p.q);
-          xs = await embedModel.embed(questions);
-          sampleInput = await embedModel.embed(['hello how are you today?']);
+          vocab = buildVocab(pairs);
+          vocabSize = vocab.length;
           if (modelType === 'classifier') {
-            // For classifier, use custom vocab (legacy)
-            const vocab = buildVocab(pairs);
-            const vocabSize = vocab.length;
             const qs = pairs.map(p => textToVector(p.q, vocab));
             xs = tf.tensor2d(qs);
             sampleInput = tf.tensor2d([textToVector('hello how are you today', vocab)]);
@@ -787,17 +799,23 @@
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
-            embedModel.dispose();  // Not used
           } else {
-            // GRU with USE
+            const wordToIdx = new Map([['<PAD>', 0], ['<UNK>', 1]]);
+            vocab.forEach((word, i) => wordToIdx.set(word, i + 2));
+            vocabSize = vocab.length + 2;
+            maxLen = Math.min(MAX_SEQ_LEN, Math.max(10, ...pairs.map(p =>
+              p.q.toLowerCase().split(/\s+/).filter(w => w.length > 1).length
+            )));
+            const sequences = pairs.map(p => questionToSequence(p.q, wordToIdx, maxLen));
+            xs = tf.tensor2d(sequences);
+            sampleInput = tf.tensor2d([questionToSequence('hello how are you today', wordToIdx, maxLen)]);
             model = tf.sequential({
               layers: [
-                tf.layers.reshape({ targetShape: [1, 512] }),
-                tf.layers.gru({ units: 16, dropout: 0.3 }),
+                tf.layers.embedding({ inputDim: vocabSize, outputDim: 8, inputLength: maxLen }),
+                tf.layers.gru({ units: 16, dropout: 0.3 }), // GRU for faster training
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
-            embedModel.dispose();
           }
           model.compile({
             optimizer: tf.train.adam(0.001),
@@ -807,8 +825,8 @@
         }
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
-        const gruInfo = modelType === 'gru' ? ` | Embed Dim: 512` : ` | Vocab: ${xs.shape[1]}`;
-        elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Classes: ${uniqueAnswers.length}${gruInfo}</p>`;
+        const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
+        elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${gruInfo}</p>`;
         elements.trainStatus.innerHTML += `<p><strong>Version:</strong> ${nextVersion}</p>`;
         // Setup dynamic training chart
         const chartContainer = document.createElement('div');
@@ -908,7 +926,7 @@
         const predIdx = pred.argMax(-1).dataSync()[0];
         const predictedA = uniqueAnswers[predIdx];
         elements.trainStatus.innerHTML += `<p><strong>Test Input:</strong> "hello how are you today" → <em>"${predictedA}"</em></p>`;
-        const allWeights = model.getWeights();
+        const weights = model.getWeights().map(w => w.arraySync());
         if (!modelName) {
           modelName = `vinaq v${nextVersion}`;
         }
@@ -918,19 +936,18 @@
           modelName,
           userId: currentUser.uid,
           timestamp: Date.now(),
+          vocab,
           uniqueAnswers,
-          numClasses: uniqueAnswers.length
+          numClasses: uniqueAnswers.length,
+          weights
         };
         if (modelType === 'classifier') {
-          const weights = allWeights.map(w => w.arraySync());
-          saveData.weights = weights;
-          saveData.inputDim = allWeights[0].shape[1];  // Vocab size
+          saveData.inputDim = vocabSize;
         } else {
-          // For GRU, save top weights only
-          const topWeights = allWeights.slice(-2);  // GRU + Dense
-          saveData.topWeights = topWeights.map(w => w.arraySync());
-          saveData.gruUnits = model.layers[1].getConfig().units;  // 16
-          saveData.inputDim = 512;  // USE fixed
+          saveData.vocabSize = vocabSize;
+          saveData.maxLen = maxLen;
+          saveData.embedDim = 8;
+          saveData.gruUnits = 16; // Updated to GRU
         }
         // Always save as new version
         const modelsRef = ref(db, 'models');
@@ -947,7 +964,7 @@
         const loadedPredIdx = loadedPred.argMax(-1).dataSync()[0];
         const loadedPredictedA = loadedUnique[loadedPredIdx];
         elements.trainStatus.innerHTML += `<p><strong>Verification:</strong> "${loadedPredictedA}"</p>`;
-        elements.modelStatus.innerHTML = `<div class="text-center"><i class="material-icons" style="font-size: 3rem; color: #16a34a;">check_circle</i><p class="text-lg font-bold mt-2">${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved!</p><p>Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p class="text-sm text-gray-600 mt-4">Model format: Custom. Use in chat UI with loadModelFromSaved function.<br>For GRU: Use predictWithEmbed for predictions.</p></div>`;
+        elements.modelStatus.innerHTML = `<div class="text-center"><i class="material-icons" style="font-size: 3rem; color: #16a34a;">check_circle</i><p class="text-lg font-bold mt-2">${modelType.toUpperCase()} ${modelName} (v${saved.version}) trained & saved!</p><p>Final Accuracy: ~${(finalAcc * 100).toFixed(1)}%</p><p class="text-sm text-gray-600 mt-4">Model format: Custom. Use in chat UI with loadModelFromSaved function.</p></div>`;
         elements.modelStatus.classList.remove('hidden');
         showSuccess('Training complete—model ready for your chat UI.');
         xs.dispose();
@@ -965,24 +982,6 @@
         }
       }
     }
-    // Exposed for chat UI: Predict with embeddings (GRU mode)
-    window.predictWithEmbed = async function(question, savedModelData) {
-      const embedModel = await use.load();
-      const inputEmbed = await embedModel.embed([question]);
-      const reshaped = inputEmbed.reshape([1, 1, 512]);
-      const loadedStuff = await loadModelFromSaved(savedModelData);
-      const topModel = loadedStuff.model;
-      const output = topModel.predict(reshaped);
-      const predIdx = output.argMax(-1).dataSync()[0];
-      const answer = loadedStuff.uniqueAnswers[predIdx];
-      // Cleanup
-      inputEmbed.dispose();
-      reshaped.dispose();
-      output.dispose();
-      topModel.dispose();
-      embedModel.dispose();
-      return answer;
-    };
     function loadTrainingData() {
       showOverlay('Fetching training data...');
       const trainingRef = ref(db, 'training_data');
@@ -1013,10 +1012,10 @@
                 </label>
                 <label class="flex items-center gap-2">
                   <input type="radio" name="model-type" value="gru">
-                  <span>GRU + Pre-trained Embeddings (semantic)</span>
+                  <span>GRU (efficient sequence input)</span>
                 </label>
                 <div class="slider-container">
-                  <span>Max Vocab (Classifier only):</span>
+                  <span>Max Vocab:</span>
                   <input type="range" id="vocab-slider" min="50" max="500" value="200" step="50">
                   <span id="vocab-value">200</span>
                 </div>
