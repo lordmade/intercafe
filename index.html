@@ -702,9 +702,10 @@
               outputDim: saved.embedDim || 8,
               inputLength: saved.maxLen
             }),
-            tf.layers.gru({ // Switched to GRU for efficiency
-              units: saved.gruUnits || 16,
-              dropout: 0.3
+            tf.layers.lstm({ // Updated to LSTM for better sequence handling
+              units: saved.lstmUnits || 16,
+              dropout: 0.3,
+              returnSequences: false
             }),
             tf.layers.dense({ units: saved.numClasses, activation: 'softmax' })
           ]
@@ -812,7 +813,7 @@
             model = tf.sequential({
               layers: [
                 tf.layers.embedding({ inputDim: vocabSize, outputDim: 8, inputLength: maxLen }),
-                tf.layers.gru({ units: 16, dropout: 0.3 }), // GRU for faster training
+                tf.layers.lstm({ units: 16, dropout: 0.3, returnSequences: false }), // Updated to LSTM
                 tf.layers.dense({ units: uniqueAnswers.length, activation: 'softmax' })
               ]
             });
@@ -825,8 +826,8 @@
         }
         const answerIndices = encodeAnswers(pairs, uniqueAnswers);
         const ys = tf.oneHot(tf.tensor1d(answerIndices, 'int32'), uniqueAnswers.length);
-        const gruInfo = modelType === 'gru' ? ` | Max len: ${maxLen}` : '';
-        elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${gruInfo}</p>`;
+        const lstmInfo = modelType === 'lstm' ? ` | Max len: ${maxLen}` : '';
+        elements.trainStatus.innerHTML += `<p><strong>Model:</strong> ${modelType.toUpperCase()} | Vocab: ${vocabSize} | Classes: ${uniqueAnswers.length}${lstmInfo}</p>`;
         elements.trainStatus.innerHTML += `<p><strong>Version:</strong> ${nextVersion}</p>`;
         // Setup dynamic training chart
         const chartContainer = document.createElement('div');
@@ -947,7 +948,7 @@
           saveData.vocabSize = vocabSize;
           saveData.maxLen = maxLen;
           saveData.embedDim = 8;
-          saveData.gruUnits = 16; // Updated to GRU
+          saveData.lstmUnits = 16; // Updated to LSTM
         }
         // Always save as new version
         const modelsRef = ref(db, 'models');
@@ -1011,8 +1012,8 @@
                   <span>Classifier (fast retrieval)</span>
                 </label>
                 <label class="flex items-center gap-2">
-                  <input type="radio" name="model-type" value="gru">
-                  <span>GRU (efficient sequence input)</span>
+                  <input type="radio" name="model-type" value="lstm">
+                  <span>LSTM (sequence input with memory)</span>
                 </label>
                 <div class="slider-container">
                   <span>Max Vocab:</span>
