@@ -564,7 +564,6 @@
     let valData; // For evaluation
     const lossData = [];
     const userPrefix = '@katlegofra15525'; // Your handle for model organization
-    let worker; // Web Worker for training
     let hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true'; // Flag to avoid repeated auto-training
     let totalIterations = 0; // For progress tracking
 
@@ -604,6 +603,33 @@
       }
 
       return bp * score;
+    }
+
+    // Simple word overlap for similarity
+    function wordOverlap(a, b) {
+      const wordsA = a.split(/\s+/).filter(w => w.length > 2);
+      const wordsB = b.split(/\s+/).filter(w => w.length > 2);
+      let matches = 0;
+      wordsA.forEach(wa => {
+        if (wordsB.some(wb => wb.includes(wa) || wa.includes(wb))) matches++;
+      });
+      return matches / Math.max(wordsA.length, 1);
+    }
+
+    // Find best matching pair from data
+    function findBestMatch(query) {
+      const qLower = query.toLowerCase();
+      let bestScore = 0;
+      let bestPair = null;
+      for (let key in qaData) {
+        const pairQ = qaData[key].q.toLowerCase();
+        const score = wordOverlap(qLower, pairQ);
+        if (score > bestScore) {
+          bestScore = score;
+          bestPair = qaData[key];
+        }
+      }
+      return { pair: bestPair, score: bestScore };
     }
 
     // Overlay functions
@@ -755,6 +781,7 @@
           elements.trainingSection.classList.remove('hidden');
           elements.qaSection.classList.remove('hidden');
           elements.dataManagement.classList.remove('hidden');
+          elements.generateBtn.disabled = false; // Enable generate for data-based search
         }
         renderDataList();
 
@@ -769,6 +796,7 @@
         if (!dataLoaded) {
           dataLoaded = true;
           hideOverlay();
+          elements.generateBtn.disabled = false; // Still enable for empty data
         }
       });
     }
@@ -896,53 +924,7 @@
       });
     }
 
-    // Initialize Web Worker
-    function initWorker() {
-      if (typeof Worker !== 'undefined') {
-        worker = new Worker('training-worker.js');
-        worker.onmessage = function(e) {
-          const { type, error, iteration, json, total } = e.data;
-          if (type === 'progress') {
-            lossData.push(error);
-            chart.data.labels.push(lossData.length);
-            chart.data.datasets[0].data.push(error);
-            chart.update('quiet');
-            elements.currentLoss.textContent = error.toFixed(6);
-            updateTrainingProgress(iteration, total);
-          } else if (type === 'complete') {
-            // Reconstruct net from JSON
-            const typeNet = elements.networkType.value;
-            net = typeNet === 'LSTM' ? new brain.recurrent.LSTM() :
-                  typeNet === 'GRU' ? new brain.recurrent.GRU() :
-                  new brain.recurrent.RNN();
-            net.fromJSON(JSON.parse(json));
-            elements.trainingProgressContainer.classList.add('hidden');
-            showSuccess(`Training complete! Final loss: ${error.toFixed(6)}`);
-            training = false;
-            elements.startTrainingBtn.disabled = false;
-            elements.stopTrainingBtn.disabled = true;
-            elements.generateBtn.disabled = false;
-            elements.saveModelBtn.disabled = false;
-            elements.evaluateBtn.disabled = false;
-            evaluateModel(); // Auto-eval
-            // Auto-save model
-            saveModelToFirebase();
-            // Set flag
-            hasAutoTrained = true;
-            localStorage.setItem('vynix-auto-trained', 'true');
-          }
-        };
-        worker.onerror = function(err) {
-          console.error('Worker error:', err);
-          showError('Training worker failed; falling back to main thread.');
-          // fallbackTrain will be called in startTraining
-        };
-      } else {
-        showError('Web Workers not supported; training may block UI.');
-      }
-    }
-
-    // Fallback synchronous training
+    // Fallback synchronous training (always used, no worker)
     function fallbackTrain(trainData, options, type) {
       net = type === 'LSTM' ? new brain.recurrent.LSTM() :
             type === 'GRU' ? new brain.recurrent.GRU() :
@@ -1064,37 +1046,18 @@
       elements.trainingProgressFill.style.width = '0%';
       elements.trainingStatus.textContent = 'Training: 0%';
 
-      if (worker) {
-        // Use worker: Send data
-        worker.postMessage({
-          action: 'init',
-          data: {
-            type,
-            trainData,
-            options: {
-              iterations: totalIterations,
-              learningRate,
-              errorThresh: 0.005,
-              log: true,
-              logPeriod: 100
-            }
-          }
-        });
-      } else {
-        // Fallback
-        fallbackTrain(trainData, {
-          iterations: totalIterations,
-          learningRate,
-          errorThresh: 0.005,
-          log: true,
-          logPeriod: 100
-        }, type);
-      }
+      // Always use fallback (synchronous) training
+      fallbackTrain(trainData, {
+        iterations: totalIterations,
+        learningRate,
+        errorThresh: 0.005,
+        log: true,
+        logPeriod: 100
+      }, type);
     }
 
     elements.stopTrainingBtn.addEventListener('click', () => {
       training = false;
-      if (worker) worker.terminate();
       elements.trainingProgressContainer.classList.add('hidden');
       showSuccess('Training stopped.');
     });
@@ -1156,9 +1119,23 @@
     }
 
     function generateResponse() {
-      if (!net) return showError('Train or load a model first!');
       const query = elements.queryInput.value.trim();
       if (!query) return;
+
+      if (!net) {
+        // Fallback to data search
+        const { pair, score } = findBestMatch(query);
+        if (pair && score > 0.5) {
+          elements.generatedText.innerHTML = `<strong>Match found (${(score * 100).toFixed(0)}% similarity):</strong><br>${pair.a}`;
+        } else {
+          elements.generatedText.innerHTML = '<strong>No good match found.</strong><br>Try adding a similar Q&A pair or training the model for generated responses.';
+        }
+        elements.generatedText.classList.remove('hidden');
+        elements.queryInput.value = '';
+        return;
+      }
+
+      // Use trained model
       const seed = `Q: ${query} A: `;
       let result = seed;
       for (let i = 0; i < 100; i++) { // Generate up to 100 chars
@@ -1237,7 +1214,7 @@
         elements.trainingSection.classList.remove('hidden');
         loadQIData();
         setupChart();
-        initWorker();  // Init worker here
+        // Removed initWorker() to use synchronous training only
         // Restore auto-train flag on login
         hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true';
       } else {
