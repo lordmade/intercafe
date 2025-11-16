@@ -926,9 +926,12 @@
 
     // Fallback synchronous training (always used, no worker)
     function fallbackTrain(trainData, options, type) {
-      net = type === 'LSTM' ? new brain.recurrent.LSTM() :
-            type === 'GRU' ? new brain.recurrent.GRU() :
-            new brain.recurrent.RNN();
+      const numLayers = parseInt(elements.hiddenLayers.value);
+      let netOptions = {};
+      if (type !== 'RNN') {
+        netOptions = { hiddenLayers: new Array(numLayers).fill(128) };
+      }
+      net = new brain.recurrent[type](netOptions);
 
       const result = net.train(trainData, {
         ...options,
@@ -1143,7 +1146,8 @@
         if (!next || next === ' ') break;
         result += next;
       }
-      elements.generatedText.textContent = result;
+      const answer = result.split('A: ')[1] || result.replace(seed, '').trim();
+      elements.generatedText.innerHTML = `<strong>Q:</strong> ${query}<br><strong>A:</strong> ${answer}`;
       elements.generatedText.classList.remove('hidden');
       elements.queryInput.value = '';
     }
@@ -1214,7 +1218,6 @@
         elements.trainingSection.classList.remove('hidden');
         loadQIData();
         setupChart();
-        // Removed initWorker() to use synchronous training only
         // Restore auto-train flag on login
         hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true';
       } else {
