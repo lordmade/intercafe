@@ -359,6 +359,13 @@
       font-family: 'Monaco', monospace;
       white-space: pre-wrap;
     }
+    .training-progress {
+      text-align: center;
+      font-family: 'Orbitron', monospace;
+      color: var(--bbm-red);
+      font-weight: 700;
+      margin-top: 0.5rem;
+    }
     @media (max-width: 1024px) {
       .main-grid {
         grid-template-columns: 1fr;
@@ -441,6 +448,12 @@
             <button type="submit" class="btn btn-success" id="startTrainingBtn"><i class="material-icons">play_arrow</i>Train & Evaluate Model</button>
             <button type="button" class="btn btn-danger" id="stopTrainingBtn" disabled><i class="material-icons">stop</i>Stop</button>
           </form>
+          <div id="training-progress-container" class="hidden">
+            <div class="progress-bar">
+              <div id="training-progress-fill" class="progress-fill"></div>
+            </div>
+            <div id="training-status" class="training-progress">Training: 0%</div>
+          </div>
           <div class="mt-4">
             <h4>Training Loss</h4>
             <canvas id="lossChart" class="training-chart"></canvas>
@@ -535,7 +548,10 @@
       generateBtn: document.getElementById('generateBtn'),
       generatedText: document.getElementById('generated-text'),
       dataManagement: document.getElementById('data-management'),
-      dataList: document.getElementById('data-list')
+      dataList: document.getElementById('data-list'),
+      trainingProgressContainer: document.getElementById('training-progress-container'),
+      trainingProgressFill: document.getElementById('training-progress-fill'),
+      trainingStatus: document.getElementById('training-status')
     };
 
     let currentUser;
@@ -550,6 +566,7 @@
     const userPrefix = '@katlegofra15525'; // Your handle for model organization
     let worker; // Web Worker for training
     let hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true'; // Flag to avoid repeated auto-training
+    let totalIterations = 0; // For progress tracking
 
     // Simple BLEU implementation
     function computeBleu(candidate, reference) {
@@ -634,6 +651,13 @@
         </div>` : ''}
       `;
       elements.metrics.classList.remove('hidden');
+    }
+
+    // New: Update training progress
+    function updateTrainingProgress(iteration, total) {
+      const percentage = Math.min((iteration / total) * 100, 100);
+      elements.trainingProgressFill.style.width = `${percentage}%`;
+      elements.trainingStatus.textContent = `Training: ${percentage.toFixed(1)}% (Iteration ${iteration}/${total}, Loss: ${elements.currentLoss.textContent})`;
     }
 
     // Q&A Data Functions
@@ -877,21 +901,22 @@
       if (typeof Worker !== 'undefined') {
         worker = new Worker('training-worker.js');
         worker.onmessage = function(e) {
-          const { type, error, iteration, json } = e.data;
+          const { type, error, iteration, json, total } = e.data;
           if (type === 'progress') {
             lossData.push(error);
             chart.data.labels.push(lossData.length);
             chart.data.datasets[0].data.push(error);
             chart.update('quiet');
             elements.currentLoss.textContent = error.toFixed(6);
-            elements.spinnerText.textContent = `Training... Iteration ${iteration} (Loss: ${error.toFixed(4)})`;
+            updateTrainingProgress(iteration, total);
           } else if (type === 'complete') {
             // Reconstruct net from JSON
-            const type = elements.networkType.value;
-            net = type === 'LSTM' ? new brain.recurrent.LSTM() :
-                  type === 'GRU' ? new brain.recurrent.GRU() :
+            const typeNet = elements.networkType.value;
+            net = typeNet === 'LSTM' ? new brain.recurrent.LSTM() :
+                  typeNet === 'GRU' ? new brain.recurrent.GRU() :
                   new brain.recurrent.RNN();
             net.fromJSON(JSON.parse(json));
+            elements.trainingProgressContainer.classList.add('hidden');
             showSuccess(`Training complete! Final loss: ${error.toFixed(6)}`);
             training = false;
             elements.startTrainingBtn.disabled = false;
@@ -899,7 +924,6 @@
             elements.generateBtn.disabled = false;
             elements.saveModelBtn.disabled = false;
             elements.evaluateBtn.disabled = false;
-            hideOverlay();
             evaluateModel(); // Auto-eval
             // Auto-save model
             saveModelToFirebase();
@@ -911,7 +935,7 @@
         worker.onerror = function(err) {
           console.error('Worker error:', err);
           showError('Training worker failed; falling back to main thread.');
-          fallbackTrain(); // Define fallback below
+          // fallbackTrain will be called in startTraining
         };
       } else {
         showError('Web Workers not supported; training may block UI.');
@@ -933,16 +957,17 @@
           chart.data.datasets[0].data.push(stats.error);
           chart.update('quiet');
           elements.currentLoss.textContent = stats.error.toFixed(6);
+          updateTrainingProgress(stats.iterations, totalIterations);
         },
         callbackPeriod: 10
       });
 
+      elements.trainingProgressContainer.classList.add('hidden');
       training = false;
       elements.startTrainingBtn.disabled = false;
       elements.stopTrainingBtn.disabled = true;
       elements.generateBtn.disabled = false;
       elements.saveModelBtn.disabled = false;
-      hideOverlay();
       showSuccess(`Training complete! Final loss: ${result.error.toFixed(6)}. Evaluating...`);
       evaluateModel(); // Auto-eval
       // Auto-save model
@@ -1022,7 +1047,7 @@
       }
 
       const type = elements.networkType.value;
-      const iterations = parseInt(elements.iterations.value);
+      totalIterations = parseInt(elements.iterations.value);
       const learningRate = parseFloat(elements.learningRate.value);
 
       training = true;
@@ -1034,7 +1059,10 @@
       lossData.length = 0;
       chart.update();
 
-      showOverlay('Initializing training...');
+      // Show training progress bar
+      elements.trainingProgressContainer.classList.remove('hidden');
+      elements.trainingProgressFill.style.width = '0%';
+      elements.trainingStatus.textContent = 'Training: 0%';
 
       if (worker) {
         // Use worker: Send data
@@ -1044,7 +1072,7 @@
             type,
             trainData,
             options: {
-              iterations,
+              iterations: totalIterations,
               learningRate,
               errorThresh: 0.005,
               log: true,
@@ -1052,12 +1080,10 @@
             }
           }
         });
-        elements.spinnerText.textContent = 'Training in background...';
       } else {
         // Fallback
-        hideOverlay();
         fallbackTrain(trainData, {
-          iterations,
+          iterations: totalIterations,
           learningRate,
           errorThresh: 0.005,
           log: true,
@@ -1069,8 +1095,8 @@
     elements.stopTrainingBtn.addEventListener('click', () => {
       training = false;
       if (worker) worker.terminate();
+      elements.trainingProgressContainer.classList.add('hidden');
       showSuccess('Training stopped.');
-      hideOverlay();
     });
 
     elements.evaluateBtn.addEventListener('click', evaluateModel);
@@ -1087,7 +1113,7 @@
           timestamp: timestamp,
           name: `Auto-Trained Model ${new Date(timestamp).toLocaleString()}`,
           json: JSON.stringify(json),
-          iterations: parseInt(elements.iterations.value),
+          iterations: totalIterations,
           networkType: elements.networkType.value
         };
         await set(modelRef, modelData);
