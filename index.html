@@ -548,6 +548,8 @@
     let valData; // For evaluation
     const lossData = [];
     const userPrefix = '@katlegofra15525'; // Your handle for model organization
+    let worker; // Web Worker for training
+    let hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true'; // Flag to avoid repeated auto-training
 
     // Simple BLEU implementation
     function computeBleu(candidate, reference) {
@@ -634,7 +636,7 @@
       elements.metrics.classList.remove('hidden');
     }
 
-    // Q&A Data Functions (unchanged)
+    // Q&A Data Functions
     async function addPair(q, a) {
       if (!currentUser || !q.trim() || !a.trim()) {
         throw new Error('Please log in and enter both question and answer.');
@@ -663,6 +665,8 @@
         await remove(qaRef);
         showSuccess('All Q&A data cleared successfully!');
         elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Data';
+        localStorage.removeItem('vynix-auto-trained'); // Reset flag
+        hasAutoTrained = false;
       } catch (error) {
         showError('Failed to clear data: ' + error.message);
         elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Data';
@@ -696,10 +700,21 @@
       try {
         await remove(ref(db, `qa_data/${key}`));
         showSuccess('Pair deleted.');
+        // If pairs drop below 5 after delete, reset auto-train flag
+        if (Object.keys(qaData).length <= 5) {
+          localStorage.removeItem('vynix-auto-trained');
+          hasAutoTrained = false;
+        }
       } catch (error) {
         showError('Failed to delete: ' + error.message);
       }
     };
+
+    // New: Check if auto-training should start
+    function shouldAutoTrain() {
+      const pairCount = Object.keys(qaData).length;
+      return pairCount >= 5 && !hasAutoTrained && !net; // No model loaded
+    }
 
     function loadQIData() {
       showOverlay('Fetching Q&A data...');
@@ -718,6 +733,12 @@
           elements.dataManagement.classList.remove('hidden');
         }
         renderDataList();
+
+        // Auto-trigger training if conditions met
+        if (shouldAutoTrain()) {
+          showSuccess('Sufficient data detected. Starting automatic training...');
+          setTimeout(() => startTraining(new Event('auto')), 1000); // Delay to show message
+        }
       }, (error) => {
         showError('Failed to load data: ' + error.message);
         elements.loading.classList.add('hidden');
@@ -728,7 +749,7 @@
       });
     }
 
-    // Bulk functionality (unchanged)
+    // Bulk functionality
     function parseBulkData(content, mode) {
       let lines;
       if (mode === 'csv') {
@@ -818,6 +839,9 @@
       }
       elements.bulkPreview.classList.add('hidden');
       renderDataList();
+      // Reset auto-train flag after bulk add (to allow re-training if desired)
+      localStorage.removeItem('vynix-auto-trained');
+      hasAutoTrained = false;
     }
 
     // Brain.js Training Functions
@@ -846,6 +870,86 @@
         data: { labels: [], datasets: [{ label: 'Training Loss', data: [], borderColor: '#10b981', fill: false }] },
         options: { responsive: true, scales: { y: { beginAtZero: false } } }
       });
+    }
+
+    // Initialize Web Worker
+    function initWorker() {
+      if (typeof Worker !== 'undefined') {
+        worker = new Worker('training-worker.js');
+        worker.onmessage = function(e) {
+          const { type, error, iteration, json } = e.data;
+          if (type === 'progress') {
+            lossData.push(error);
+            chart.data.labels.push(lossData.length);
+            chart.data.datasets[0].data.push(error);
+            chart.update('quiet');
+            elements.currentLoss.textContent = error.toFixed(6);
+            elements.spinnerText.textContent = `Training... Iteration ${iteration} (Loss: ${error.toFixed(4)})`;
+          } else if (type === 'complete') {
+            // Reconstruct net from JSON
+            const type = elements.networkType.value;
+            net = type === 'LSTM' ? new brain.recurrent.LSTM() :
+                  type === 'GRU' ? new brain.recurrent.GRU() :
+                  new brain.recurrent.RNN();
+            net.fromJSON(JSON.parse(json));
+            showSuccess(`Training complete! Final loss: ${error.toFixed(6)}`);
+            training = false;
+            elements.startTrainingBtn.disabled = false;
+            elements.stopTrainingBtn.disabled = true;
+            elements.generateBtn.disabled = false;
+            elements.saveModelBtn.disabled = false;
+            elements.evaluateBtn.disabled = false;
+            hideOverlay();
+            evaluateModel(); // Auto-eval
+            // Auto-save model
+            saveModelToFirebase();
+            // Set flag
+            hasAutoTrained = true;
+            localStorage.setItem('vynix-auto-trained', 'true');
+          }
+        };
+        worker.onerror = function(err) {
+          console.error('Worker error:', err);
+          showError('Training worker failed; falling back to main thread.');
+          fallbackTrain(); // Define fallback below
+        };
+      } else {
+        showError('Web Workers not supported; training may block UI.');
+      }
+    }
+
+    // Fallback synchronous training
+    function fallbackTrain(trainData, options, type) {
+      net = type === 'LSTM' ? new brain.recurrent.LSTM() :
+            type === 'GRU' ? new brain.recurrent.GRU() :
+            new brain.recurrent.RNN();
+
+      const result = net.train(trainData, {
+        ...options,
+        callback: (stats) => {
+          if (!training) return false;
+          lossData.push(stats.error);
+          chart.data.labels.push(lossData.length);
+          chart.data.datasets[0].data.push(stats.error);
+          chart.update('quiet');
+          elements.currentLoss.textContent = stats.error.toFixed(6);
+        },
+        callbackPeriod: 10
+      });
+
+      training = false;
+      elements.startTrainingBtn.disabled = false;
+      elements.stopTrainingBtn.disabled = true;
+      elements.generateBtn.disabled = false;
+      elements.saveModelBtn.disabled = false;
+      hideOverlay();
+      showSuccess(`Training complete! Final loss: ${result.error.toFixed(6)}. Evaluating...`);
+      evaluateModel(); // Auto-eval
+      // Auto-save model
+      saveModelToFirebase();
+      // Set flag
+      hasAutoTrained = true;
+      localStorage.setItem('vynix-auto-trained', 'true');
     }
 
     async function evaluateModel() {
@@ -918,9 +1022,8 @@
       }
 
       const type = elements.networkType.value;
-      net = type === 'LSTM' ? new brain.recurrent.LSTM() :
-            type === 'GRU' ? new brain.recurrent.GRU() :
-            new brain.recurrent.RNN();
+      const iterations = parseInt(elements.iterations.value);
+      const learningRate = parseFloat(elements.learningRate.value);
 
       training = true;
       elements.startTrainingBtn.disabled = true;
@@ -931,40 +1034,43 @@
       lossData.length = 0;
       chart.update();
 
-      const iterations = parseInt(elements.iterations.value);
-      const learningRate = parseFloat(elements.learningRate.value);
+      showOverlay('Initializing training...');
 
-      showOverlay('Training model...');
-      net.train(trainData, {
-        iterations: iterations,
-        log: true,
-        logPeriod: 100,
-        learningRate: learningRate,
-        errorThresh: 0.005,
-        callback: (stats) => {
-          if (!training) return false;
-          lossData.push(stats.error);
-          chart.data.labels.push(lossData.length);
-          chart.data.datasets[0].data.push(stats.error);
-          chart.update('quiet');
-          elements.currentLoss.textContent = stats.error.toFixed(6);
-        },
-        callbackPeriod: 10
-      });
-
-      training = false;
-      elements.startTrainingBtn.disabled = false;
-      elements.stopTrainingBtn.disabled = true;
-      elements.generateBtn.disabled = false;
-      elements.saveModelBtn.disabled = false;
-      hideOverlay();
-      showSuccess('Training complete! Evaluating...');
-      await evaluateModel(); // Auto-eval
+      if (worker) {
+        // Use worker: Send data
+        worker.postMessage({
+          action: 'init',
+          data: {
+            type,
+            trainData,
+            options: {
+              iterations,
+              learningRate,
+              errorThresh: 0.005,
+              log: true,
+              logPeriod: 100
+            }
+          }
+        });
+        elements.spinnerText.textContent = 'Training in background...';
+      } else {
+        // Fallback
+        hideOverlay();
+        fallbackTrain(trainData, {
+          iterations,
+          learningRate,
+          errorThresh: 0.005,
+          log: true,
+          logPeriod: 100
+        }, type);
+      }
     }
 
     elements.stopTrainingBtn.addEventListener('click', () => {
       training = false;
+      if (worker) worker.terminate();
       showSuccess('Training stopped.');
+      hideOverlay();
     });
 
     elements.evaluateBtn.addEventListener('click', evaluateModel);
@@ -979,15 +1085,15 @@
         const modelData = {
           user: userPrefix,
           timestamp: timestamp,
-          name: `Trained Model ${new Date(timestamp).toLocaleString()}`,
+          name: `Auto-Trained Model ${new Date(timestamp).toLocaleString()}`,
           json: JSON.stringify(json),
           iterations: parseInt(elements.iterations.value),
           networkType: elements.networkType.value
         };
         await set(modelRef, modelData);
-        showSuccess(`Model saved to Firebase! ID: ${modelId}`);
+        showSuccess(`Model auto-saved to Firebase! ID: ${modelId}`);
       } catch (error) {
-        showError(`Save failed: ${error.message}`);
+        showError(`Auto-save failed: ${error.message}`);
       }
     }
 
@@ -1015,6 +1121,8 @@
         net.fromJSON(JSON.parse(modelData.json));
         elements.generateBtn.disabled = false;
         elements.evaluateBtn.disabled = false;
+        hasAutoTrained = true; // Treat as trained
+        localStorage.setItem('vynix-auto-trained', 'true');
         showSuccess(`Loaded: ${modelData.name}. Click Evaluate!`);
       } catch (error) {
         showError(`Load failed: ${error.message}`);
@@ -1048,6 +1156,9 @@
         elements.newA.value = '';
         showSuccess('Pair added successfully!');
         renderDataList();
+        // Reset auto-train flag after single add
+        localStorage.removeItem('vynix-auto-trained');
+        hasAutoTrained = false;
       } catch (error) {
         showError(error.message);
       }
@@ -1099,7 +1210,10 @@
         elements.bulkForm.classList.remove('hidden');
         elements.trainingSection.classList.remove('hidden');
         loadQIData();
-        setupChart(); // Init chart on login
+        setupChart();
+        initWorker();  // Init worker here
+        // Restore auto-train flag on login
+        hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true';
       } else {
         hideOverlay();
         elements.authStatus.innerHTML = '<div class="flex items-center justify-center gap-2"><span>Not logged in.</span><button class="btn" onclick="signInAnonymously()"><i class="material-icons">login</i>Sign In Anonymously</button></div>';
@@ -1124,6 +1238,8 @@
 
     window.signOutUser = async function() {
       try {
+        localStorage.removeItem('vynix-auto-trained'); // Reset on sign out
+        hasAutoTrained = false;
         await signOut(auth);
       } catch (error) {
         showError('Sign out failed: ' + error.message);
