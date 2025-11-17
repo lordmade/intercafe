@@ -110,7 +110,7 @@
     let charToIx = {};
     let ixToChar = [];
     let vocabSize = 0;
-    let seqLen = 40; // Sequence length for training
+    let seqLen = 20; // Reduced for faster training
     let userModels = {};
     let trainedAccuracy = 0;
     let modelReady = false;
@@ -162,7 +162,7 @@
       });
     }
 
-    // Encode text to one-hot sequences
+    // Encode text to sequence of indices
     function encodeText(text, maxLen = seqLen) {
       const encoded = text.split('').map(char => charToIx[char] || 0);
       while (encoded.length < maxLen) encoded.push(0);
@@ -171,7 +171,7 @@
 
     // Decode sequence to text
     function decodeSequence(encoded) {
-      return encoded.map(ix => ixToChar[ix] || '?').join('');
+      return encoded.map(ix => ixToChar[ix] || '?').join('').trim();
     }
 
     // Prepare training data as sequences
@@ -188,17 +188,18 @@
           ys.push(y);
         }
       });
-      return { xs: tf.tensor2d(xs, [xs.length, seqLen]), ys: tf.tensor2d(ys, [ys.length, seqLen]) };
+      if (xs.length === 0) return null;
+      const xsTensor = tf.tensor2d(xs, [xs.length, seqLen]);
+      const ysTensor = tf.tensor2d(ys, [ys.length, seqLen]).expandDims(-1); // [batch, seq, 1] for sparse
+      return { xs: xsTensor, ys: ysTensor };
     }
 
-    // Create LSTM model
+    // Create smaller, faster LSTM model
     function createModel() {
       const model = tf.sequential({
         layers: [
-          tf.layers.embedding({ inputDim: vocabSize, outputDim: 64, inputLength: seqLen }),
-          tf.layers.lstm({ units: 128, returnSequences: true }),
-          tf.layers.dropout({ rate: 0.2 }),
-          tf.layers.lstm({ units: 128, returnSequences: true }),
+          tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: seqLen }), // Reduced embedding dim
+          tf.layers.lstm({ units: 64, returnSequences: true }), // Reduced units, single layer
           tf.layers.dropout({ rate: 0.2 }),
           tf.layers.timeDistributed({
             layer: tf.layers.dense({ units: vocabSize, activation: 'softmax' })
@@ -206,7 +207,7 @@
         ]
       });
       model.compile({
-        optimizer: 'adam',
+        optimizer: tf.train.adam(0.001), // Explicit Adam with LR
         loss: 'sparseCategoricalCrossentropy',
         metrics: ['accuracy']
       });
@@ -317,11 +318,16 @@
       if (!model || trainingData.length === 0) return 0;
       let correct = 0;
       trainingData.forEach(pair => {
-        const inputEncoded = encodeText(pair.input);
-        const pred = model.predict(tf.tensor2d([inputEncoded], [1, seqLen]));
-        const predArgmax = pred.argMax(-1).dataSync()[0];
-        const decodedPred = decodeSequence(Array.from(predArgmax).slice(0, pair.output.length));
-        if (decodedPred.trim() === pair.output.trim()) correct++;
+        const inputEncoded = tf.tidy(() => {
+          const x = tf.tensor2d([encodeText(pair.input)], [1, seqLen]);
+          const pred = model.predict(x);
+          const argmax = pred.argMax(-1).dataSync()[0];
+          x.dispose();
+          pred.dispose();
+          return argmax;
+        });
+        const decodedPred = decodeSequence(Array.from(inputEncoded).slice(0, pair.output.length));
+        if (decodedPred === pair.output) correct++;
       });
       return (correct / trainingData.length) * 100;
     }
@@ -340,13 +346,14 @@
         const data = prepareData();
         if (!data) throw new Error('Failed to prepare data.');
 
-        const totalEpochs = 50; // Reduced for browser speed
+        const totalEpochs = 20; // Reduced for speed
         elements.trainingLog.innerHTML += '<br>Training for ' + totalEpochs + ' epochs...';
 
-        await model.fit(data.xs, data.ys, {
+        const history = await model.fit(data.xs, data.ys, {
           epochs: totalEpochs,
-          batchSize: 32,
+          batchSize: 16, // Smaller batch for browser
           validationSplit: 0.2,
+          shuffle: true, // Shuffle for better training
           callbacks: {
             onEpochEnd: (epoch, logs) => {
               const progress = ((epoch + 1) / totalEpochs) * 100;
@@ -378,13 +385,16 @@
         return;
       }
       try {
-        const inputEncoded = encodeText(input);
-        const pred = model.predict(tf.tensor2d([inputEncoded], [1, seqLen]));
-        const predArgmax = pred.argMax(-1).dataSync()[0];
-        const decodedPred = decodeSequence(Array.from(predArgmax));
-        elements.predictionText.textContent = decodedPred.trim();
+        const decodedPred = tf.tidy(() => {
+          const inputEncoded = tf.tensor2d([encodeText(input)], [1, seqLen]);
+          const pred = model.predict(inputEncoded);
+          const argmax = pred.argMax(-1).dataSync()[0];
+          inputEncoded.dispose();
+          pred.dispose();
+          return decodeSequence(Array.from(argmax));
+        });
+        elements.predictionText.textContent = decodedPred;
         elements.testOutput.classList.remove('hidden');
-        pred.dispose();
       } catch (error) {
         elements.predictionText.textContent = 'Error: ' + error.message;
         elements.testOutput.classList.remove('hidden');
@@ -404,9 +414,6 @@
       elements.saveStatus.classList.add('text-blue-600');
       try {
         const modelJson = await model.toJSON();
-        const modelWeights = await model.save(tf.io.withSaveHandler(async (handler) => {
-          await handler.save(tf.io.browserHTTPRequest('', { method: 'POST' }));
-        }));
 
         // Global versioning
         const modelsRef = ref(db, 'global-models');
@@ -486,7 +493,7 @@
         charToIx = data.charToIx || {};
         ixToChar = data.ixToChar || [];
         vocabSize = data.vocabSize || 0;
-        seqLen = data.seqLen || 40;
+        seqLen = data.seqLen || 20;
         trainedAccuracy = data.accuracy || 0;
         updateModelReady();
         elements.testOutput.classList.add('hidden');
