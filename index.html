@@ -1,4 +1,4 @@
-<!-- train.html: Enhanced Dashboard for Training with Bulk Upload -->
+<!-- train.html: Enhanced Dashboard for Training with Bulk Text Paste -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,11 +17,12 @@
   <div class="max-w-4xl mx-auto px-4">
     <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Training Dashboard</h1>
     
-    <!-- Bulk Upload Section -->
+    <!-- Bulk Paste Section -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Upload Bulk Training Data</h2>
+      <h2 class="text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
       <div class="space-y-4">
-        <input type="file" id="bulk-upload" accept=".json,.csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+        <textarea id="bulk-text" placeholder='Paste JSON array (e.g., [{"input": "hello", "output": "Hey!"}]) or CSV content here...' class="w-full p-2 border rounded h-24 text-sm"></textarea>
+        <button id="process-bulk-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Process Bulk Data</button>
         <p class="text-sm text-gray-600">Supports JSON (array of {input: "text", output: "response"}) or CSV (columns: input,output). Max 1000 pairs.</p>
       </div>
       <div id="bulk-status" class="mt-4 text-sm text-gray-600 hidden"></div>
@@ -46,6 +47,12 @@
       <button id="train-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded hover:bg-green-600 disabled:opacity-50" disabled>
         Train Model (0 pairs)
       </button>
+      <div id="progress-container" class="mt-4 hidden">
+        <div class="w-full bg-gray-200 rounded-full h-2.5">
+          <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="progress-text" class="text-sm text-gray-600 mt-2">0%</p>
+      </div>
       <div id="training-log" class="mt-4 text-sm text-gray-600 hidden"></div>
     </div>
 
@@ -91,7 +98,7 @@
     ];
 
     const elements = {
-      bulkUpload: document.getElementById('bulk-upload'),
+      bulkText: document.getElementById('bulk-text'),
       bulkStatus: document.getElementById('bulk-status'),
       inputText: document.getElementById('input-text'),
       outputText: document.getElementById('output-text'),
@@ -99,9 +106,13 @@
       trainingPairs: document.getElementById('training-pairs'),
       loadDefaultsBtn: document.getElementById('load-defaults-btn'),
       trainBtn: document.getElementById('train-btn'),
+      progressContainer: document.getElementById('progress-container'),
+      progressBar: document.getElementById('progress-bar'),
+      progressText: document.getElementById('progress-text'),
       trainingLog: document.getElementById('training-log'),
       saveModelBtn: document.getElementById('save-model-btn'),
-      saveStatus: document.getElementById('save-status')
+      saveStatus: document.getElementById('save-status'),
+      processBulkBtn: document.getElementById('process-bulk-btn')
     };
 
     function normalizeText(text) {
@@ -153,31 +164,31 @@
       elements.bulkStatus.classList.add('hidden');
     }
 
-    async function handleBulkUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+    async function handleBulkText() {
+      const text = elements.bulkText.value.trim();
+      if (!text) return;
       elements.bulkStatus.classList.remove('hidden');
       elements.bulkStatus.textContent = 'Processing...';
       elements.bulkStatus.classList.remove('text-green-600', 'text-red-600');
       elements.bulkStatus.classList.add('text-blue-600');
 
       try {
-        const text = await file.text();
         let newPairs = [];
 
-        if (file.name.endsWith('.json')) {
+        // Try JSON first
+        try {
           const data = JSON.parse(text);
-          if (!Array.isArray(data)) throw new Error('JSON must be an array of objects.');
-          newPairs = data.map(item => ({ input: item.input, output: item.output })).filter(Boolean);
-        } else if (file.name.endsWith('.csv')) {
+          if (Array.isArray(data)) {
+            newPairs = data.map(item => ({ input: item.input, output: item.output })).filter(Boolean);
+          }
+        } catch (jsonErr) {
+          // If JSON fails, try CSV
           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-          if (parsed.errors.length > 0) throw new Error('CSV parsing error: ' + parsed.errors[0].message);
+          if (parsed.errors.length > 0) throw new Error('Parsing error: ' + parsed.errors[0].message);
           newPairs = parsed.data.map(row => ({ input: row.input, output: row.output })).filter(row => row.input && row.output);
-        } else {
-          throw new Error('Unsupported file type. Use JSON or CSV.');
         }
 
-        if (newPairs.length === 0) throw new Error('No valid pairs found in file.');
+        if (newPairs.length === 0) throw new Error('No valid pairs found in pasted content.');
 
         const addedCount = newPairs.reduce((count, pair) => {
           if (trainingData.length >= MAX_PAIRS) return count;
@@ -187,6 +198,7 @@
         elements.bulkStatus.textContent = `Added ${addedCount} new pairs (${newPairs.length - addedCount} skipped due to limits/errors).`;
         elements.bulkStatus.classList.remove('text-blue-600');
         elements.bulkStatus.classList.add('text-green-600');
+        elements.bulkText.value = ''; // Clear textarea after processing
       } catch (error) {
         elements.bulkStatus.textContent = 'Error: ' + error.message;
         elements.bulkStatus.classList.remove('text-blue-600');
@@ -197,25 +209,51 @@
     async function trainModel() {
       if (trainingData.length === 0) return;
       elements.trainBtn.disabled = true;
+      elements.progressContainer.classList.remove('hidden');
       elements.trainingLog.classList.remove('hidden');
       elements.trainingLog.innerHTML = 'Training started...';
+      elements.progressBar.style.width = '0%';
+      elements.progressText.textContent = '0%';
       try {
+        const totalIterations = 200;
         net.train(trainingData, {
-          iterations: 200,
+          iterations: totalIterations,
           errorThresh: 0.005,
           log: true,
           logPeriod: 10,
           callback: (stats) => {
+            const progress = (stats.iterations / totalIterations) * 100;
+            elements.progressBar.style.width = `${progress}%`;
+            elements.progressText.textContent = `${Math.round(progress)}%`;
             elements.trainingLog.innerHTML += `<br>Iteration ${stats.iterations}: Error ${stats.error.toFixed(4)}`;
           },
           callbackPeriod: 10
         });
+        elements.progressBar.style.width = '100%';
+        elements.progressText.textContent = '100%';
         elements.trainingLog.innerHTML += '<br>Training complete!';
         elements.saveModelBtn.disabled = false;
       } catch (error) {
         elements.trainingLog.innerHTML += '<br>Error during training: ' + error.message;
       } finally {
         elements.trainBtn.disabled = false;
+        // Optionally hide progress after a delay, but keep visible for now
+      }
+    }
+
+    function cleanSerializable(obj) {
+      const replacer = (key, value) => {
+        if (typeof value === 'function') return undefined;
+        if (value instanceof RegExp) return undefined;
+        if (value instanceof Date) return value.toISOString();
+        // Add more type handling if needed
+        return value;
+      };
+      try {
+        return JSON.parse(JSON.stringify(obj, replacer));
+      } catch (err) {
+        console.error('Deep serialization failed:', err);
+        throw new Error(`Serialization failed: ${err.message}. Model may contain circular references or unsupported types.`);
       }
     }
 
@@ -227,12 +265,32 @@
       }
       elements.saveModelBtn.disabled = true;
       elements.saveStatus.textContent = 'Saving...';
+      elements.saveStatus.classList.remove('text-green-600', 'text-red-600');
+      elements.saveStatus.classList.add('text-blue-600');
       try {
         const modelJson = net.toJSON();
-        await set(ref(db, `users/${user.uid}/trainedModel`), modelJson);
+        const cleanedModel = cleanSerializable(modelJson);
+        // Validate that cleaned model is an object
+        if (typeof cleanedModel !== 'object' || cleanedModel === null) {
+          throw new Error('Cleaned model is not a valid object.');
+        }
+        await set(ref(db, `users/${user.uid}/trainedModel`), cleanedModel);
         elements.saveStatus.textContent = 'Model saved successfully!';
+        elements.saveStatus.classList.remove('text-blue-600');
+        elements.saveStatus.classList.add('text-green-600');
       } catch (error) {
-        elements.saveStatus.textContent = 'Error saving: ' + error.message;
+        console.error('Save model error:', error);
+        let errorMsg = 'Error saving model: ';
+        if (error.message.includes('serialization')) {
+          errorMsg += 'Model contains non-serializable data (e.g., functions). Try training with fewer pairs or simpler data.';
+        } else if (error.message.includes('permission')) {
+          errorMsg += 'Permission denied. Check your Firebase rules.';
+        } else {
+          errorMsg += error.message;
+        }
+        elements.saveStatus.textContent = errorMsg;
+        elements.saveStatus.classList.remove('text-blue-600');
+        elements.saveStatus.classList.add('text-red-600');
       } finally {
         elements.saveModelBtn.disabled = false;
       }
@@ -254,7 +312,7 @@
     }
 
     // Event Listeners
-    elements.bulkUpload.addEventListener('change', handleBulkUpload);
+    elements.processBulkBtn.addEventListener('click', handleBulkText);
     elements.addPairBtn.addEventListener('click', () => addTrainingPair(elements.inputText.value, elements.outputText.value));
     elements.loadDefaultsBtn.addEventListener('click', loadDefaults);
     elements.trainBtn.addEventListener('click', trainModel);
