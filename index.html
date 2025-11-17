@@ -13,37 +13,37 @@
     body { font-family: 'Inter', sans-serif; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen py-8">
-  <div class="max-w-4xl mx-auto px-4">
-    <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Training Dashboard</h1>
+<body class="bg-gray-50 min-h-screen py-4 sm:py-8">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8">Vynix AI Training Dashboard</h1>
     
     <!-- Bulk Paste Section -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+      <h2 class="text-lg sm:text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
       <div class="space-y-4">
-        <textarea id="bulk-text" placeholder='Paste JSON array (e.g., [{"input": "hello", "output": "Hey!"}]) or CSV content here...' class="w-full p-2 border rounded h-24 text-sm"></textarea>
-        <button id="process-bulk-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Process Bulk Data</button>
+        <textarea id="bulk-text" placeholder='Paste JSON array (e.g., [{"input": "hello", "output": "Hey!"}]) or CSV content here...' class="w-full p-2 border rounded h-24 sm:h-32 text-sm"></textarea>
+        <button id="process-bulk-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Process Bulk Data</button>
         <p class="text-sm text-gray-600">Supports JSON (array of {input: "text", output: "response"}) or CSV (columns: input,output). Max 1000 pairs.</p>
       </div>
       <div id="bulk-status" class="mt-4 text-sm text-gray-600 hidden"></div>
     </div>
 
     <!-- Training Data Input -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Add Individual Training Data</h2>
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+      <h2 class="text-lg sm:text-xl font-semibold mb-4">Add Individual Training Data</h2>
       <div id="training-data-form" class="space-y-4">
-        <div class="flex gap-4">
+        <div class="flex flex-col sm:flex-row gap-4">
           <input type="text" id="input-text" placeholder="Input (e.g., 'hello')" class="flex-1 p-2 border rounded">
           <input type="text" id="output-text" placeholder="Output (e.g., 'Hey there!')" class="flex-1 p-2 border rounded">
-          <button id="add-pair-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Pair</button>
         </div>
+        <button id="add-pair-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Pair</button>
       </div>
-      <div id="training-pairs" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></div>
-      <button id="load-defaults-btn" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Load Default Data</button>
+      <div id="training-pairs" class="mt-4 space-y-2 max-h-32 sm:max-h-40 overflow-y-auto"></div>
+      <button id="load-defaults-btn" class="mt-4 w-full sm:w-auto px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Load Default Data</button>
     </div>
 
     <!-- Train Button -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
       <button id="train-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded hover:bg-green-600 disabled:opacity-50" disabled>
         Train Model (0 pairs)
       </button>
@@ -57,8 +57,8 @@
     </div>
 
     <!-- Model Preview Testing -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Model Preview Testing</h2>
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+      <h2 class="text-lg sm:text-xl font-semibold mb-4">Model Preview Testing</h2>
       <div class="space-y-4">
         <input type="text" id="test-input" placeholder="Enter test input (e.g., 'hello')" class="w-full p-2 border rounded">
         <button id="test-model-btn" class="w-full px-6 py-3 bg-indigo-500 text-white font-semibold rounded hover:bg-indigo-600 disabled:opacity-50" disabled>
@@ -72,7 +72,7 @@
     </div>
 
     <!-- Save Model -->
-    <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
       <button id="save-model-btn" class="w-full px-6 py-3 bg-purple-500 text-white font-semibold rounded hover:bg-purple-600 disabled:opacity-50" disabled>
         Save Trained Model to Firebase
       </button>
@@ -80,9 +80,9 @@
     </div>
 
     <!-- Trained Models List -->
-    <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-      <h2 class="text-xl font-semibold mb-4">Your Trained Models</h2>
-      <div id="models-list" class="space-y-2 max-h-60 overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mt-6">
+      <h2 class="text-lg sm:text-xl font-semibold mb-4">Your Trained Models</h2>
+      <div id="models-list" class="space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
         <p class="text-gray-500">Loading models...</p>
       </div>
     </div>
@@ -91,7 +91,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, set, get, remove, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -170,7 +170,7 @@
     function renderTrainingPairs() {
       elements.trainingPairs.innerHTML = trainingData.map((pair, index) => `
         <div class="flex justify-between items-center p-2 bg-gray-100 rounded">
-          <span class="truncate" title="${pair.input} → ${pair.output}">${pair.input} → ${pair.output}</span>
+          <span class="truncate text-sm" title="${pair.input} → ${pair.output}">${pair.input} → ${pair.output}</span>
           <button onclick="removePair(${index})" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
         </div>
       `).join('');
@@ -385,16 +385,15 @@
       }
     }
 
-    async function loadModels() {
-      // No user check needed—global for all auth'd users
-      try {
-        const snapshot = await get(ref(db, 'global-models'));
+    function setupRealtimeModels() {
+      const modelsRef = ref(db, 'global-models');
+      onValue(modelsRef, (snapshot) => {
         userModels = snapshot.val() || {};
         renderModels();
-      } catch (error) {
-        console.error('Error loading global models:', error);
+      }, (error) => {
+        console.error('Realtime listener error:', error);
         document.getElementById('models-list').innerHTML = '<p class="text-red-500">Error loading models.</p>';
-      }
+      });
     }
 
     function renderModels() {
@@ -406,12 +405,12 @@
       listEl.innerHTML = Object.entries(userModels)
         .sort(([a], [b]) => parseInt(b) - parseInt(a)) // Newest first
         .map(([version, data]) => `
-          <div class="flex justify-between items-center p-3 bg-gray-100 rounded border">
-            <div>
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-100 rounded border gap-2">
+            <div class="w-full sm:w-auto">
               <div class="font-medium">Global Version ${version}</div>
               <div class="text-sm text-gray-600">Accuracy: ${(data.accuracy || 0).toFixed(2)}% | Trained by ${data.trainer || 'Unknown'} | ${new Date(data.timestamp).toLocaleString()}</div>
             </div>
-            <div class="space-x-2">
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
               <button onclick="loadModel(${version})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Load</button>
               <button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600" ${data.trainer !== auth?.currentUser?.email ? 'disabled title="Only trainer can delete"' : ''}>Delete</button>
             </div>
@@ -455,7 +454,7 @@
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           console.log('Logged in as:', user.displayName);
-          await loadModels();  // Now loads global
+          setupRealtimeModels();  // Realtime listener for global models
         } else {
           window.location.href = 'signup.html';
         }
