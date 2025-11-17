@@ -433,16 +433,21 @@
     window.deleteModel = async function(version) {
       if (!confirm(`Delete Global Version ${version}?`)) return;
       const user = auth.currentUser;
-      if (!user || userModels[version]?.trainer !== user.email) {
-        alert('Only the trainer can delete this model.');
+      if (!user) {
+        alert('Please log in to delete models.');
+        return;
+      }
+      if (userModels[version]?.trainer !== user.email) {
+        alert('Only the trainer who saved this model can delete it.');
         return;
       }
       try {
         await remove(ref(db, `global-models/${version}`));
-        delete userModels[version];
-        renderModels();
+        // Local update will be handled by realtime listener
+        alert(`Global Version ${version} deleted successfully from Firebase.`);
       } catch (e) {
-        alert('Error deleting: ' + e.message);
+        console.error('Delete error:', e);
+        alert('Error deleting model: ' + e.message);
       }
     };
 
