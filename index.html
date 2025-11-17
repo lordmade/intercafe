@@ -1,497 +1,67 @@
+<!-- train.html: Enhanced Dashboard for Training with Bulk Upload -->
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vynix AI Q&A Brain.js Training</title>
+  <title>Vynix AI - Training Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.23/dist/brain-browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> <!-- For CSV parsing -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #f8f9fa;
-      --card-bg: #ffffff;
-      --text-primary: #1f2937;
-      --text-secondary: #6b7280;
-      --border: #e5e7eb;
-      --accent: #d40000;
-      --bbm-red: #d40000;
-      --success-green: #10b981;
-      --warning-yellow: #f59e0b;
-      --error-red: #ef4444;
-      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-      --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-      --glow: 0 0 10px rgba(212, 0, 0, 0.3);
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text-primary);
-      margin: 0;
-      padding: 0;
-      line-height: 1.6;
-    }
-    .header {
-      background: linear-gradient(135deg, var(--card-bg) 0%, #f8f9fa 100%);
-      padding: 2rem;
-      text-align: center;
-      box-shadow: var(--shadow-md);
-      border-bottom: 1px solid var(--border);
-    }
-    .header h1 {
-      font-family: 'Orbitron', monospace;
-      color: var(--bbm-red);
-      font-weight: 900;
-      font-size: clamp(24px, 4vw, 32px);
-      letter-spacing: 0.5px;
-      text-shadow: var(--glow);
-      margin: 0;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-    }
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 350px;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-    .main-content {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-    .card {
-      background: var(--card-bg);
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: var(--shadow-md);
-      border: 1px solid var(--border);
-    }
-    .add-form, .bulk-form, .training-form {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      align-items: end;
-    }
-    .add-form input, .training-form input, .training-form select {
-      flex: 1;
-      min-width: 200px;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 16px;
-    }
-    .bulk-form {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
-    }
-    .bulk-form input[type="file"], .bulk-form textarea {
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: white;
-    }
-    .bulk-form textarea {
-      min-height: 120px;
-      font-family: 'Monaco', monospace;
-      font-size: 14px;
-    }
-    .bulk-preview {
-      background: #f3f4f6;
-      padding: 1rem;
-      border-radius: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-size: 12px;
-      font-family: 'Monaco', monospace;
-      white-space: pre-wrap;
-      border: 1px solid var(--border);
-    }
-    .btn {
-      background: var(--bbm-red);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .btn:hover {
-      background: #b30000;
-      box-shadow: var(--glow);
-      transform: translateY(-1px);
-    }
-    .btn-danger {
-      background: #ef4444;
-    }
-    .btn-danger:hover {
-      background: #dc2626;
-    }
-    .btn-secondary {
-      background: #6b7280;
-    }
-    .btn-secondary:hover {
-      background: #4b5563;
-    }
-    .btn-success {
-      background: var(--success-green);
-    }
-    .btn-success:hover {
-      background: #059669;
-    }
-    .stats {
-      text-align: center;
-      font-size: 18px;
-      color: var(--text-secondary);
-    }
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-    .metric-card {
-      background: var(--card-bg);
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: var(--shadow-sm);
-      text-align: center;
-      border-left: 4px solid var(--accent);
-    }
-    .metric-value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 0.25rem;
-    }
-    .metric-label {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-    }
-    .quality-score {
-      border-left-color: var(--success-green);
-    }
-    .quality-score .metric-value {
-      color: var(--success-green);
-    }
-    .bleu-score {
-      border-left-color: var(--warning-yellow);
-    }
-    .bleu-score .metric-value {
-      color: var(--warning-yellow);
-    }
-    .perplexity-score {
-      border-left-color: var(--error-red);
-    }
-    .perplexity-score .metric-value {
-      color: var(--error-red);
-    }
-    .warning .metric-value {
-      color: var(--warning-yellow);
-    }
-    .error .metric-value {
-      color: var(--error-red);
-    }
-    .loading {
-      text-align: center;
-      padding: 4rem 2rem;
-      font-style: italic;
-      color: var(--text-secondary);
-    }
-    .error {
-      background: #fef2f2;
-      color: #dc2626;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      border-left: 4px solid #dc2626;
-    }
-    .success {
-      background: #f0fdf4;
-      color: #16a34a;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      border-left: 4px solid #16a34a;
-    }
-    .warning-msg {
-      background: #fffbeb;
-      color: #92400e;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      border-left: 4px solid #f59e0b;
-    }
-    .hidden {
-      display: none !important;
-    }
-    .progress-bar {
-      width: 100%;
-      height: 8px;
-      background: var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 1rem 0;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--bbm-red), #b30000);
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-    .qa-section {
-      text-align: center;
-    }
-    .qa-status {
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    .query-form {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      align-items: end;
-      margin-bottom: 1rem;
-    }
-    .query-form input {
-      flex: 1;
-      min-width: 300px;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 16px;
-    }
-    .results {
-      background: #f3f4f6;
-      padding: 1rem;
-      border-radius: 8px;
-      max-height: 300px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-    }
-    .result-item {
-      margin-bottom: 1rem;
-      padding: 0.5rem;
-      background: white;
-      border-radius: 4px;
-      border-left: 4px solid var(--success-green);
-    }
-    .sim-score {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.25rem;
-    }
-    /* Overlay Spinner Styles */
-    .overlay-spinner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(248, 248, 248, 0.95);
-      backdrop-filter: blur(4px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      transition: opacity 0.3s ease;
-    }
-    .overlay-spinner.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .spinner {
-      border: 4px solid var(--border);
-      border-top: 4px solid var(--bbm-red);
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .spinner-text {
-      margin-top: 1rem;
-      font-family: 'Orbitron', monospace;
-      color: var(--bbm-red);
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: 0.5px;
-    }
-    .btn-group {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      margin: 1.5rem 0;
-      flex-wrap: wrap;
-    }
-    .training-chart {
-      height: 200px;
-    }
-    .generated-text {
-      background: #f3f4f6;
-      padding: 1rem;
-      border-radius: 8px;
-      min-height: 100px;
-      font-family: 'Monaco', monospace;
-      white-space: pre-wrap;
-    }
-    .training-progress {
-      text-align: center;
-      font-family: 'Orbitron', monospace;
-      color: var(--bbm-red);
-      font-weight: 700;
-      margin-top: 0.5rem;
-    }
-    @media (max-width: 1024px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
-      .sidebar {
-        order: -1;
-      }
-    }
+    body { font-family: 'Inter', sans-serif; }
   </style>
 </head>
-<body>
-  <!-- Overlay Spinner -->
-  <div id="overlay-spinner" class="overlay-spinner">
-    <div class="spinner"></div>
-    <div class="spinner-text" id="spinner-text">Initializing Vynix Brain.js...</div>
-  </div>
-  <header class="header">
-    <h1><i class="material-icons align-middle" style="font-size: 0.8em; vertical-align: middle;">smart_toy</i> Vynix AI Q&A Brain.js Training</h1>
-    <p class="mt-2 text-gray-600">Add Q&A data, train Brain.js models, evaluate metrics, and generate responses</p>
-  </header>
-  <div class="container">
-    <div id="auth-status" class="stats">Loading...</div>
-    <div id="stats" class="stats hidden">Total pairs: <span id="pair-count">0</span></div>
-    <div id="metrics" class="metrics-grid hidden"></div>
-    <div id="error-message" class="error hidden"></div>
-    <div id="success-message" class="success hidden"></div>
-    <div class="main-grid">
-      <div class="main-content">
-        <form id="add-form" class="add-form card hidden">
-          <i class="material-icons" style="font-size: 2rem; color: var(--accent);">add_circle</i>
-          <input type="text" id="new-q" placeholder="Question (e.g., 'hello')" required>
-          <input type="text" id="new-a" placeholder="Answer (e.g., 'Hi! What's up?')" required>
-          <button type="submit" class="btn"><i class="material-icons">add</i>Add Q&A Pair</button>
-        </form>
-        <form id="bulk-form" class="bulk-form card hidden">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold"><i class="material-icons mr-2 align-middle" style="font-size: 1.2em;">cloud_upload</i>Bulk Upload</h3>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Upload Options</label>
-            <div class="flex gap-4 mb-4">
-              <label class="flex items-center">
-                <input type="radio" name="bulk-mode" value="csv" checked class="mr-2">
-                CSV File (q,a per line)
-              </label>
-              <label class="flex items-center">
-                <input type="radio" name="bulk-mode" value="text" class="mr-2">
-                Text (q|a per line)
-              </label>
-            </div>
-          </div>
-          <input type="file" id="bulk-input" accept=".csv,.txt" class="block w-full">
-          <textarea id="bulk-text" placeholder="Or paste bulk data here (one pair per line: question|answer)" style="display: none;"></textarea>
-          <div id="bulk-preview" class="bulk-preview hidden">Preview will appear here...</div>
-          <div class="progress-bar hidden">
-            <div id="progress-fill" class="progress-fill"></div>
-          </div>
-          <button type="submit" class="btn" id="bulk-submit" disabled><i class="material-icons">file_upload</i>Bulk Add Q&A Pairs</button>
-        </form>
-        <div id="loading" class="loading hidden card">Loading Q&A data...</div>
-        <div class="btn-group hidden">
-          <button id="clear-all-btn" class="btn btn-danger"><i class="material-icons">delete_forever</i>Clear All Data</button>
-        </div>
-        <!-- Training Section -->
-        <div id="training-section" class="card hidden">
-          <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
-            <i class="material-icons">build</i>Train Brain.js Model
-          </h3>
-          <form id="training-form" class="training-form">
-            <label>Network: 
-              <select id="networkType">
-                <option value="LSTM">LSTM (best for text)</option>
-                <option value="RNN">RNN</option>
-                <option value="GRU">GRU</option>
-              </select>
-            </label>
-            <label>Hidden Layers: <input type="range" id="hiddenLayers" min="1" max="3" value="2"/> <span id="hlVal">2</span></label>
-            <label>Learning Rate: <input type="number" id="learningRate" step="0.001" value="0.01" min="0.001" max="0.1"/></label>
-            <label>Iterations: <input type="number" id="iterations" value="2000" min="100" max="10000"/></label>
-            <button type="submit" class="btn btn-success" id="startTrainingBtn"><i class="material-icons">play_arrow</i>Train & Evaluate Model</button>
-            <button type="button" class="btn btn-danger" id="stopTrainingBtn" disabled><i class="material-icons">stop</i>Stop</button>
-          </form>
-          <div id="training-progress-container" class="hidden">
-            <div class="progress-bar">
-              <div id="training-progress-fill" class="progress-fill"></div>
-            </div>
-            <div id="training-status" class="training-progress">Training: 0%</div>
-          </div>
-          <div class="mt-4">
-            <h4>Training Loss</h4>
-            <canvas id="lossChart" class="training-chart"></canvas>
-            <p>Current loss: <strong id="currentLoss">-</strong></p>
-          </div>
-          <div class="btn-group mt-4">
-            <button id="saveModelBtn" class="btn" disabled><i class="material-icons">save</i>Save Model to Firebase</button>
-            <button id="loadModelBtn" class="btn btn-secondary"><i class="material-icons">folder_open</i>Load Model from Firebase</button>
-            <button id="evaluateBtn" class="btn btn-success" disabled><i class="material-icons">assessment</i>Re-Evaluate Model</button>
-          </div>
-        </div>
-        <!-- Query/Generate Section -->
-        <div id="qa-section" class="card hidden">
-          <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
-            <i class="material-icons">smart_toy</i>Generate Response
-          </h3>
-          <form id="query-form" class="query-form">
-            <input type="text" id="query-input" placeholder="Enter question to generate answer..." required>
-            <button type="submit" class="btn" id="generateBtn" disabled><i class="material-icons">send</i>Generate</button>
-          </form>
-          <div id="generated-text" class="generated-text hidden">Generated response will appear here...</div>
-        </div>
-        <div id="qa-status" class="card qa-status hidden"></div>
+<body class="bg-gray-50 min-h-screen py-8">
+  <div class="max-w-4xl mx-auto px-4">
+    <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Training Dashboard</h1>
+    
+    <!-- Bulk Upload Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Upload Bulk Training Data</h2>
+      <div class="space-y-4">
+        <input type="file" id="bulk-upload" accept=".json,.csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+        <p class="text-sm text-gray-600">Supports JSON (array of {input: "text", output: "response"}) or CSV (columns: input,output). Max 1000 pairs.</p>
       </div>
-      <div class="sidebar">
-        <div id="data-management" class="card hidden">
-          <h3 class="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
-            <i class="material-icons">storage</i>Stored Data
-          </h3>
-          <div id="data-list" class="space-y-2 mb-4 max-h-80 overflow-y-auto"></div>
+      <div id="bulk-status" class="mt-4 text-sm text-gray-600 hidden"></div>
+    </div>
+
+    <!-- Training Data Input -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Add Individual Training Data</h2>
+      <div id="training-data-form" class="space-y-4">
+        <div class="flex gap-4">
+          <input type="text" id="input-text" placeholder="Input (e.g., 'hello')" class="flex-1 p-2 border rounded">
+          <input type="text" id="output-text" placeholder="Output (e.g., 'Hey there!')" class="flex-1 p-2 border rounded">
+          <button id="add-pair-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Pair</button>
         </div>
       </div>
+      <div id="training-pairs" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></div>
+      <button id="load-defaults-btn" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Load Default Data</button>
+    </div>
+
+    <!-- Train Button -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <button id="train-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded hover:bg-green-600 disabled:opacity-50" disabled>
+        Train Model (0 pairs)
+      </button>
+      <div id="training-log" class="mt-4 text-sm text-gray-600 hidden"></div>
+    </div>
+
+    <!-- Save Model -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <button id="save-model-btn" class="w-full px-6 py-3 bg-purple-500 text-white font-semibold rounded hover:bg-purple-600 disabled:opacity-50" disabled>
+        Save Trained Model to Firebase
+      </button>
+      <div id="save-status" class="mt-4 text-sm text-gray-600"></div>
     </div>
   </div>
+
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
-    import { getDatabase, ref, set, push, onValue, remove, get } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -504,757 +74,210 @@
       measurementId: "G-V4W97VMSKL"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
+    let app, auth, db;
+    let trainingData = [];
+    let net = new brain.recurrent.LSTM();
+    const MAX_PAIRS = 1000;
+    const defaultTrainingData = [
+      { input: "hello", output: "Hey there!" },
+      { input: "how are you", output: "I'm doing great, thanks for asking!" },
+      { input: "what's up", output: "Just chilling in the cloud, you?" },
+      { input: "tell me a joke", output: "Why did the computer go to art school? It wanted to learn how to draw a better 'byte'!" },
+      { input: "goodbye", output: "Catch you later, pal!" },
+      { input: "what's your name", output: "I'm Vynix AI, your friendly chat buddy!" },
+      { input: "how's the weather", output: "No clue, I'm in the cloud! What's it like where you are?" },
+      { input: "who made you", output: "Katlego from Mokopane, South Africa, brought me to life!" },
+      { input: "help me", output: "Sure thing! What's on your mind?" }
+    ];
 
     const elements = {
-      overlaySpinner: document.getElementById('overlay-spinner'),
-      spinnerText: document.getElementById('spinner-text'),
-      authStatus: document.getElementById('auth-status'),
-      stats: document.getElementById('stats'),
-      pairCount: document.getElementById('pair-count'),
-      metrics: document.getElementById('metrics'),
-      errorMessage: document.getElementById('error-message'),
-      successMessage: document.getElementById('success-message'),
-      addForm: document.getElementById('add-form'),
-      newQ: document.getElementById('new-q'),
-      newA: document.getElementById('new-a'),
-      bulkForm: document.getElementById('bulk-form'),
-      bulkInput: document.getElementById('bulk-input'),
-      bulkText: document.getElementById('bulk-text'),
-      bulkPreview: document.getElementById('bulk-preview'),
-      bulkSubmit: document.getElementById('bulk-submit'),
-      progressFill: document.getElementById('progress-fill'),
-      loading: document.getElementById('loading'),
-      clearAllBtn: document.getElementById('clear-all-btn'),
-      trainingSection: document.getElementById('training-section'),
-      trainingForm: document.getElementById('training-form'),
-      networkType: document.getElementById('networkType'),
-      hiddenLayers: document.getElementById('hiddenLayers'),
-      hlVal: document.getElementById('hlVal'),
-      learningRate: document.getElementById('learningRate'),
-      iterations: document.getElementById('iterations'),
-      startTrainingBtn: document.getElementById('startTrainingBtn'),
-      stopTrainingBtn: document.getElementById('stopTrainingBtn'),
-      lossChart: document.getElementById('lossChart'),
-      currentLoss: document.getElementById('currentLoss'),
-      saveModelBtn: document.getElementById('saveModelBtn'),
-      loadModelBtn: document.getElementById('loadModelBtn'),
-      evaluateBtn: document.getElementById('evaluateBtn'),
-      qaSection: document.getElementById('qa-section'),
-      queryForm: document.getElementById('query-form'),
-      queryInput: document.getElementById('query-input'),
-      generateBtn: document.getElementById('generateBtn'),
-      generatedText: document.getElementById('generated-text'),
-      dataManagement: document.getElementById('data-management'),
-      dataList: document.getElementById('data-list'),
-      trainingProgressContainer: document.getElementById('training-progress-container'),
-      trainingProgressFill: document.getElementById('training-progress-fill'),
-      trainingStatus: document.getElementById('training-status')
+      bulkUpload: document.getElementById('bulk-upload'),
+      bulkStatus: document.getElementById('bulk-status'),
+      inputText: document.getElementById('input-text'),
+      outputText: document.getElementById('output-text'),
+      addPairBtn: document.getElementById('add-pair-btn'),
+      trainingPairs: document.getElementById('training-pairs'),
+      loadDefaultsBtn: document.getElementById('load-defaults-btn'),
+      trainBtn: document.getElementById('train-btn'),
+      trainingLog: document.getElementById('training-log'),
+      saveModelBtn: document.getElementById('save-model-btn'),
+      saveStatus: document.getElementById('save-status')
     };
 
-    let currentUser;
-    let qaData = {};
-    let dataKeys = [];
-    let dataLoaded = false;
-    let net; // Brain.js model
-    let training = false;
-    let chart;
-    let valData; // For evaluation
-    const lossData = [];
-    const userPrefix = '@katlegofra15525'; // Your handle for model organization
-    let hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true'; // Flag to avoid repeated auto-training
-    let totalIterations = 0; // For progress tracking
+    function normalizeText(text) {
+      return text.toLowerCase().trim();
+    }
 
-    // Simple BLEU implementation
-    function computeBleu(candidate, reference) {
-      const candTokens = candidate.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-      const refTokens = reference.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-      if (candTokens.length === 0) return 0;
-
-      const bp = Math.min(1, refTokens.length / candTokens.length); // Brevity penalty
-
-      let score = 1;
-      for (let n = 1; n <= 4; n++) {
-        const candNgrams = [];
-        for (let i = 0; i <= candTokens.length - n; i++) {
-          candNgrams.push(candTokens.slice(i, i + n).join(' '));
-        }
-        if (candNgrams.length === 0) {
-          score *= 0;
-          continue;
-        }
-
-        const refCounts = new Map();
-        for (let i = 0; i <= refTokens.length - n; i++) {
-          const gram = refTokens.slice(i, i + n).join(' ');
-          refCounts.set(gram, (refCounts.get(gram) || 0) + 1);
-        }
-
-        let countClip = 0;
-        candNgrams.forEach(gram => {
-          const refC = refCounts.get(gram) || 0;
-          if (refC > 0) countClip += 1; // Clip to 1 per ref occurrence (simple for single ref)
-        });
-
-        const prec = countClip / candNgrams.length;
-        score *= Math.pow(Math.max(prec, 0.1), 1 / 4); // Smooth with 0.1 floor
+    function addTrainingPair(input, output, fromBulk = false) {
+      const normInput = normalizeText(input);
+      const normOutput = output.trim();
+      if (!normInput || !normOutput) return false;
+      if (trainingData.length >= MAX_PAIRS) {
+        alert(`Maximum ${MAX_PAIRS} pairs reached.`);
+        return false;
       }
-
-      return bp * score;
-    }
-
-    // Simple word overlap for similarity
-    function wordOverlap(a, b) {
-      const wordsA = a.split(/\s+/).filter(w => w.length > 2);
-      const wordsB = b.split(/\s+/).filter(w => w.length > 2);
-      let matches = 0;
-      wordsA.forEach(wa => {
-        if (wordsB.some(wb => wb.includes(wa) || wa.includes(wb))) matches++;
-      });
-      return matches / Math.max(wordsA.length, 1);
-    }
-
-    // Find best matching pair from data
-    function findBestMatch(query) {
-      const qLower = query.toLowerCase();
-      let bestScore = 0;
-      let bestPair = null;
-      for (let key in qaData) {
-        const pairQ = qaData[key].q.toLowerCase();
-        const score = wordOverlap(qLower, pairQ);
-        if (score > bestScore) {
-          bestScore = score;
-          bestPair = qaData[key];
-        }
+      trainingData.push({ input: normInput, output: normOutput });
+      if (!fromBulk) {
+        elements.inputText.value = '';
+        elements.outputText.value = '';
       }
-      return { pair: bestPair, score: bestScore };
+      renderTrainingPairs();
+      updateTrainButton();
+      return true;
     }
 
-    // Overlay functions
-    function showOverlay(text = 'Loading...') {
-      elements.spinnerText.textContent = text;
-      elements.overlaySpinner.classList.remove('hidden');
-    }
-    function hideOverlay() {
-      elements.overlaySpinner.classList.add('hidden');
-    }
-    function showError(msg) {
-      elements.errorMessage.textContent = msg;
-      elements.errorMessage.classList.remove('hidden');
-      elements.successMessage.classList.add('hidden');
-    }
-    function showSuccess(msg) {
-      elements.successMessage.textContent = msg;
-      elements.successMessage.classList.remove('hidden');
-      elements.errorMessage.classList.add('hidden');
-    }
-    function hideMessages() {
-      elements.errorMessage.classList.add('hidden');
-      elements.successMessage.classList.add('hidden');
-    }
-    function updateStats() {
-      elements.pairCount.textContent = Object.keys(qaData).length;
-      elements.stats.classList.remove('hidden');
-    }
-    function updateMetrics(bleu = null, perplexity = null) {
-      const totalPairs = Object.keys(qaData).length;
-      elements.metrics.innerHTML = `
-        <div class="metric-card">
-          <div class="metric-value">${totalPairs}</div>
-          <div class="metric-label">Total Pairs</div>
+    function renderTrainingPairs() {
+      elements.trainingPairs.innerHTML = trainingData.map((pair, index) => `
+        <div class="flex justify-between items-center p-2 bg-gray-100 rounded">
+          <span class="truncate" title="${pair.input} → ${pair.output}">${pair.input} → ${pair.output}</span>
+          <button onclick="removePair(${index})" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
         </div>
-        ${bleu !== null ? `
-        <div class="metric-card bleu-score">
-          <div class="metric-value">${(bleu * 100).toFixed(1)}%</div>
-          <div class="metric-label">Avg BLEU Score</div>
-        </div>` : ''}
-        ${perplexity !== null ? `
-        <div class="metric-card perplexity-score">
-          <div class="metric-value">${perplexity.toFixed(2)}</div>
-          <div class="metric-label">Perplexity</div>
-        </div>` : ''}
-      `;
-      elements.metrics.classList.remove('hidden');
+      `).join('');
     }
 
-    // New: Update training progress
-    function updateTrainingProgress(iteration, total) {
-      const percentage = Math.min((iteration / total) * 100, 100);
-      elements.trainingProgressFill.style.width = `${percentage}%`;
-      elements.trainingStatus.textContent = `Training: ${percentage.toFixed(1)}% (Iteration ${iteration}/${total}, Loss: ${elements.currentLoss.textContent})`;
+    function removePair(index) {
+      trainingData.splice(index, 1);
+      renderTrainingPairs();
+      updateTrainButton();
     }
 
-    // Q&A Data Functions
-    async function addPair(q, a) {
-      if (!currentUser || !q.trim() || !a.trim()) {
-        throw new Error('Please log in and enter both question and answer.');
-      }
-      const qaRef = ref(db, 'qa_data');
-      const snapshot = await get(qaRef);
-      const existingData = snapshot.val() || {};
-      const normalizedQ = q.trim().toLowerCase();
-      const existing = Object.values(existingData).some(pair => pair.q.toLowerCase() === normalizedQ);
-      if (existing) {
-        throw new Error('Duplicate question already exists. Please use a different question.');
-      }
-      const newPairRef = push(qaRef);
-      const newPair = { q: normalizedQ, a: a.trim(), timestamp: Date.now() };
-      await set(newPairRef, newPair);
-      return newPair;
+    function updateTrainButton() {
+      elements.trainBtn.textContent = `Train Model (${trainingData.length} pairs)`;
+      elements.trainBtn.disabled = trainingData.length === 0;
     }
 
-    window.clearAllData = async function() {
-      if (!currentUser) return;
-      if (!confirm('Delete ALL Q&A data? This cannot be undone.')) return;
-      try {
-        hideMessages();
-        elements.clearAllBtn.innerHTML = '<i class="material-icons">hourglass_empty</i>Clearing...';
-        const qaRef = ref(db, 'qa_data');
-        await remove(qaRef);
-        showSuccess('All Q&A data cleared successfully!');
-        elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Data';
-        localStorage.removeItem('vynix-auto-trained'); // Reset flag
-        hasAutoTrained = false;
-      } catch (error) {
-        showError('Failed to clear data: ' + error.message);
-        elements.clearAllBtn.innerHTML = '<i class="material-icons">delete_forever</i>Clear All Data';
-      }
-    };
-
-    function renderDataList() {
-      const list = elements.dataList;
-      list.innerHTML = '';
-      if (dataKeys.length === 0) {
-        list.innerHTML = '<p class="text-center text-gray-500 py-4">No data stored. Add some!</p>';
-        return;
-      }
-      dataKeys.slice(-10).reverse().forEach(key => {
-        const pair = qaData[key];
-        const div = document.createElement('div');
-        div.className = 'flex items-center justify-between p-3 rounded-lg shadow-sm border border-gray-200';
-        div.innerHTML = `
-          <div class="flex-1">
-            <div class="font-medium truncate">${pair.q}</div>
-            <div class="text-sm text-gray-600 truncate">${pair.a}</div>
-          </div>
-          <button onclick="deleteSinglePair('${key}')" class="btn btn-danger text-sm px-2 py-1"><i class="material-icons" style="font-size: 1rem;">delete</i></button>
-        `;
-        list.appendChild(div);
-      });
+    function loadDefaults() {
+      trainingData = [...defaultTrainingData];
+      renderTrainingPairs();
+      updateTrainButton();
+      elements.bulkStatus.classList.add('hidden');
     }
 
-    window.deleteSinglePair = async function(key) {
-      if (!currentUser || !confirm('Delete this pair?')) return;
-      try {
-        await remove(ref(db, `qa_data/${key}`));
-        showSuccess('Pair deleted.');
-        // If pairs drop below 5 after delete, reset auto-train flag
-        if (Object.keys(qaData).length <= 5) {
-          localStorage.removeItem('vynix-auto-trained');
-          hasAutoTrained = false;
-        }
-      } catch (error) {
-        showError('Failed to delete: ' + error.message);
-      }
-    };
-
-    // New: Check if auto-training should start
-    function shouldAutoTrain() {
-      const pairCount = Object.keys(qaData).length;
-      return pairCount >= 5 && !hasAutoTrained && !net; // No model loaded
-    }
-
-    function loadQIData() {
-      showOverlay('Fetching Q&A data...');
-      const qaRef = ref(db, 'qa_data');
-      onValue(qaRef, async (snapshot) => {
-        const data = snapshot.val();
-        qaData = data || {};
-        dataKeys = Object.keys(qaData);
-        updateStats();
-        elements.loading.classList.add('hidden');
-        if (!dataLoaded) {
-          dataLoaded = true;
-          hideOverlay();
-          elements.trainingSection.classList.remove('hidden');
-          elements.qaSection.classList.remove('hidden');
-          elements.dataManagement.classList.remove('hidden');
-          elements.generateBtn.disabled = false; // Enable generate for data-based search
-        }
-        renderDataList();
-
-        // Auto-trigger training if conditions met
-        if (shouldAutoTrain()) {
-          showSuccess('Sufficient data detected. Starting automatic training...');
-          setTimeout(() => startTraining(new Event('auto')), 1000); // Delay to show message
-        }
-      }, (error) => {
-        showError('Failed to load data: ' + error.message);
-        elements.loading.classList.add('hidden');
-        if (!dataLoaded) {
-          dataLoaded = true;
-          hideOverlay();
-          elements.generateBtn.disabled = false; // Still enable for empty data
-        }
-      });
-    }
-
-    // Bulk functionality
-    function parseBulkData(content, mode) {
-      let lines;
-      if (mode === 'csv') {
-        lines = content.split('\n').slice(1).filter(line => line.trim());
-        return lines.map(line => {
-          const [q, a] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          return { q, a };
-        }).filter(pair => pair.q && pair.a);
-      } else {
-        lines = content.split('\n').filter(line => line.trim());
-        return lines.map(line => {
-          const [q, a] = line.split('|').map(s => s.trim());
-          return { q, a };
-        }).filter(pair => pair.q && pair.a);
-      }
-    }
-
-    function updateBulkPreview(pairs) {
-      if (pairs.length === 0) {
-        elements.bulkPreview.textContent = 'No valid pairs found.';
-        elements.bulkSubmit.disabled = true;
-      } else {
-        elements.bulkPreview.textContent = `${pairs.length} valid pairs parsed:\n\n${pairs.slice(0, 10).map(p => `${p.q} | ${p.a}`).join('\n')}${pairs.length > 10 ? '\n\n... (showing first 10)' : ''}`;
-        elements.bulkSubmit.disabled = false;
-      }
-      elements.bulkPreview.classList.remove('hidden');
-    }
-
-    async function handleBulkSubmit(e) {
-      e.preventDefault();
-      const mode = document.querySelector('input[name="bulk-mode"]:checked').value;
-      let content = '';
-      if (mode === 'text') {
-        content = elements.bulkText.value;
-      } else {
-        const file = elements.bulkInput.files[0];
-        if (!file) {
-          showError('Please select a file.');
-          return;
-        }
-        const text = await file.text();
-        content = text;
-      }
-      const pairs = parseBulkData(content, mode);
-      if (pairs.length === 0) {
-        showError('No valid pairs found in the input.');
-        return;
-      }
-      const progressBar = elements.progressFill.parentElement;
-      progressBar.classList.remove('hidden');
-      hideMessages();
-      let added = 0;
-      let skipped = 0;
-      let errors = 0;
-      const qaRef = ref(db, 'qa_data');
-      const snapshot = await get(qaRef);
-      const existingData = snapshot.val() || {};
-      const existingQs = new Set(Object.values(existingData).map(pair => pair.q.toLowerCase()));
-      for (let i = 0; i < pairs.length; i++) {
-        try {
-          const normalizedQ = pairs[i].q.trim().toLowerCase();
-          if (existingQs.has(normalizedQ)) {
-            skipped++;
-            continue;
-          }
-          await addPair(pairs[i].q, pairs[i].a);
-          existingQs.add(normalizedQ);
-          added++;
-        } catch (error) {
-          errors++;
-          console.error(`Failed to add pair ${i + 1}:`, error);
-        }
-        const progress = ((i + 1) / pairs.length) * 100;
-        elements.progressFill.style.width = `${progress}%`;
-      }
-      progressBar.classList.add('hidden');
-      elements.progressFill.style.width = '0%';
-      let message = `Bulk upload complete: ${added} pairs added`;
-      if (skipped > 0) message += `, ${skipped} duplicates skipped`;
-      if (errors > 0) message += `, ${errors} errors`;
-      message += '.';
-      showSuccess(message);
-      if (mode === 'text') {
-        elements.bulkText.value = '';
-      } else {
-        elements.bulkInput.value = '';
-      }
-      elements.bulkPreview.classList.add('hidden');
-      renderDataList();
-      // Reset auto-train flag after bulk add (to allow re-training if desired)
-      localStorage.removeItem('vynix-auto-trained');
-      hasAutoTrained = false;
-    }
-
-    // Brain.js Training Functions
-    elements.hiddenLayers.addEventListener('input', e => {
-      elements.hlVal.textContent = e.target.value;
-    });
-
-    function qaToTrainingData(qaPairs, isVal = false) {
-      const data = [];
-      qaPairs.forEach(pair => {
-        const sequence = `Q: ${pair.q} A: ${pair.a}${isVal ? ' </s>' : ''}`; // End token for val
-        for (let i = 10; i < sequence.length; i++) {
-          data.push({
-            input: sequence.slice(i - 10, i),
-            output: sequence[i]
-          });
-        }
-      });
-      return data;
-    }
-
-    function setupChart() {
-      const ctx = elements.lossChart.getContext('2d');
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Training Loss', data: [], borderColor: '#10b981', fill: false }] },
-        options: { responsive: true, scales: { y: { beginAtZero: false } } }
-      });
-    }
-
-    // Fallback synchronous training (always used, no worker)
-    function fallbackTrain(trainData, options, type) {
-      const numLayers = parseInt(elements.hiddenLayers.value);
-      let netOptions = {};
-      if (type !== 'RNN') {
-        netOptions = { hiddenLayers: new Array(numLayers).fill(128) };
-      }
-      net = new brain.recurrent[type](netOptions);
-
-      const result = net.train(trainData, {
-        ...options,
-        callback: (stats) => {
-          if (!training) return false;
-          lossData.push(stats.error);
-          chart.data.labels.push(lossData.length);
-          chart.data.datasets[0].data.push(stats.error);
-          chart.update('quiet');
-          elements.currentLoss.textContent = stats.error.toFixed(6);
-          updateTrainingProgress(stats.iterations, totalIterations);
-        },
-        callbackPeriod: 10
-      });
-
-      elements.trainingProgressContainer.classList.add('hidden');
-      training = false;
-      elements.startTrainingBtn.disabled = false;
-      elements.stopTrainingBtn.disabled = true;
-      elements.generateBtn.disabled = false;
-      elements.saveModelBtn.disabled = false;
-      showSuccess(`Training complete! Final loss: ${result.error.toFixed(6)}. Evaluating...`);
-      evaluateModel(); // Auto-eval
-      // Auto-save model
-      saveModelToFirebase();
-      // Set flag
-      hasAutoTrained = true;
-      localStorage.setItem('vynix-auto-trained', 'true');
-    }
-
-    async function evaluateModel() {
-      if (!net || Object.keys(qaData).length < 5) {
-        showError('Need a trained model and at least 5 pairs for evaluation!');
-        return;
-      }
-      showOverlay('Evaluating model...');
-      try {
-        // Simple 80/20 split (random for demo)
-        const shuffledKeys = [...dataKeys].sort(() => 0.5 - Math.random());
-        const splitIdx = Math.floor(shuffledKeys.length * 0.8);
-        const trainKeys = shuffledKeys.slice(0, splitIdx);
-        const valKeys = shuffledKeys.slice(splitIdx);
-        const valPairs = valKeys.map(key => qaData[key]);
-        valData = qaToTrainingData(valPairs, true);
-
-        // Perplexity: Compute cross-entropy on val set
-        const valResult = net.train(valData, { iterations: 1, log: false });
-        const perplexity = Math.exp(valResult.error);
-
-        // BLEU: Generate for each val Q, compare to true A
-        let totalBleu = 0;
-        valPairs.forEach(pair => {
-          const seed = `Q: ${pair.q} A: `;
-          let generated = seed;
-          for (let i = 0; i < 50; i++) { // Limit generation
-            const next = net.run(generated.slice(-10));
-            if (!next || next === ' ') break;
-            generated += next;
-          }
-          const refAnswer = `A: ${pair.a}`;
-          const candAnswer = generated.replace(seed, '').trim();
-          totalBleu += computeBleu(candAnswer, refAnswer);
-        });
-        const avgBleu = totalBleu / valPairs.length;
-
-        updateMetrics(avgBleu, perplexity);
-        elements.evaluateBtn.disabled = false;
-        hideOverlay();
-        showSuccess(`Evaluation complete! Avg BLEU: ${(avgBleu * 100).toFixed(1)}%, Perplexity: ${perplexity.toFixed(2)}`);
-      } catch (error) {
-        hideOverlay();
-        showError(`Evaluation failed: ${error.message}`);
-      }
-    }
-
-    async function startTraining(e) {
-      e.preventDefault();
-      if (Object.keys(qaData).length === 0) {
-        showError('Add some Q&A pairs first!');
-        return;
-      }
-      const allPairs = Object.values(qaData);
-      if (allPairs.length < 5) {
-        showError('Need at least 5 pairs for training + evaluation!');
-        return;
-      }
-
-      // 80/20 split
-      const shuffled = allPairs.sort(() => 0.5 - Math.random());
-      const splitIdx = Math.floor(shuffled.length * 0.8);
-      const trainPairs = shuffled.slice(0, splitIdx);
-      const valPairs = shuffled.slice(splitIdx);
-      const trainData = qaToTrainingData(trainPairs);
-
-      if (trainData.length < 100) {
-        showError('Not enough training sequences. Add more pairs!');
-        return;
-      }
-
-      const type = elements.networkType.value;
-      totalIterations = parseInt(elements.iterations.value);
-      const learningRate = parseFloat(elements.learningRate.value);
-
-      training = true;
-      elements.startTrainingBtn.disabled = true;
-      elements.stopTrainingBtn.disabled = false;
-      elements.generateBtn.disabled = true;
-      elements.saveModelBtn.disabled = true;
-      elements.evaluateBtn.disabled = true;
-      lossData.length = 0;
-      chart.update();
-
-      // Show training progress bar
-      elements.trainingProgressContainer.classList.remove('hidden');
-      elements.trainingProgressFill.style.width = '0%';
-      elements.trainingStatus.textContent = 'Training: 0%';
-
-      // Always use fallback (synchronous) training
-      fallbackTrain(trainData, {
-        iterations: totalIterations,
-        learningRate,
-        errorThresh: 0.005,
-        log: true,
-        logPeriod: 100
-      }, type);
-    }
-
-    elements.stopTrainingBtn.addEventListener('click', () => {
-      training = false;
-      elements.trainingProgressContainer.classList.add('hidden');
-      showSuccess('Training stopped.');
-    });
-
-    elements.evaluateBtn.addEventListener('click', evaluateModel);
-
-    async function saveModelToFirebase() {
-      if (!net) return showError('No model to save');
-      try {
-        const json = net.toJSON();
-        const timestamp = Date.now();
-        const modelId = `${userPrefix}-model-${timestamp}`;
-        const modelRef = ref(db, `models/${modelId}`);
-        const modelData = {
-          user: userPrefix,
-          timestamp: timestamp,
-          name: `Auto-Trained Model ${new Date(timestamp).toLocaleString()}`,
-          json: JSON.stringify(json),
-          iterations: totalIterations,
-          networkType: elements.networkType.value
-        };
-        await set(modelRef, modelData);
-        showSuccess(`Model auto-saved to Firebase! ID: ${modelId}`);
-      } catch (error) {
-        showError(`Auto-save failed: ${error.message}`);
-      }
-    }
-
-    async function loadModelFromFirebase() {
-      try {
-        const modelsRef = ref(db, 'models');
-        const snapshot = await get(modelsRef);
-        const models = snapshot.val() || {};
-        const userModels = Object.entries(models).filter(([id, m]) => m.user === userPrefix);
-        if (userModels.length === 0) {
-          showError('No models found in Firebase!');
-          return;
-        }
-        const choices = userModels.map(([id, m], i) => `${i+1}. ${m.name} (${new Date(m.timestamp).toLocaleString()})`).join('\n');
-        const choice = prompt(`Select a model to load:\n${choices}\n\nEnter number (1-${userModels.length}):`);
-        if (!choice || isNaN(choice)) return;
-        const selected = userModels[parseInt(choice) - 1];
-        if (!selected) return showError('Invalid choice!');
-        const [id] = selected;
-        const modelData = models[id];
-        const type = modelData.networkType;
-        net = type === 'LSTM' ? new brain.recurrent.LSTM() :
-              type === 'GRU' ? new brain.recurrent.GRU() :
-              new brain.recurrent.RNN();
-        net.fromJSON(JSON.parse(modelData.json));
-        elements.generateBtn.disabled = false;
-        elements.evaluateBtn.disabled = false;
-        hasAutoTrained = true; // Treat as trained
-        localStorage.setItem('vynix-auto-trained', 'true');
-        showSuccess(`Loaded: ${modelData.name}. Click Evaluate!`);
-      } catch (error) {
-        showError(`Load failed: ${error.message}`);
-      }
-    }
-
-    function generateResponse() {
-      const query = elements.queryInput.value.trim();
-      if (!query) return;
-
-      if (!net) {
-        // Fallback to data search
-        const { pair, score } = findBestMatch(query);
-        if (pair && score > 0.5) {
-          elements.generatedText.innerHTML = `<strong>Match found (${(score * 100).toFixed(0)}% similarity):</strong><br>${pair.a}`;
-        } else {
-          elements.generatedText.innerHTML = '<strong>No good match found.</strong><br>Try adding a similar Q&A pair or training the model for generated responses.';
-        }
-        elements.generatedText.classList.remove('hidden');
-        elements.queryInput.value = '';
-        return;
-      }
-
-      // Use trained model
-      const seed = `Q: ${query} A: `;
-      let result = seed;
-      for (let i = 0; i < 100; i++) { // Generate up to 100 chars
-        const next = net.run(result.slice(-10));
-        if (!next || next === ' ') break;
-        result += next;
-      }
-      const answer = result.split('A: ')[1] || result.replace(seed, '').trim();
-      elements.generatedText.innerHTML = `<strong>Q:</strong> ${query}<br><strong>A:</strong> ${answer}`;
-      elements.generatedText.classList.remove('hidden');
-      elements.queryInput.value = '';
-    }
-
-    // Event listeners
-    elements.addForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const q = elements.newQ.value;
-      const a = elements.newA.value;
-      try {
-        await addPair(q, a);
-        elements.newQ.value = '';
-        elements.newA.value = '';
-        showSuccess('Pair added successfully!');
-        renderDataList();
-        // Reset auto-train flag after single add
-        localStorage.removeItem('vynix-auto-trained');
-        hasAutoTrained = false;
-      } catch (error) {
-        showError(error.message);
-      }
-    });
-
-    elements.clearAllBtn.addEventListener('click', clearAllData);
-    elements.bulkForm.addEventListener('submit', handleBulkSubmit);
-    const modeRadios = document.querySelectorAll('input[name="bulk-mode"]');
-    modeRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const isText = e.target.value === 'text';
-        elements.bulkInput.style.display = isText ? 'none' : 'block';
-        elements.bulkText.style.display = isText ? 'block' : 'none';
-        elements.bulkPreview.classList.add('hidden');
-        elements.bulkSubmit.disabled = true;
-      });
-    });
-    elements.bulkInput.addEventListener('change', async (e) => {
-      elements.bulkPreview.classList.add('hidden');
-      elements.progressFill.parentElement.classList.add('hidden');
-      elements.progressFill.style.width = '0%';
-      const file = e.target.files[0];
+    async function handleBulkUpload(event) {
+      const file = event.target.files[0];
       if (!file) return;
-      const content = await file.text();
-      const pairs = parseBulkData(content, 'csv');
-      updateBulkPreview(pairs);
-    });
-    elements.bulkText.addEventListener('input', (e) => {
-      const content = e.target.value;
-      const pairs = parseBulkData(content, 'text');
-      updateBulkPreview(pairs);
-    });
+      elements.bulkStatus.classList.remove('hidden');
+      elements.bulkStatus.textContent = 'Processing...';
+      elements.bulkStatus.classList.remove('text-green-600', 'text-red-600');
+      elements.bulkStatus.classList.add('text-blue-600');
 
-    elements.trainingForm.addEventListener('submit', startTraining);
-    elements.saveModelBtn.addEventListener('click', saveModelToFirebase);
-    elements.loadModelBtn.addEventListener('click', loadModelFromFirebase);
-    elements.queryForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      generateResponse();
-    });
-
-    // Auth
-    onAuthStateChanged(auth, (user) => {
-      currentUser = user;
-      if (user) {
-        showOverlay('Authenticating...');
-        elements.authStatus.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Logged in as: ${user.displayName || user.email || 'User'}</span><button class="btn btn-secondary text-sm px-3 py-1" onclick="signOutUser()"><i class="material-icons" style="font-size: 1rem;">logout</i>Sign Out</button></div>`;
-        elements.addForm.classList.remove('hidden');
-        elements.bulkForm.classList.remove('hidden');
-        elements.trainingSection.classList.remove('hidden');
-        loadQIData();
-        setupChart();
-        // Restore auto-train flag on login
-        hasAutoTrained = localStorage.getItem('vynix-auto-trained') === 'true';
-      } else {
-        hideOverlay();
-        elements.authStatus.innerHTML = '<div class="flex items-center justify-center gap-2"><span>Not logged in.</span><button class="btn" onclick="signInAnonymously()"><i class="material-icons">login</i>Sign In Anonymously</button></div>';
-        elements.addForm.classList.add('hidden');
-        elements.bulkForm.classList.add('hidden');
-        elements.trainingSection.classList.add('hidden');
-        elements.qaSection.classList.add('hidden');
-        elements.dataManagement.classList.add('hidden');
-        elements.loading.classList.add('hidden');
-      }
-    });
-
-    window.signInAnonymously = async function() {
       try {
-        showOverlay('Signing in...');
-        await signInAnonymously(auth);
-      } catch (error) {
-        showError('Sign in failed: ' + error.message);
-        hideOverlay();
-      }
-    };
+        const text = await file.text();
+        let newPairs = [];
 
-    window.signOutUser = async function() {
+        if (file.name.endsWith('.json')) {
+          const data = JSON.parse(text);
+          if (!Array.isArray(data)) throw new Error('JSON must be an array of objects.');
+          newPairs = data.map(item => ({ input: item.input, output: item.output })).filter(Boolean);
+        } else if (file.name.endsWith('.csv')) {
+          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+          if (parsed.errors.length > 0) throw new Error('CSV parsing error: ' + parsed.errors[0].message);
+          newPairs = parsed.data.map(row => ({ input: row.input, output: row.output })).filter(row => row.input && row.output);
+        } else {
+          throw new Error('Unsupported file type. Use JSON or CSV.');
+        }
+
+        if (newPairs.length === 0) throw new Error('No valid pairs found in file.');
+
+        const addedCount = newPairs.reduce((count, pair) => {
+          if (trainingData.length >= MAX_PAIRS) return count;
+          return addTrainingPair(pair.input, pair.output, true) ? count + 1 : count;
+        }, 0);
+
+        elements.bulkStatus.textContent = `Added ${addedCount} new pairs (${newPairs.length - addedCount} skipped due to limits/errors).`;
+        elements.bulkStatus.classList.remove('text-blue-600');
+        elements.bulkStatus.classList.add('text-green-600');
+      } catch (error) {
+        elements.bulkStatus.textContent = 'Error: ' + error.message;
+        elements.bulkStatus.classList.remove('text-blue-600');
+        elements.bulkStatus.classList.add('text-red-600');
+      }
+    }
+
+    async function trainModel() {
+      if (trainingData.length === 0) return;
+      elements.trainBtn.disabled = true;
+      elements.trainingLog.classList.remove('hidden');
+      elements.trainingLog.innerHTML = 'Training started...';
       try {
-        localStorage.removeItem('vynix-auto-trained'); // Reset on sign out
-        hasAutoTrained = false;
-        await signOut(auth);
+        net.train(trainingData, {
+          iterations: 200,
+          errorThresh: 0.005,
+          log: true,
+          logPeriod: 10,
+          callback: (stats) => {
+            elements.trainingLog.innerHTML += `<br>Iteration ${stats.iterations}: Error ${stats.error.toFixed(4)}`;
+          },
+          callbackPeriod: 10
+        });
+        elements.trainingLog.innerHTML += '<br>Training complete!';
+        elements.saveModelBtn.disabled = false;
       } catch (error) {
-        showError('Sign out failed: ' + error.message);
+        elements.trainingLog.innerHTML += '<br>Error during training: ' + error.message;
+      } finally {
+        elements.trainBtn.disabled = false;
       }
-    };
+    }
 
-    // Initial load
-    showOverlay('Connecting to Firebase...');
-    elements.loading.classList.add('hidden');
+    async function saveModel() {
+      const user = auth.currentUser;
+      if (!user) {
+        elements.saveStatus.textContent = 'Please log in to save.';
+        return;
+      }
+      elements.saveModelBtn.disabled = true;
+      elements.saveStatus.textContent = 'Saving...';
+      try {
+        const modelJson = net.toJSON();
+        await set(ref(db, `users/${user.uid}/trainedModel`), modelJson);
+        elements.saveStatus.textContent = 'Model saved successfully!';
+      } catch (error) {
+        elements.saveStatus.textContent = 'Error saving: ' + error.message;
+      } finally {
+        elements.saveModelBtn.disabled = false;
+      }
+    }
+
+    async function initializeFirebase() {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getDatabase(app);
+
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          console.log('Logged in as:', user.displayName);
+          // Optionally load existing model or patterns
+        } else {
+          window.location.href = 'signup.html'; // Redirect if needed
+        }
+      });
+    }
+
+    // Event Listeners
+    elements.bulkUpload.addEventListener('change', handleBulkUpload);
+    elements.addPairBtn.addEventListener('click', () => addTrainingPair(elements.inputText.value, elements.outputText.value));
+    elements.loadDefaultsBtn.addEventListener('click', loadDefaults);
+    elements.trainBtn.addEventListener('click', trainModel);
+    elements.saveModelBtn.addEventListener('click', saveModel);
+
+    // Enter key to add pair
+    elements.inputText.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (elements.outputText.value.trim()) addTrainingPair(elements.inputText.value, elements.outputText.value);
+      }
+    });
+    elements.outputText.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTrainingPair(elements.inputText.value, elements.outputText.value);
+      }
+    });
+
+    // Global remove function for onclick
+    window.removePair = removePair;
+
+    document.addEventListener('DOMContentLoaded', initializeFirebase);
   </script>
 </body>
 </html>
