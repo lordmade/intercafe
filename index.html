@@ -56,6 +56,21 @@
       <div id="training-log" class="mt-4 text-sm text-gray-600 hidden"></div>
     </div>
 
+    <!-- Model Preview Testing -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Model Preview Testing</h2>
+      <div class="space-y-4">
+        <input type="text" id="test-input" placeholder="Enter test input (e.g., 'hello')" class="w-full p-2 border rounded">
+        <button id="test-model-btn" class="w-full px-6 py-3 bg-indigo-500 text-white font-semibold rounded hover:bg-indigo-600 disabled:opacity-50" disabled>
+          Test Model
+        </button>
+        <div id="test-output" class="p-3 bg-gray-100 rounded hidden">
+          <strong>Predicted Output:</strong> <span id="prediction-text"></span>
+        </div>
+      </div>
+      <p class="text-sm text-gray-600 mt-2">Test your trained model here. Enable after training or loading a model.</p>
+    </div>
+
     <!-- Save Model -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <button id="save-model-btn" class="w-full px-6 py-3 bg-purple-500 text-white font-semibold rounded hover:bg-purple-600 disabled:opacity-50" disabled>
@@ -63,12 +78,20 @@
       </button>
       <div id="save-status" class="mt-4 text-sm text-gray-600"></div>
     </div>
+
+    <!-- Trained Models List -->
+    <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+      <h2 class="text-xl font-semibold mb-4">Your Trained Models</h2>
+      <div id="models-list" class="space-y-2 max-h-60 overflow-y-auto">
+        <p class="text-gray-500">Loading models...</p>
+      </div>
+    </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -84,6 +107,9 @@
     let app, auth, db;
     let trainingData = [];
     let net = new brain.recurrent.LSTM();
+    let userModels = {};
+    let trainedAccuracy = 0;
+    let modelReady = false;
     const MAX_PAIRS = 1000;
     const defaultTrainingData = [
       { input: "hello", output: "Hey there!" },
@@ -112,7 +138,11 @@
       trainingLog: document.getElementById('training-log'),
       saveModelBtn: document.getElementById('save-model-btn'),
       saveStatus: document.getElementById('save-status'),
-      processBulkBtn: document.getElementById('process-bulk-btn')
+      processBulkBtn: document.getElementById('process-bulk-btn'),
+      testInput: document.getElementById('test-input'),
+      testModelBtn: document.getElementById('test-model-btn'),
+      testOutput: document.getElementById('test-output'),
+      predictionText: document.getElementById('prediction-text')
     };
 
     function normalizeText(text) {
@@ -155,6 +185,12 @@
     function updateTrainButton() {
       elements.trainBtn.textContent = `Train Model (${trainingData.length} pairs)`;
       elements.trainBtn.disabled = trainingData.length === 0;
+    }
+
+    function updateModelReady() {
+      modelReady = true;
+      elements.testModelBtn.disabled = false;
+      elements.saveModelBtn.disabled = false;
     }
 
     function loadDefaults() {
@@ -206,6 +242,16 @@
       }
     }
 
+    function computeAccuracy() {
+      if (trainingData.length === 0) return 0;
+      let correct = 0;
+      trainingData.forEach(({ input, output }) => {
+        const pred = net.run(input);
+        if (pred.trim() === output.trim()) correct++;
+      });
+      return (correct / trainingData.length) * 100;
+    }
+
     async function trainModel() {
       if (trainingData.length === 0) return;
       elements.trainBtn.disabled = true;
@@ -221,23 +267,40 @@
           errorThresh: 0.005,
           log: true,
           logPeriod: 10,
+          callbackPeriod: 1,
           callback: (stats) => {
             const progress = (stats.iterations / totalIterations) * 100;
             elements.progressBar.style.width = `${progress}%`;
             elements.progressText.textContent = `${Math.round(progress)}%`;
             elements.trainingLog.innerHTML += `<br>Iteration ${stats.iterations}: Error ${stats.error.toFixed(4)}`;
-          },
-          callbackPeriod: 10
+          }
         });
         elements.progressBar.style.width = '100%';
         elements.progressText.textContent = '100%';
-        elements.trainingLog.innerHTML += '<br>Training complete!';
-        elements.saveModelBtn.disabled = false;
+        trainedAccuracy = computeAccuracy();
+        elements.trainingLog.innerHTML += `<br>Training complete! Accuracy: ${trainedAccuracy.toFixed(2)}%`;
+        updateModelReady();
       } catch (error) {
         elements.trainingLog.innerHTML += '<br>Error during training: ' + error.message;
       } finally {
         elements.trainBtn.disabled = false;
         // Optionally hide progress after a delay, but keep visible for now
+      }
+    }
+
+    function testModel() {
+      const input = normalizeText(elements.testInput.value);
+      if (!input) {
+        alert('Please enter test input.');
+        return;
+      }
+      try {
+        const prediction = net.run(input);
+        elements.predictionText.textContent = prediction;
+        elements.testOutput.classList.remove('hidden');
+      } catch (error) {
+        elements.predictionText.textContent = 'Error: ' + error.message;
+        elements.testOutput.classList.remove('hidden');
       }
     }
 
@@ -274,8 +337,27 @@
         if (typeof cleanedModel !== 'object' || cleanedModel === null) {
           throw new Error('Cleaned model is not a valid object.');
         }
-        await set(ref(db, `users/${user.uid}/trainedModel`), cleanedModel);
-        elements.saveStatus.textContent = 'Model saved successfully!';
+
+        // Get current models to find next version
+        const modelsRef = ref(db, `users/${user.uid}/models`);
+        const snapshot = await get(modelsRef);
+        const currentModels = snapshot.val() || {};
+        const versions = Object.keys(currentModels).map(v => parseInt(v)).filter(Boolean);
+        const nextVersion = versions.length ? Math.max(...versions) + 1 : 1;
+
+        const modelData = {
+          model: cleanedModel,
+          accuracy: trainedAccuracy,
+          timestamp: Date.now()
+        };
+
+        await set(ref(db, `users/${user.uid}/models/${nextVersion}`), modelData);
+
+        // Update local cache
+        userModels[nextVersion] = modelData;
+        renderModels();
+
+        elements.saveStatus.textContent = `Model saved as Version ${nextVersion}!`;
         elements.saveStatus.classList.remove('text-blue-600');
         elements.saveStatus.classList.add('text-green-600');
       } catch (error) {
@@ -296,15 +378,75 @@
       }
     }
 
+    async function loadModels() {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const snapshot = await get(ref(db, `users/${user.uid}/models`));
+        userModels = snapshot.val() || {};
+        renderModels();
+      } catch (error) {
+        console.error('Error loading models:', error);
+        document.getElementById('models-list').innerHTML = '<p class="text-red-500">Error loading models.</p>';
+      }
+    }
+
+    function renderModels() {
+      const listEl = document.getElementById('models-list');
+      if (Object.keys(userModels).length === 0) {
+        listEl.innerHTML = '<p class="text-gray-500">No models trained yet.</p>';
+        return;
+      }
+      listEl.innerHTML = Object.entries(userModels)
+        .sort(([a], [b]) => parseInt(b) - parseInt(a)) // Newest first
+        .map(([version, data]) => `
+          <div class="flex justify-between items-center p-3 bg-gray-100 rounded border">
+            <div>
+              <div class="font-medium">Version ${version}</div>
+              <div class="text-sm text-gray-600">Accuracy: ${(data.accuracy || 0).toFixed(2)}% | ${new Date(data.timestamp).toLocaleString()}</div>
+            </div>
+            <div class="space-x-2">
+              <button onclick="loadModel(${version})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Load</button>
+              <button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">Delete</button>
+            </div>
+          </div>
+        `).join('');
+    }
+
+    window.loadModel = function(version) {
+      try {
+        net.fromJSON(userModels[version].model);
+        trainedAccuracy = userModels[version].accuracy || 0;
+        updateModelReady();
+        elements.testOutput.classList.add('hidden');
+        alert(`Loaded Version ${version}`);
+      } catch (e) {
+        alert('Error loading model: ' + e.message);
+      }
+    };
+
+    window.deleteModel = async function(version) {
+      if (!confirm(`Delete Version ${version}?`)) return;
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        await remove(ref(db, `users/${user.uid}/models/${version}`));
+        delete userModels[version];
+        renderModels();
+      } catch (e) {
+        alert('Error deleting: ' + e.message);
+      }
+    };
+
     async function initializeFirebase() {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
       db = getDatabase(app);
 
-      onAuthStateChanged(auth, (user) => {
+      onAuthStateChanged(auth, async (user) => {
         if (user) {
           console.log('Logged in as:', user.displayName);
-          // Optionally load existing model or patterns
+          await loadModels();
         } else {
           window.location.href = 'signup.html'; // Redirect if needed
         }
@@ -317,6 +459,7 @@
     elements.loadDefaultsBtn.addEventListener('click', loadDefaults);
     elements.trainBtn.addEventListener('click', trainModel);
     elements.saveModelBtn.addEventListener('click', saveModel);
+    elements.testModelBtn.addEventListener('click', testModel);
 
     // Enter key to add pair
     elements.inputText.addEventListener('keypress', (e) => {
@@ -329,6 +472,14 @@
       if (e.key === 'Enter') {
         e.preventDefault();
         addTrainingPair(elements.inputText.value, elements.outputText.value);
+      }
+    });
+
+    // Enter key to test model
+    elements.testInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        testModel();
       }
     });
 
