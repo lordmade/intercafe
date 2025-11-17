@@ -1,4 +1,4 @@
-<!-- train.html: Enhanced Dashboard for Training with Bulk Text Paste -->
+<!-- train.html: Enhanced Dashboard for Training with TensorFlow.js and WebGL -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vynix AI - Training Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> <!-- For CSV parsing -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -106,7 +106,11 @@
 
     let app, auth, db;
     let trainingData = [];
-    let net = new brain.recurrent.LSTM();
+    let model;
+    let charToIx = {};
+    let ixToChar = [];
+    let vocabSize = 0;
+    let seqLen = 40; // Sequence length for training
     let userModels = {};
     let trainedAccuracy = 0;
     let modelReady = false;
@@ -145,6 +149,70 @@
       predictionText: document.getElementById('prediction-text')
     };
 
+    // Build vocabulary from training data
+    function buildVocab() {
+      const allText = trainingData.flatMap(pair => pair.input + ' ' + pair.output).join(' ');
+      const uniqueChars = [...new Set(allText.split(''))];
+      vocabSize = uniqueChars.length;
+      charToIx = {};
+      ixToChar = [];
+      uniqueChars.forEach((char, ix) => {
+        charToIx[char] = ix;
+        ixToChar[ix] = char;
+      });
+    }
+
+    // Encode text to one-hot sequences
+    function encodeText(text, maxLen = seqLen) {
+      const encoded = text.split('').map(char => charToIx[char] || 0);
+      while (encoded.length < maxLen) encoded.push(0);
+      return encoded.slice(0, maxLen);
+    }
+
+    // Decode sequence to text
+    function decodeSequence(encoded) {
+      return encoded.map(ix => ixToChar[ix] || '?').join('');
+    }
+
+    // Prepare training data as sequences
+    function prepareData() {
+      if (trainingData.length === 0 || vocabSize === 0) return null;
+      const xs = [];
+      const ys = [];
+      trainingData.forEach(pair => {
+        const fullText = pair.input + ' ' + pair.output;
+        for (let i = 0; i < fullText.length - seqLen; i++) {
+          const x = encodeText(fullText.slice(i, i + seqLen));
+          const y = encodeText(fullText.slice(i + 1, i + seqLen + 1));
+          xs.push(x);
+          ys.push(y);
+        }
+      });
+      return { xs: tf.tensor2d(xs, [xs.length, seqLen]), ys: tf.tensor2d(ys, [ys.length, seqLen]) };
+    }
+
+    // Create LSTM model
+    function createModel() {
+      const model = tf.sequential({
+        layers: [
+          tf.layers.embedding({ inputDim: vocabSize, outputDim: 64, inputLength: seqLen }),
+          tf.layers.lstm({ units: 128, returnSequences: true }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.lstm({ units: 128, returnSequences: true }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.timeDistributed({
+            layer: tf.layers.dense({ units: vocabSize, activation: 'softmax' })
+          })
+        ]
+      });
+      model.compile({
+        optimizer: 'adam',
+        loss: 'sparseCategoricalCrossentropy',
+        metrics: ['accuracy']
+      });
+      return model;
+    }
+
     function normalizeText(text) {
       return text.toLowerCase().trim();
     }
@@ -162,6 +230,7 @@
         elements.inputText.value = '';
         elements.outputText.value = '';
       }
+      buildVocab(); // Rebuild vocab on add
       renderTrainingPairs();
       updateTrainButton();
       return true;
@@ -178,6 +247,7 @@
 
     function removePair(index) {
       trainingData.splice(index, 1);
+      buildVocab();
       renderTrainingPairs();
       updateTrainButton();
     }
@@ -195,6 +265,7 @@
 
     function loadDefaults() {
       trainingData = [...defaultTrainingData];
+      buildVocab();
       renderTrainingPairs();
       updateTrainButton();
       elements.bulkStatus.classList.add('hidden');
@@ -243,38 +314,51 @@
     }
 
     function computeAccuracy() {
-      if (trainingData.length === 0) return 0;
+      if (!model || trainingData.length === 0) return 0;
       let correct = 0;
-      trainingData.forEach(({ input, output }) => {
-        const pred = net.run(input);
-        if (pred.trim() === output.trim()) correct++;
+      trainingData.forEach(pair => {
+        const inputEncoded = encodeText(pair.input);
+        const pred = model.predict(tf.tensor2d([inputEncoded], [1, seqLen]));
+        const predArgmax = pred.argMax(-1).dataSync()[0];
+        const decodedPred = decodeSequence(Array.from(predArgmax).slice(0, pair.output.length));
+        if (decodedPred.trim() === pair.output.trim()) correct++;
       });
       return (correct / trainingData.length) * 100;
     }
 
     async function trainModel() {
-      if (trainingData.length === 0) return;
+      if (trainingData.length === 0 || vocabSize === 0) return;
       elements.trainBtn.disabled = true;
       elements.progressContainer.classList.remove('hidden');
       elements.trainingLog.classList.remove('hidden');
-      elements.trainingLog.innerHTML = 'Training started...';
+      elements.trainingLog.innerHTML = 'Training started... Building model...';
       elements.progressBar.style.width = '0%';
       elements.progressText.textContent = '0%';
+
       try {
-        const totalIterations = 200;
-        net.train(trainingData, {
-          iterations: totalIterations,
-          errorThresh: 0.005,
-          log: true,
-          logPeriod: 10,
-          callbackPeriod: 1,
-          callback: (stats) => {
-            const progress = (stats.iterations / totalIterations) * 100;
-            elements.progressBar.style.width = `${progress}%`;
-            elements.progressText.textContent = `${Math.round(progress)}%`;
-            elements.trainingLog.innerHTML += `<br>Iteration ${stats.iterations}: Error ${stats.error.toFixed(4)}`;
+        model = createModel();
+        const data = prepareData();
+        if (!data) throw new Error('Failed to prepare data.');
+
+        const totalEpochs = 50; // Reduced for browser speed
+        elements.trainingLog.innerHTML += '<br>Training for ' + totalEpochs + ' epochs...';
+
+        await model.fit(data.xs, data.ys, {
+          epochs: totalEpochs,
+          batchSize: 32,
+          validationSplit: 0.2,
+          callbacks: {
+            onEpochEnd: (epoch, logs) => {
+              const progress = ((epoch + 1) / totalEpochs) * 100;
+              elements.progressBar.style.width = `${progress}%`;
+              elements.progressText.textContent = `${Math.round(progress)}%`;
+              elements.trainingLog.innerHTML += `<br>Epoch ${epoch + 1}: Loss ${logs.loss?.toFixed(4)}, Accuracy ${logs.acc?.toFixed(4)}`;
+            }
           }
         });
+
+        data.xs.dispose();
+        data.ys.dispose();
         elements.progressBar.style.width = '100%';
         elements.progressText.textContent = '100%';
         trainedAccuracy = computeAccuracy();
@@ -284,65 +368,45 @@
         elements.trainingLog.innerHTML += '<br>Error during training: ' + error.message;
       } finally {
         elements.trainBtn.disabled = false;
-        // Optionally hide progress after a delay, but keep visible for now
       }
     }
 
-    function testModel() {
+    async function testModel() {
       const input = normalizeText(elements.testInput.value);
-      if (!input) {
-        alert('Please enter test input.');
+      if (!input || !model || vocabSize === 0) {
+        alert('Please enter test input and train/load a model first.');
         return;
       }
       try {
-        const prediction = net.run(input);
-        elements.predictionText.textContent = prediction;
+        const inputEncoded = encodeText(input);
+        const pred = model.predict(tf.tensor2d([inputEncoded], [1, seqLen]));
+        const predArgmax = pred.argMax(-1).dataSync()[0];
+        const decodedPred = decodeSequence(Array.from(predArgmax));
+        elements.predictionText.textContent = decodedPred.trim();
         elements.testOutput.classList.remove('hidden');
+        pred.dispose();
       } catch (error) {
         elements.predictionText.textContent = 'Error: ' + error.message;
         elements.testOutput.classList.remove('hidden');
       }
     }
 
-    function cleanSerializable(obj) {
-      const replacer = (key, value) => {
-        if (typeof value === 'function') return undefined;
-        if (value instanceof RegExp) return undefined;
-        if (value instanceof Date) return value.toISOString();
-        // Add more type handling if needed
-        return value;
-      };
-      try {
-        return JSON.parse(JSON.stringify(obj, replacer));
-      } catch (err) {
-        console.error('Deep serialization failed:', err);
-        throw new Error(`Serialization failed: ${err.message}. Model may contain circular references or unsupported types.`);
-      }
-    }
-
     async function saveModel() {
       const user = auth.currentUser;
-      if (!user) {
-        elements.saveStatus.textContent = 'Please log in to save.';
+      if (!user || !model) {
+        elements.saveStatus.textContent = 'Please log in and train a model first.';
         return;
       }
-      // Optional: Trainer check (uncomment and set allowedEmails)
-      // const allowedEmails = ['your-trainer-email@example.com']; // Add trainer emails
-      // if (!allowedEmails.includes(user.email)) {
-      //   elements.saveStatus.textContent = 'Only trainers can save global models.';
-      //   return;
-      // }
 
       elements.saveModelBtn.disabled = true;
       elements.saveStatus.textContent = 'Saving...';
       elements.saveStatus.classList.remove('text-green-600', 'text-red-600');
       elements.saveStatus.classList.add('text-blue-600');
       try {
-        const modelJson = net.toJSON();
-        const cleanedModel = cleanSerializable(modelJson);
-        if (typeof cleanedModel !== 'object' || cleanedModel === null) {
-          throw new Error('Cleaned model is not a valid object.');
-        }
+        const modelJson = await model.toJSON();
+        const modelWeights = await model.save(tf.io.withSaveHandler(async (handler) => {
+          await handler.save(tf.io.browserHTTPRequest('', { method: 'POST' }));
+        }));
 
         // Global versioning
         const modelsRef = ref(db, 'global-models');
@@ -352,15 +416,19 @@
         const nextVersion = versions.length ? Math.max(...versions) + 1 : 1;
 
         const modelData = {
-          model: cleanedModel,
+          modelJson: modelJson,
+          vocabSize: vocabSize,
+          charToIx: charToIx,
+          ixToChar: ixToChar,
+          seqLen: seqLen,
           accuracy: trainedAccuracy,
           timestamp: Date.now(),
-          trainer: user.email  // Track who trained it
+          trainer: user.email
         };
 
         await set(ref(db, `global-models/${nextVersion}`), modelData);
 
-        // Update local cache (now global)
+        // Update local cache
         userModels[nextVersion] = modelData;
         renderModels();
 
@@ -369,15 +437,7 @@
         elements.saveStatus.classList.add('text-green-600');
       } catch (error) {
         console.error('Save model error:', error);
-        let errorMsg = 'Error saving model: ';
-        if (error.message.includes('serialization')) {
-          errorMsg += 'Model contains non-serializable data. Try simpler data.';
-        } else if (error.message.includes('permission')) {
-          errorMsg += 'Permission denied. Contact admin.';
-        } else {
-          errorMsg += error.message;
-        }
-        elements.saveStatus.textContent = errorMsg;
+        elements.saveStatus.textContent = 'Error saving model: ' + error.message;
         elements.saveStatus.classList.remove('text-blue-600');
         elements.saveStatus.classList.add('text-red-600');
       } finally {
@@ -418,10 +478,16 @@
         `).join('');
     }
 
-    window.loadModel = function(version) {
+    window.loadModel = async function(version) {
       try {
-        net.fromJSON(userModels[version].model);
-        trainedAccuracy = userModels[version].accuracy || 0;
+        const data = userModels[version];
+        if (!data.modelJson) throw new Error('Invalid model data.');
+        model = await tf.loadLayersModel(tf.Model.json(data.modelJson));
+        charToIx = data.charToIx || {};
+        ixToChar = data.ixToChar || [];
+        vocabSize = data.vocabSize || 0;
+        seqLen = data.seqLen || 40;
+        trainedAccuracy = data.accuracy || 0;
         updateModelReady();
         elements.testOutput.classList.add('hidden');
         alert(`Loaded Global Version ${version}`);
