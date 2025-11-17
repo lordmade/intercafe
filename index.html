@@ -326,6 +326,13 @@
         elements.saveStatus.textContent = 'Please log in to save.';
         return;
       }
+      // Optional: Trainer check (uncomment and set allowedEmails)
+      // const allowedEmails = ['your-trainer-email@example.com']; // Add trainer emails
+      // if (!allowedEmails.includes(user.email)) {
+      //   elements.saveStatus.textContent = 'Only trainers can save global models.';
+      //   return;
+      // }
+
       elements.saveModelBtn.disabled = true;
       elements.saveStatus.textContent = 'Saving...';
       elements.saveStatus.classList.remove('text-green-600', 'text-red-600');
@@ -333,13 +340,12 @@
       try {
         const modelJson = net.toJSON();
         const cleanedModel = cleanSerializable(modelJson);
-        // Validate that cleaned model is an object
         if (typeof cleanedModel !== 'object' || cleanedModel === null) {
           throw new Error('Cleaned model is not a valid object.');
         }
 
-        // Get current models to find next version
-        const modelsRef = ref(db, `users/${user.uid}/models`);
+        // Global versioning
+        const modelsRef = ref(db, 'global-models');
         const snapshot = await get(modelsRef);
         const currentModels = snapshot.val() || {};
         const versions = Object.keys(currentModels).map(v => parseInt(v)).filter(Boolean);
@@ -348,25 +354,26 @@
         const modelData = {
           model: cleanedModel,
           accuracy: trainedAccuracy,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          trainer: user.email  // Track who trained it
         };
 
-        await set(ref(db, `users/${user.uid}/models/${nextVersion}`), modelData);
+        await set(ref(db, `global-models/${nextVersion}`), modelData);
 
-        // Update local cache
+        // Update local cache (now global)
         userModels[nextVersion] = modelData;
         renderModels();
 
-        elements.saveStatus.textContent = `Model saved as Version ${nextVersion}!`;
+        elements.saveStatus.textContent = `Global model saved as Version ${nextVersion}!`;
         elements.saveStatus.classList.remove('text-blue-600');
         elements.saveStatus.classList.add('text-green-600');
       } catch (error) {
         console.error('Save model error:', error);
         let errorMsg = 'Error saving model: ';
         if (error.message.includes('serialization')) {
-          errorMsg += 'Model contains non-serializable data (e.g., functions). Try training with fewer pairs or simpler data.';
+          errorMsg += 'Model contains non-serializable data. Try simpler data.';
         } else if (error.message.includes('permission')) {
-          errorMsg += 'Permission denied. Check your Firebase rules.';
+          errorMsg += 'Permission denied. Contact admin.';
         } else {
           errorMsg += error.message;
         }
@@ -379,14 +386,13 @@
     }
 
     async function loadModels() {
-      const user = auth.currentUser;
-      if (!user) return;
+      // No user check needed—global for all auth'd users
       try {
-        const snapshot = await get(ref(db, `users/${user.uid}/models`));
+        const snapshot = await get(ref(db, 'global-models'));
         userModels = snapshot.val() || {};
         renderModels();
       } catch (error) {
-        console.error('Error loading models:', error);
+        console.error('Error loading global models:', error);
         document.getElementById('models-list').innerHTML = '<p class="text-red-500">Error loading models.</p>';
       }
     }
@@ -394,7 +400,7 @@
     function renderModels() {
       const listEl = document.getElementById('models-list');
       if (Object.keys(userModels).length === 0) {
-        listEl.innerHTML = '<p class="text-gray-500">No models trained yet.</p>';
+        listEl.innerHTML = '<p class="text-gray-500">No global models available yet.</p>';
         return;
       }
       listEl.innerHTML = Object.entries(userModels)
@@ -402,12 +408,12 @@
         .map(([version, data]) => `
           <div class="flex justify-between items-center p-3 bg-gray-100 rounded border">
             <div>
-              <div class="font-medium">Version ${version}</div>
-              <div class="text-sm text-gray-600">Accuracy: ${(data.accuracy || 0).toFixed(2)}% | ${new Date(data.timestamp).toLocaleString()}</div>
+              <div class="font-medium">Global Version ${version}</div>
+              <div class="text-sm text-gray-600">Accuracy: ${(data.accuracy || 0).toFixed(2)}% | Trained by ${data.trainer || 'Unknown'} | ${new Date(data.timestamp).toLocaleString()}</div>
             </div>
             <div class="space-x-2">
               <button onclick="loadModel(${version})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Load</button>
-              <button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">Delete</button>
+              <button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600" ${data.trainer !== auth?.currentUser?.email ? 'disabled title="Only trainer can delete"' : ''}>Delete</button>
             </div>
           </div>
         `).join('');
@@ -419,18 +425,21 @@
         trainedAccuracy = userModels[version].accuracy || 0;
         updateModelReady();
         elements.testOutput.classList.add('hidden');
-        alert(`Loaded Version ${version}`);
+        alert(`Loaded Global Version ${version}`);
       } catch (e) {
         alert('Error loading model: ' + e.message);
       }
     };
 
     window.deleteModel = async function(version) {
-      if (!confirm(`Delete Version ${version}?`)) return;
+      if (!confirm(`Delete Global Version ${version}?`)) return;
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user || userModels[version]?.trainer !== user.email) {
+        alert('Only the trainer can delete this model.');
+        return;
+      }
       try {
-        await remove(ref(db, `users/${user.uid}/models/${version}`));
+        await remove(ref(db, `global-models/${version}`));
         delete userModels[version];
         renderModels();
       } catch (e) {
@@ -446,9 +455,9 @@
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           console.log('Logged in as:', user.displayName);
-          await loadModels();
+          await loadModels();  // Now loads global
         } else {
-          window.location.href = 'signup.html'; // Redirect if needed
+          window.location.href = 'signup.html';
         }
       });
     }
