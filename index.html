@@ -362,33 +362,64 @@
     el.cancelTrainBtn.onclick = () => { if(trainingWorker) trainingWorker.terminate(); finishTraining(true, 'Cancelled'); };
     // ==================== SAVE MODEL (FIREBASE-SAFE) ====================
     async function saveModel() {
-      const user = auth.currentUser;
-      if (!user || !net) return;
-      el.saveModelBtn.disabled = true;
-      el.saveStatus.textContent = 'Saving (cleaning model for Firebase)...';
-      el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-blue-600';
-      try {
-        const cleanModel = JSON.parse(JSON.stringify(net.toJSON())); // ← Removes all functions
-        const newRef = push(ref(db, 'global-models'));
-        await set(newRef, {
-          model: cleanModel,
-          accuracy: trainedAccuracy,
-          pairs: trainingData.length,
-          mode: isTurboMode ? 'Turbo' : 'Standard LSTM',
-          timestamp: Date.now(),
-          trainer: user.email || 'Anonymous',
-          trainerId: user.uid
-        });
-        el.saveStatus.textContent = '✓ Model saved successfully!';
-        el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-green-600';
-        loadGlobalModels();
-      } catch (e) {
-        el.saveStatus.textContent = 'Save failed: ' + e.message;
-        el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-red-600';
-      } finally {
-        setTimeout(() => el.saveModelBtn.disabled = false, 2000);
+  const user = auth.currentUser;
+  if (!user || !net) return;
+
+  el.saveModelBtn.disabled = true;
+  el.saveStatus.textContent = 'Cleaning model for Firebase...';
+  el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-blue-600';
+
+  try {
+    // Step 1: Get raw JSON
+    let modelJson = net.toJSON();
+
+    // Step 2: Remove ALL illegal keys and functions (deep clean)
+    function deepClean(obj) {
+      if (obj === null || typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) return obj.map(deepClean);
+
+      const cleaned = {};
+      for (const key in obj) {
+        if (Object.hasOwnProperty.call(obj, key)) {
+          const value = obj[key];
+          // Skip any key with illegal Firebase characters
+          if (/[.#$/\[\]]/.test(key)) continue;
+          // Skip functions
+          if (typeof value === 'function') continue;
+          // Recurse
+          cleaned[key] = deepClean(value);
+        }
       }
+      return cleaned;
     }
+
+    const firebaseSafeModel = deepClean(modelJson);
+
+    // Step 3: Final stringify-parse to be 100% sure
+    const finalModel = JSON.parse(JSON.stringify(firebaseSafeModel));
+
+    const newRef = push(ref(db, 'global-models'));
+    await set(newRef, {
+      model: finalModel,
+      accuracy: trainedAccuracy,
+      pairs: trainingData.length,
+      mode: isTurboMode ? 'Turbo' : 'Standard LSTM',
+      timestamp: Date.now(),
+      trainer: user.email || 'Anonymous',
+      trainerId: user.uid
+    });
+
+    el.saveStatus.textContent = 'Model saved perfectly!';
+    el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-green-600';
+    loadGlobalModels();
+  } catch (e) {
+    console.error(e);
+    el.saveStatus.textContent = 'Save failed: ' + e.message;
+    el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-red-600';
+  } finally {
+    setTimeout(() => el.saveModelBtn.disabled = false, 2000);
+  }
+}
     el.saveModelBtn.onclick = saveModel;
     // ==================== GLOBAL MODELS WITH SELECT & DELETE ====================
     async function loadGlobalModels() {
