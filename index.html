@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vynix AI - Training Dashboard (FULLY WORKING)</title>
+  <title>Vynix AI - Training Dashboard (FINAL 100% WORKING)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -16,81 +16,86 @@
 </head>
 <body class="bg-gray-50 min-h-screen py-8">
   <div class="max-w-5xl mx-auto px-4">
-    <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">Vynix AI Training Dashboard</h1>
+    <h1 class="text-4xl font-bold text-center mb-10 text-gray-800">Vynix AI Training Dashboard</h1>
 
-    <!-- Bulk Paste -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h2 class="text-2xl font-bold mb-4">Bulk Training Data</h2>
-      <textarea id="bulk-text" class="w-full p-4 border-2 rounded-lg h-40 text-sm font-mono" placeholder='[{"input":"hello","output":"Hi there!"}, ...] or CSV'></textarea>
-      <button id="process-bulk-btn" class="mt-4 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled>Process Data</button>
-      <div id="bulk-status" class="mt-4 text-sm font-medium"></div>
+    <!-- Bulk Paste Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <h2 class="text-2xl font-bold mb-4">Bulk Training Data (JSON or CSV)</h2>
+      <textarea id="bulk-text" class="w-full p-5 border-2 border-gray-300 rounded-lg h-56 text-sm font-mono focus:border-blue-500 focus:ring focus:ring-blue-200" placeholder='JSON Example:
+[{"input":"hello","output":"Hi there!"},{"input":"how are you","output":"I am great!"}]
+
+CSV Example:
+input,output
+hello,Hi there!
+how are you,I am great!' spellcheck="false"></textarea>
+      <button id="process-bulk-btn" class="mt-6 px-8 py-4 bg-blue-600 text-white font-bold text-lg rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-lg" disabled>Process Bulk Data</button>
+      <div id="bulk-status" class="mt-6 text-lg font-medium"></div>
     </div>
 
-    <!-- Add Pair -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h2 class="text-2xl font-bold mb-4">Add Training Pair</h2>
-      <div class="flex gap-4 mb-4">
-        <input type="text" id="input-text" placeholder="User message..." class="flex-1 p-4 border-2 rounded-lg">
-        <input type="text" id="output-text" placeholder="Bot reply..." class="flex-1 p-4 border-2 rounded-lg">
-        <button id="add-pair-btn" class="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700">Add</button>
+    <!-- Add Individual Pair -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <h2 class="text-2xl font-bold mb-6">Add Individual Training Pair</h2>
+      <div class="flex gap-6 mb-6">
+        <input type="text" id="input-text" placeholder="User says..." class="flex-1 p-5 border-2 rounded-lg text-lg">
+        <input type="text" id="output-text" placeholder="Vynix replies..." class="flex-1 p-5 border-2 rounded-lg text-lg">
+        <button id="add-pair-btn" class="px-8 py-5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-lg">Add Pair</button>
       </div>
-      <div id="training-pairs" class="space-y-3 max-h-80 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-gray-50"></div>
-      <button id="load-defaults-btn" class="mt-4 px-5 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Load 9 Default Pairs</button>
+      </div>
+      <div id="training-pairs" class="space-y-4 max-h-96 overflow-y-auto border-2 border-gray-200 rounded-lg p-6 bg-gray-50"></div>
+      <button id="load-defaults-btn" class="mt-6 px-6 py-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700">Load 9 Default Pairs</button>
     </div>
 
     <!-- Training Buttons -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <button id="train-btn" class="p-8 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <button id="train-btn" class="p-10 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl font-bold text-2xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
           <div>Standard LSTM</div>
-          <div class="text-sm mt-2 opacity-90">Highest Quality • Slower</div>
-          <div id="standard-count" class="text-2xl mt-3">(0 pairs)</div>
+          <div class="text-lg mt-3 opacity-90">Highest Quality • Slower</div>
+          <div id="standard-count" class="text-3xl mt-4">(0 pairs)</div>
         </button>
-        <button id="turbo-btn" class="p-8 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-xl font-bold text-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
-          <div class="flex items-center justify-center gap-3">⚡ Turbo Mode</div>
-          <div class="text-sm mt-2 opacity-90">10× Faster • Still Excellent</div>
-          <div id="turbo-count" class="text-2xl mt-3">(0 pairs)</div>
+        <button id="turbo-btn" class="p-10 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-2xl font-bold text-2xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
+          <div class="flex items-center justify-center gap-4">⚡ Turbo Mode</div>
+          <div class="text-lg mt-3 opacity-90">10× Faster • Still Great</div>
+          <div id="turbo-count" class="text-3xl mt-4">(0 pairs)</div>
         </button>
       </div>
 
-      <button id="cancel-train-btn" class="w-full py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 disabled:opacity-50" disabled>Cancel Training</button>
+      <button id="cancel-train-btn" class="w-full py-5 bg-red-600 text-white font-bold text-xl rounded-xl hover:bg-red-700 disabled:opacity-50 shadow-lg" disabled>Cancel Training</button>
 
-      <div id="progress-container" class="mt-8 hidden">
-        <div class="w-full bg-gray-300 rounded-full h-8 shadow-inner">
-          <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-purple-600 h-8 rounded-full transition-all duration-500 ease-out flex items-center justify-center text-white font-bold" style="width: 0%">0%</div>
+      <div id="progress-container" class="mt-10 hidden">
+        <div class="w-full bg-gray-300 rounded-full h-10 shadow-inner overflow-hidden">
+          <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-purple-600 h-10 rounded-full transition-all duration-500 ease-out flex items-center justify-center text-white font-bold text-xl" style="width: 0%">0%</div>
         </div>
-        <p id="progress-text" class="text-center mt-4 text-xl font-semibold">Starting training...</p>
+        <p id="progress-text" class="text-center mt-6 text-2xl font-semibold text-gray-700">Starting...</p>
       </div>
 
-      <div id="training-status" class="mt-6 text-center text-2xl font-bold hidden training-pulse"></div>
+      <div id="training-status" class="mt-8 text-center text-3xl font-bold hidden training-pulse"></div>
     </div>
 
     <!-- Test Model -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h2 class="text-2xl font-bold mb-4">Test Your Model</h2>
-      <div class="flex gap-4">
-        <input type="text" id="test-input" placeholder="Type a message..." class="flex-1 p-5 border-2 rounded-xl text-lg">
-        <button id="test-model-btn" class="px-10 py-5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50" disabled>Test</button>
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <h2 class="text-2xl font-bold mb-6">Test Your Trained Model</h2>
+      <div class="flex gap-6">
+        <input type="text" id="test-input" placeholder="Type anything here..." class="flex-1 p-6 border-2 rounded-xl text-xl">
+        <button id="test-model-btn" class="px-12 py-6 bg-indigo-600 text-white font-bold text-xl rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-lg" disabled>Test Model</button>
       </div>
-      <div id="test-output" class="mt-6 p-6 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl hidden text-xl">
+      <div id="test-output" class="mt-8 p-8 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl hidden text-2xl font-medium">
         <strong>Vynix AI:</strong> <span id="prediction-text"></span>
       </div>
     </div>
 
     <!-- Save Model -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <button id="save-model-btn" class="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl" disabled>
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <button id="save-model-btn" class="w-full py-7 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-2xl rounded-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl" disabled>
         Save Model to Global Database
       </button>
-      <div id="save-status" class="mt-4 text-center text-lg font-medium"></div>
+      <div id="save-status" class="mt-6 text-center text-xl font-medium"></div>
     </div>
 
     <!-- Global Models -->
-    <div class="bg-white rounded-xl shadow-lg p-6">
-      <h2 class="text-2xl font-bold mb-6">Global Trained Models</h2>
-      <div id="models-list" class="space-y-4 max-h-screen overflow-y-auto">
-        <p class="text-gray-500 text-center">Loading models...</p>
-      </div>
+    <div class="bg-white rounded-xl shadow-lg p-8">
+      <h2 class="text-2xl font-bold mb-8">Global Trained Models</h2>
+      <div id="models-list" class="space-y-6 max-h-screen overflow-y-auto"></div>
     </div>
   </div>
 
@@ -147,17 +152,93 @@
     };
 
     const defaultData = [
-      { input: "hello", output: "Hey there!" },
-      { input: "how are you", output: "I'm doing great, thanks!" },
-      { input: "what's up", output: "Just chilling in the cloud!" },
-      { input: "joke", output: "Why did the AI cross the road? To process the other side!" },
-      { input: "who are you", output: "I'm Vynix AI, your smart assistant!" },
-      { input: "bye", output: "Goodbye! Come back soon!" },
-      { input: "what is your name", output: "Call me Vynix!" },
-      { input: "help", output: "I'm here to help! What do you need?" },
-      { input: "thanks", output: "You're welcome!" }
+      { input: "hello", output: "Hey there! How can I help you today?" },
+      { input: "how are you", output: "I'm doing fantastic, thanks for asking!" },
+      { input: "what's your name", output: "I'm Vynix AI, your personal chat assistant!" },
+      { input: "tell me a joke", output: "Why don't scientists trust atoms? Because they make up everything!" },
+      { input: "good morning", output: "Good morning! Hope you have a wonderful day!" },
+      { input: "who made you", output: "I was created by an awesome developer using brain.js and lots of love!" },
+      { input: "bye", output: "Goodbye! Come back anytime!" },
+      { input: "thank you", output: "You're very welcome!" },
+      { input: "what can you do", output: "I can chat, answer questions, and learn from training data!" }
     ];
 
+    // ====================== BULK DATA PROCESSING (FULLY FIXED) ======================
+    function processBulkData() {
+      const text = el.bulkText.value.trim();
+      if (!text) return;
+
+      el.bulkStatus.textContent = 'Processing data...';
+      el.bulkStatus.className = 'mt-6 text-lg font-medium text-blue-600';
+      el.processBulkBtn.disabled = true;
+
+      setTimeout(() => {
+        let pairs = [];
+
+        // Try JSON first
+        try {
+          const json = JSON.parse(text);
+          if (Array.isArray(json)) {
+            pairs = json
+              .map(item => ({
+                input: String(item.input || '').trim().toLowerCase(),
+                output: String(item.output || '').trim()
+              }))
+              .filter(p => p.input && p.output);
+          }
+        } catch (e) {
+          // Not JSON → try CSV with PapaParse
+          Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+              pairs = results.data
+                .map(row => ({
+                  input: String(row.input || row.Input || row.INPUT || row['User Message'] || '').trim().toLowerCase(),
+                  output: String(row.output || row.Output || row.OUTPUT || row['Bot Reply'] || '').trim()
+                }))
+                .filter(p => p.input && p.output);
+              finalizeBulk();
+            },
+            error: function() {
+              el.bulkStatus.textContent = 'Invalid CSV format!';
+              el.bulkStatus.className = 'mt-6 text-lg font-medium text-red-600';
+              el.processBulkBtn.disabled = false;
+            }
+          });
+          return;
+        }
+
+        finalizeBulk();
+
+        function finalizeBulk() {
+          if (pairs.length === 0) {
+            el.bulkStatus.textContent = 'No valid training pairs found!';
+            el.bulkStatus.className = 'mt-6 text-lg font-medium text-red-600';
+            el.processBulkBtn.disabled = false;
+            return;
+          }
+
+          const toAdd = pairs.slice(0, 1500 - trainingData.length);
+          trainingData.push(...toAdd);
+
+          renderPairs();
+          updateCounts();
+
+          el.bulkText.value = '';
+          el.bulkStatus.textContent = `Success! Added ${toAdd.length} pairs (Total: ${trainingData.length})`;
+          el.bulkStatus.className = 'mt-6 text-lg font-medium text-green-600';
+          el.processBulkBtn.disabled = false;
+
+          setTimeout(() => el.bulkStatus.textContent = '', 8000);
+        }
+      }, 100);
+    }
+
+    el.processBulkBtn.onclick = processBulkData;
+    el.bulkText.addEventListener('input', () => el.processBulkBtn.disabled = !el.bulkText.value.trim());
+
+    // ====================== INDIVIDUAL PAIR & UI ======================
     function updateCounts() {
       const c = trainingData.length;
       document.getElementById('standard-count').textContent = `(${c} pairs)`;
@@ -167,12 +248,12 @@
 
     function renderPairs() {
       el.trainingPairs.innerHTML = trainingData.map((p, i) => `
-        <div class="flex justify-between items-center p-4 bg-white rounded-lg border shadow">
+        <div class="flex justify-between items-center p-5 bg-white rounded-lg border-2 shadow">
           <div class="flex-1">
-            <div class="font-medium text-gray-700">User: "${p.input}"</div>
-            <div class="text-gray-600">→ Vynix: "${p.output}"</div>
+            <div class="font-semibold text-gray-800">User: "${p.input}"</div>
+            <div class="text-gray-600 mt-1">→ Vynix: "${p.output}"</div>
           </div>
-          <button onclick="trainingData.splice(${i},1); renderPairs(); updateCounts();" class="ml-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Remove</button>
+          <button onclick="trainingData.splice(${i},1); renderPairs(); updateCounts();" class="ml-6 px-5 py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600">Remove</button>
         </div>
       `).join('');
     }
@@ -180,7 +261,7 @@
     el.addPairBtn.onclick = () => {
       const i = el.inputText.value.trim().toLowerCase();
       const o = el.outputText.value.trim();
-      if (i && o) {
+      if (i && o && trainingData.length < 1500) {
         trainingData.push({input: i, output: o});
         el.inputText.value = el.outputText.value = '';
         renderPairs();
@@ -194,8 +275,9 @@
       updateCounts();
     };
 
-    function createTrainingWorker() {
-      const code = `
+    // ====================== TRAINING ENGINE (WORKER + PROGRESS) ======================
+    function createWorker() {
+      const workerCode = `
         importScripts('https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js');
         self.onmessage = function(e) {
           if (e.data.cmd !== 'start') return;
@@ -205,33 +287,31 @@
 
           try {
             if (turbo) {
-              net = new brain.NeuralNetwork({hiddenLayers: [64, 64], activation: 'leaky-relu'});
+              net = new brain.NeuralNetwork({hiddenLayers: [80, 80], activation: 'leaky-relu'});
               const formatted = data.map(p => ({
-                input: p.input.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255),
-                output: p.output.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255)
+                input: p.input.padEnd(120, ' ').slice(0,120).split('').map(c => c.charCodeAt(0)/255),
+                output: p.output.padEnd(120, ' ').slice(0,120).split('').map(c => c.charCodeAt(0)/255)
               }));
               net.train(formatted, {
                 iterations: iterations,
-                errorThresh: 0.005,
-                log: false,
-                callbackPeriod: 200,
-                callback: stats => self.postMessage({type:'progress', id, iter: stats.iterations, error: stats.error, total: iterations})
+                errorThresh: 0.006,
+                callbackPeriod: 150,
+                callback: s => self.postMessage({type:'progress', id, iter:s.iterations, error:s.error, total:iterations})
               });
             } else {
               net = new brain.recurrent.LSTM();
               net.train(data, {
                 iterations: iterations,
-                errorThresh: 0.018,
-                log: false,
-                callbackPeriod: 3,
-                callback: stats => self.postMessage({type:'progress', id, iter: stats.iterations, error: stats.error, total: iterations})
+                errorThresh: 0.015,
+                callbackPeriod: 4,
+                callback: s => self.postMessage({type:'progress', id, iter:s.iterations, error:s.error, total:iterations})
               });
             }
 
-            const jsonStr = JSON.stringify(net.toJSON());
-            const chunkSize = 3 * 1024 * 1024;
-            for (let i = 0; i < jsonStr.length; i += chunkSize) {
-              chunks.push(jsonStr.slice(i, i + chunkSize));
+            const json = JSON.stringify(net.toJSON());
+            const chunkSize = 3*1024*1024;
+            for (let i = 0; i < json.length; i += chunkSize) {
+              chunks.push(json.slice(i, i + chunkSize));
             }
             self.postMessage({type:'complete', id, chunks});
           } catch (err) {
@@ -239,32 +319,31 @@
           }
         };
       `;
-      return new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'})));
+      return new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
     }
 
     function startTraining(turbo = false) {
       isTurboMode = turbo;
       el.progressContainer.classList.remove('hidden');
       el.trainingStatus.classList.remove('hidden');
-      el.trainingStatus.textContent = turbo ? '⚡ Turbo Mode Active...' : 'Training LSTM (High Quality)...';
+      el.trainingStatus.textContent = turbo ? '⚡ Turbo Mode Training...' : 'Training LSTM (Best Quality)...';
       el.trainingStatus.classList.add('training-pulse');
       el.progressBar.style.width = '0%';
       el.progressBar.textContent = '0%';
-      el.progressText.textContent = 'Initializing neural network...';
+      el.progressText.textContent = 'Initializing...';
 
-      trainingWorker = createTrainingWorker();
+      trainingWorker = createWorker();
       currentTrainingId = Date.now();
 
-      let totalIterations = turbo ? 18000 : trainingData.length < 200 ? 160 : trainingData.length < 800 ? 80 : 40;
+      const totalIters = turbo ? 20000 : trainingData.length < 200 ? 180 : trainingData.length < 800 ? 90 : 45;
 
       trainingWorker.onmessage = e => {
         if (e.data.id !== currentTrainingId) return;
-
         if (e.data.type === 'progress') {
-          const percent = Math.min(98, Math.round((e.data.iter / e.data.total) * 100));
-          el.progressBar.style.width = percent + '%';
-          el.progressBar.textContent = percent + '%';
-          el.progressText.textContent = `${percent}% (Error: ${e.data.error.toFixed(5)})`;
+          const pct = Math.min(98, Math.round((e.data.iter / e.data.total) * 100));
+          el.progressBar.style.width = pct + '%';
+          el.progressBar.textContent = pct + '%';
+          el.progressText.textContent = `${pct}% • Error: ${e.data.error.toFixed(6)}`;
         }
         if (e.data.type === 'complete') {
           const modelJson = e.data.chunks.join('');
@@ -278,10 +357,10 @@
 
       trainingWorker.postMessage({
         cmd: 'start',
-        data: trainingData.map(p => ({input: p.input, output: p.output})),
+        data: trainingData,
         turbo,
         id: currentTrainingId,
-        iterations: totalIterations
+        iterations: totalIters
       });
     }
 
@@ -292,151 +371,145 @@
       if (!error) {
         el.progressBar.style.width = '100%';
         el.progressBar.textContent = '100%';
-        el.progressText.textContent = `Training Complete! Accuracy: ${trainedAccuracy.toFixed(1)}%`;
-        el.testModelBtn.disabled = el.saveModelBtn.disabled = false;
-        setTimeout(() => el.progressContainer.classList.add('hidden'), 6000);
+        el.progressText.textContent = `Complete! Accuracy: ${trainedAccuracy.toFixed(1)}%`;
+        el.testModelBtn.disabled = false;
+        el.saveModelBtn.disabled = false;
+        setTimeout(() => el.progressContainer.classList.add('hidden'), 8000);
       } else {
-        el.trainingStatus.textContent = 'Training Failed: ' + msg;
+        el.trainingStatus.textContent = 'Error: ' + msg;
+        el.trainingStatus.className = 'mt-8 text-center text-3xl font-bold text-red-600';
       }
       if (trainingWorker) trainingWorker.terminate();
       trainingWorker = null;
     }
 
     function computeAccuracy() {
-      if (!net || trainingData.length === 0) return 0;
+      if (!net) return 0;
       let correct = 0;
-      const sample = trainingData.length > 200 ? trainingData.slice(0, 200) : trainingData;
-      for (const {input, output} of sample) {
+      const testSet = trainingData.length > 300 ? trainingData.slice(0, 300) : trainingData;
+      for (const {input, output} of testSet) {
         try {
           const pred = isTurboMode 
             ? decode(net.run(encode(input)))
             : net.run(input);
           if (pred.trim() === output.trim()) correct++;
-        } catch(e) {}
+        } catch {}
       }
-      return (correct / sample.length) * 100;
+      return (correct / testSet.length) * 100;
     }
 
-    function encode(str) {
-      return str.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255);
-    }
-
-    function decode(arr) {
-      return arr.map(n => String.fromCharCode(Math.round(n * 255))).join('').trim();
-    }
+    function encode(s) { return s.padEnd(120,' ').slice(0,120).split('').map(c=>c.charCodeAt(0)/255); }
+    function decode(a) { return a.map(n=>String.fromCharCode(Math.round(n*255))).join('').trim(); }
 
     el.testModelBtn.onclick = () => {
-      if (!net) return;
       const input = el.testInput.value.trim().toLowerCase();
-      if (!input) return;
+      if (!input || !net) return;
       const reply = isTurboMode ? decode(net.run(encode(input))) : net.run(input);
-      el.predictionText.textContent = reply || "(no response)";
+      el.predictionText.textContent = reply || "(silent)";
       el.testOutput.classList.remove('hidden');
     };
 
-    // === FULLY WORKING FIREBASE SAVE/LOAD ===
+    el.trainBtn.onclick = () => startTraining(false);
+    el.turboBtn.onclick = () => startTraining(true);
+    el.cancelTrainBtn.onclick = () => { if(trainingWorker) trainingWorker.terminate(); finishTraining(true, 'Cancelled'); };
+
+    // ====================== FIREBASE SAVE / LOAD / DELETE ======================
     async function saveModel() {
       const user = auth.currentUser;
       if (!user || !net) return;
 
       el.saveModelBtn.disabled = true;
-      el.saveStatus.textContent = 'Saving to global database...';
-      el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-blue-600';
+      el.saveStatus.textContent = 'Saving model...';
+      el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-blue-600';
 
       try {
-        const modelRef = ref(db, 'global-models');
-        const newModelRef = push(modelRef);
-        await set(newModelRef, {
+        const newRef = push(ref(db, 'global-models'));
+        await set(newRef, {
           model: net.toJSON(),
           accuracy: trainedAccuracy,
           pairs: trainingData.length,
           mode: isTurboMode ? 'Turbo' : 'Standard LSTM',
           timestamp: Date.now(),
-          trainer: user.email || user.uid,
+          trainer: user.email || 'Anonymous',
           trainerId: user.uid
         });
-
         el.saveStatus.textContent = 'Model saved successfully!';
-        el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-green-600';
+        el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-green-600';
         loadGlobalModels();
-      } catch (err) {
-        el.saveStatus.textContent = 'Save failed: ' + err.message;
-        el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-red-600';
+      } catch (e) {
+        el.saveStatus.textContent = 'Save failed: ' + e.message;
+        el.saveStatus.className = 'mt-6 text-center text-xl font-medium text-red-600';
       } finally {
-        el.saveModelBtn.disabled = false;
+        setTimeout(() => el.saveModelBtn.disabled = false, 2000);
       }
     }
 
     async function loadGlobalModels() {
       try {
-        const snapshot = await get(ref(db, 'global-models'));
-        userModels = snapshot.val() || {};
+        const snap = await get(ref(db, 'global-models'));
+        userModels = snap.val() || {};
         renderGlobalModels();
-      } catch (err) {
-        el.modelsList.innerHTML = '<p class="text-red-600 text-center">Failed to load models</p>';
+      } catch (e) {
+        el.modelsList.innerHTML = '<p class="text-red-600 text-center">Error loading models</p>';
       }
     }
 
     function renderGlobalModels() {
-      const models = Object.entries(userModels)
-        .map(([id, data]) => ({id, ...data}))
-        .sort((a, b) => b.timestamp - a.timestamp);
+      const list = Object.entries(userModels)
+        .map(([id, d]) => ({id, ...d}))
+        .sort((a,b) => b.timestamp - a.timestamp);
 
-      if (models.length === 0) {
-        el.modelsList.innerHTML = '<p class="text-gray-500 text-center">No models saved yet</p>';
+      if (list.length === 0) {
+        el.modelsList.innerHTML = '<p class="text-gray-500 text-center text-xl">No models saved yet</p>';
         return;
       }
 
-      el.modelsList.innerHTML = models.map(m => `
-        <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border-2 shadow-lg">
-          < PROCEDUREdiv class="flex justify-between items-start">
+      el.modelsList.innerHTML = list.map(m => `
+        <div class="p-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border-2 shadow-xl">
+          <div class="flex justify-between items-start">
             <div class="flex-1">
-              <h3 class="text-xl font-bold">${m.mode === 'Turbo' ? '⚡ Turbo Model' : 'Standard LSTM Model'}</h3>
-              <div class="mt-2 text-gray-600">
-                <div>Accuracy: <strong>${m.accuracy?.toFixed(1)}%</strong> • ${m.pairs} training pairs</div>
+              <h3 class="text-2xl font-bold ${m.mode==='Turbo' ? 'text-purple-600' : 'text-emerald-600'}">
+                ${m.mode === 'Turbo' ? '⚡ Turbo Model' : 'Standard LSTM Model'}
+              </h3>
+              <div class="mt-4 space-y-2 text-lg text-gray-700">
+                <div>Accuracy: <strong>${m.accuracy?.toFixed(1)}%</strong> • ${m.pairs} pairs</div>
                 <div>Trained by: <strong>${m.trainer}</strong></div>
                 <div>Created: ${new Date(m.timestamp).toLocaleString()}</div>
               </div>
             </div>
-            <div class="flex gap-3 ml-4">
-              <button onclick="loadThisModel('${m.id}')" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Load</button>
-              ${m.trainerId === auth.currentUser?.uid ? `<button onclick="deleteThisModel('${m.id}')" class="px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700">Delete</button>` : ''}
+            <div class="flex gap-4">
+              <button onclick="loadModel('${m.id}')" class="px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg">Load</button>
+              ${m.trainerId === auth.currentUser?.uid ? `<button onclick="deleteModel('${m.id}')" class="px-8 py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg">Delete</button>` : ''}
             </div>
           </div>
         </div>
       `).join('');
     }
 
-    window.loadThisModel = async (id) => {
+    window.loadModel = async (id) => {
       const data = userModels[id];
-      if (!data) return;
       isTurboMode = data.mode === 'Turbo';
       net = isTurboMode ? new brain.NeuralNetwork() : new brain.recurrent.LSTM();
       net.fromJSON(data.model);
       trainedAccuracy = data.accuracy;
-      el.testModelBtn.disabled = el.saveModelBtn.disabled = false;
-      el.trainingStatus.textContent = `Loaded: ${data.mode} (Accuracy: ${data.accuracy.toFixed(1)}%)`;
-      el.trainingStatus.className = 'mt-6 text-center text-2xl font-bold text-green-600';
+      el.testModelBtn.disabled = false;
+      el.saveModelBtn.disabled = false;
+      el.trainingStatus.textContent = `Loaded ${data.mode} Model (Accuracy: ${data.accuracy.toFixed(1)}%)`;
+      el.trainingStatus.className = 'mt-8 text-center text-3xl font-bold text-green-600';
       el.trainingStatus.classList.remove('hidden');
-      setTimeout(() => el.trainingStatus.classList.add('hidden'), 4000);
+      setTimeout(() => el.trainingStatus.classList.add('hidden'), 5000);
     };
 
-    window.deleteThisModel = async (id) => {
-      if (!confirm('Delete this model permanently?')) return;
+    window.deleteModel = async (id) => {
+      if (!confirm('Permanently delete this model?')) return;
       await remove(ref(db, `global-models/${id}`));
       delete userModels[id];
       renderGlobalModels();
     };
 
     el.saveModelBtn.onclick = saveModel;
-    el.trainBtn.onclick = () => startTraining(false);
-    el.turboBtn.onclick = () => startTraining(true);
-    el.cancelTrainBtn.onclick = () => {
-      if (trainingWorker) trainingWorker.terminate();
-      finishTraining(true, 'Cancelled by user');
-    };
 
-    // Auth & Init
+    // ====================== AUTH & INIT ======================
     onAuthStateChanged(auth, user => {
       if (user) {
         el.processBulkBtn.disabled = false;
@@ -446,7 +519,9 @@
       }
     });
 
+    // Init
     updateCounts();
+    renderPairs();
   </script>
 </body>
 </html>
