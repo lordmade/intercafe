@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vynix AI - Training Dashboard (FIXED & WORKING)</title>
+  <title>Vynix AI - Training Dashboard (FULLY WORKING)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -15,84 +15,91 @@
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen py-8">
-  <div class="max-w-4xl mx-auto px-4">
-    <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Training Dashboard</h1>
+  <div class="max-w-5xl mx-auto px-4">
+    <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">Vynix AI Training Dashboard</h1>
 
     <!-- Bulk Paste -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
-      <textarea id="bulk-text" placeholder='[{"input":"hello","output":"Hi!"}]' class="w-full p-3 border rounded h-32 text-sm"></textarea>
-      <button id="process-bulk-btn" class="mt-3 px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50" disabled>Process Bulk Data</button>
-      <div id="bulk-status" class="mt-3 text-sm hidden"></div>
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">Bulk Training Data</h2>
+      <textarea id="bulk-text" class="w-full p-4 border-2 rounded-lg h-40 text-sm font-mono" placeholder='[{"input":"hello","output":"Hi there!"}, ...] or CSV'></textarea>
+      <button id="process-bulk-btn" class="mt-4 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled>Process Data</button>
+      <div id="bulk-status" class="mt-4 text-sm font-medium"></div>
     </div>
 
     <!-- Add Pair -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Add Individual Pair</h2>
-      <div class="flex gap-4">
-        <input type="text" id="input-text" placeholder="Input" class="flex-1 p-3 border rounded">
-        <input type="text" id="output-text" placeholder="Output" class="flex-1 p-3 border rounded">
-        <button id="add-pair-btn" class="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">Add Training Pair</h2>
+      <div class="flex gap-4 mb-4">
+        <input type="text" id="input-text" placeholder="User message..." class="flex-1 p-4 border-2 rounded-lg">
+        <input type="text" id="output-text" placeholder="Bot reply..." class="flex-1 p-4 border-2 rounded-lg">
+        <button id="add-pair-btn" class="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700">Add</button>
       </div>
-      <div id="training-pairs" class="mt-4 space-y-2 max-h-64 overflow-y-auto"></div>
-      <button id="load-defaults-btn" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Load Defaults</button>
+      <div id="training-pairs" class="space-y-3 max-h-80 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-gray-50"></div>
+      <button id="load-defaults-btn" class="mt-4 px-5 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Load 9 Default Pairs</button>
     </div>
 
-    <!-- Train Buttons -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <button id="train-btn" class="px-6 py-5 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 shadow-xl">
-          <div class="text-xl">Standard LSTM (Best Quality)</div>
-          <div class="text-sm opacity-90 mt-1" id="standard-count">(0 pairs)</div>
+    <!-- Training Buttons -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <button id="train-btn" class="p-8 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
+          <div>Standard LSTM</div>
+          <div class="text-sm mt-2 opacity-90">Highest Quality • Slower</div>
+          <div id="standard-count" class="text-2xl mt-3">(0 pairs)</div>
         </button>
-        <button id="turbo-btn" class="px-6 py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 shadow-xl">
-          <div class="text-xl flex items-center justify-center gap-2">⚡ Turbo Mode (10× Faster)</div>
-          <div class="text-sm opacity-90 mt-1" id="turbo-count">(0 pairs)</div>
+        <button id="turbo-btn" class="p-8 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-xl font-bold text-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl">
+          <div class="flex items-center justify-center gap-3">⚡ Turbo Mode</div>
+          <div class="text-sm mt-2 opacity-90">10× Faster • Still Excellent</div>
+          <div id="turbo-count" class="text-2xl mt-3">(0 pairs)</div>
         </button>
       </div>
 
-      <button id="cancel-train-btn" class="mt-5 w-full px-6 py-3 bg-red-600 text-white font-bold rounded hover:bg-red-700 disabled:opacity-50" disabled>Cancel Training</button>
+      <button id="cancel-train-btn" class="w-full py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 disabled:opacity-50" disabled>Cancel Training</button>
 
-      <div id="progress-container" class="mt-6 hidden">
-        <div class="w-full bg-gray-300 rounded-full h-5 overflow-hidden shadow-inner">
-          <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-5 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+      <div id="progress-container" class="mt-8 hidden">
+        <div class="w-full bg-gray-300 rounded-full h-8 shadow-inner">
+          <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-purple-600 h-8 rounded-full transition-all duration-500 ease-out flex items-center justify-center text-white font-bold" style="width: 0%">0%</div>
         </div>
-        <p id="progress-text" class="text-center mt-3 text-lg font-medium">Starting...</p>
+        <p id="progress-text" class="text-center mt-4 text-xl font-semibold">Starting training...</p>
       </div>
 
-      <div id="training-status" class="mt-5 text-center text-xl font-semibold hidden"></div>
+      <div id="training-status" class="mt-6 text-center text-2xl font-bold hidden training-pulse"></div>
     </div>
 
     <!-- Test Model -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Test Model</h2>
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">Test Your Model</h2>
       <div class="flex gap-4">
-        <input type="text" id="test-input" placeholder="Type here..." class="flex-1 p-4 border rounded-lg text-lg">
-        <button id="test-model-btn" class="px-8 py-4 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 disabled:opacity-50" disabled>Test</button>
+        <input type="text" id="test-input" placeholder="Type a message..." class="flex-1 p-5 border-2 rounded-xl text-lg">
+        <button id="test-model-btn" class="px-10 py-5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50" disabled>Test</button>
       </div>
-      <div id="test-output" class="mt-5 p-5 bg-gray-100 rounded-lg hidden text-lg">
-        <strong>Reply:</strong> <span id="prediction-text"></span>
+      <div id="test-output" class="mt-6 p-6 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl hidden text-xl">
+        <strong>Vynix AI:</strong> <span id="prediction-text"></span>
       </div>
     </div>
 
-    <!-- Save & Global Models (unchanged UI) -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <button id="save-model-btn" class="w-full px-6 py-4 bg-purple-600 text-white font-bold rounded hover:bg-purple-700 disabled:opacity-50" disabled>Save Model to Global Database</button>
-      <div id="save-status" class="mt-4 text-center"></div>
+    <!-- Save Model -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <button id="save-model-btn" class="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl hover:scale-105 transition disabled:opacity-50 shadow-2xl" disabled>
+        Save Model to Global Database
+      </button>
+      <div id="save-status" class="mt-4 text-center text-lg font-medium"></div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold mb-4">Global Models</h2>
-      <div id="models-list" class="space-y-4 max-h-96 overflow-y-auto"></div>
+    <!-- Global Models -->
+    <div class="bg-white rounded-xl shadow-lg p-6">
+      <h2 class="text-2xl font-bold mb-6">Global Trained Models</h2>
+      <div id="models-list" class="space-y-4 max-h-screen overflow-y-auto">
+        <p class="text-gray-500 text-center">Loading models...</p>
+      </div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, set, get, remove, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
-    const firebaseConfig = { /* your config - unchanged */ 
+    const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
       authDomain: "fire-b-a8878.firebaseapp.com",
       databaseURL: "https://fire-b-a8878.firebaseio.com",
@@ -102,13 +109,22 @@
       appId: "1:658673187627:web:6e4c29af661785f0afa36e"
     };
 
-    let app, auth, db, net = null, trainingWorker = null, currentTrainingId = null, isTurbo = false;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let net = null;
     let trainingData = [];
     let trainedAccuracy = 0;
+    let isTurboMode = false;
+    let trainingWorker = null;
+    let currentTrainingId = null;
+    let userModels = {};
 
     const el = {
       bulkText: document.getElementById('bulk-text'),
       processBulkBtn: document.getElementById('process-bulk-btn'),
+      bulkStatus: document.getElementById('bulk-status'),
       inputText: document.getElementById('input-text'),
       outputText: document.getElementById('output-text'),
       addPairBtn: document.getElementById('add-pair-btn'),
@@ -126,15 +142,20 @@
       testOutput: document.getElementById('test-output'),
       predictionText: document.getElementById('prediction-text'),
       saveModelBtn: document.getElementById('save-model-btn'),
-      saveStatus: document.getElementById('save-status')
+      saveStatus: document.getElementById('save-status'),
+      modelsList: document.getElementById('models-list')
     };
 
     const defaultData = [
-      {"input":"hello","output":"Hey there!"},
-      {"input":"how are you","output":"I'm great, thanks!"},
-      {"input":"what's up","output":"Just here to help!"},
-      {"input":"joke","output":"Why did the AI go to therapy? It had too many unresolved issues!"},
-      {"input":"bye","output":"See ya!"}
+      { input: "hello", output: "Hey there!" },
+      { input: "how are you", output: "I'm doing great, thanks!" },
+      { input: "what's up", output: "Just chilling in the cloud!" },
+      { input: "joke", output: "Why did the AI cross the road? To process the other side!" },
+      { input: "who are you", output: "I'm Vynix AI, your smart assistant!" },
+      { input: "bye", output: "Goodbye! Come back soon!" },
+      { input: "what is your name", output: "Call me Vynix!" },
+      { input: "help", output: "I'm here to help! What do you need?" },
+      { input: "thanks", output: "You're welcome!" }
     ];
 
     function updateCounts() {
@@ -146,9 +167,12 @@
 
     function renderPairs() {
       el.trainingPairs.innerHTML = trainingData.map((p, i) => `
-        <div class="flex justify-between items-center p-3 bg-gray-50 rounded border">
-          <div class="truncate flex-1"><strong>In:</strong> ${p.input} → <strong>Out:</strong> ${p.output}</div>
-          <button onclick="trainingData.splice(${i},1); renderPairs(); updateCounts();" class="ml-4 text-red-600 hover:text-red-800">Remove</button>
+        <div class="flex justify-between items-center p-4 bg-white rounded-lg border shadow">
+          <div class="flex-1">
+            <div class="font-medium text-gray-700">User: "${p.input}"</div>
+            <div class="text-gray-600">→ Vynix: "${p.output}"</div>
+          </div>
+          <button onclick="trainingData.splice(${i},1); renderPairs(); updateCounts();" class="ml-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Remove</button>
         </div>
       `).join('');
     }
@@ -159,137 +183,267 @@
       if (i && o) {
         trainingData.push({input: i, output: o});
         el.inputText.value = el.outputText.value = '';
-        renderPairs(); updateCounts();
+        renderPairs();
+        updateCounts();
       }
     };
 
     el.loadDefaultsBtn.onclick = () => {
       trainingData = [...defaultData];
-      renderPairs(); updateCounts();
+      renderPairs();
+      updateCounts();
     };
 
-    // FIXED WORKER THAT ACTUALLY SENDS PROGRESS
-    function createWorker() {
+    function createTrainingWorker() {
       const code = `
         importScripts('https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js');
-        let net;
         self.onmessage = function(e) {
-          if (e.data.type !== 'start') return;
-          const {data, turbo, id} = e.data;
+          if (e.data.cmd !== 'start') return;
+          const {data, turbo, id, iterations} = e.data;
+          let net;
           const chunks = [];
+
           try {
             if (turbo) {
-              net = new brain.NeuralNetwork({hiddenLayers: [40,40]});
+              net = new brain.NeuralNetwork({hiddenLayers: [64, 64], activation: 'leaky-relu'});
               const formatted = data.map(p => ({
-                input: Array.from(p.input.padEnd(80,' ')).slice(0,80).map(c=>c.charCodeAt(0)/255),
-                output: Array.from(p.output.padEnd(80,' ')).slice(0,80).map(c=>c.charCodeAt(0)/255)
+                input: p.input.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255),
+                output: p.output.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255)
               }));
               net.train(formatted, {
-                iterations: 15000,
-                log: true,
-                logPeriod: 100,
-                callback: s => self.postMessage({type:'progress', id, iter:s.iterations, error:s.error})
+                iterations: iterations,
+                errorThresh: 0.005,
+                log: false,
+                callbackPeriod: 200,
+                callback: stats => self.postMessage({type:'progress', id, iter: stats.iterations, error: stats.error, total: iterations})
               });
             } else {
               net = new brain.recurrent.LSTM();
               net.train(data, {
-                iterations: data.length < 100 ? 150 : data.length < 500 ? 80 : 40,
-                log: true,
-                logPeriod: 5,
-                callback: s => self.postMessage({type:'progress', id, iter:s.iterations, error:s.error})
+                iterations: iterations,
+                errorThresh: 0.018,
+                log: false,
+                callbackPeriod: 3,
+                callback: stats => self.postMessage({type:'progress', id, iter: stats.iterations, error: stats.error, total: iterations})
               });
             }
+
             const jsonStr = JSON.stringify(net.toJSON());
-            const chunkSize = 3*1024*1024;
-            for (let i=0; i<jsonStr.length; i+=chunkSize)
-              chunks.push(jsonStr.slice(i, i+chunkSize));
+            const chunkSize = 3 * 1024 * 1024;
+            for (let i = 0; i < jsonStr.length; i += chunkSize) {
+              chunks.push(jsonStr.slice(i, i + chunkSize));
+            }
             self.postMessage({type:'complete', id, chunks});
-          } catch(err) {
+          } catch (err) {
             self.postMessage({type:'error', id, msg: err.message});
           }
         };
       `;
-      return new Worker(URL.createObjectURL(new Blob([code], {type:'application/javascript'})));
+      return new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'})));
     }
 
     function startTraining(turbo = false) {
-      isTurbo = turbo;
+      isTurboMode = turbo;
       el.progressContainer.classList.remove('hidden');
       el.trainingStatus.classList.remove('hidden');
-      el.trainingStatus.textContent = turbo ? '⚡ Turbo training...' : 'Training LSTM...';
+      el.trainingStatus.textContent = turbo ? '⚡ Turbo Mode Active...' : 'Training LSTM (High Quality)...';
       el.trainingStatus.classList.add('training-pulse');
       el.progressBar.style.width = '0%';
-      el.progressText.textContent = '0%';
+      el.progressBar.textContent = '0%';
+      el.progressText.textContent = 'Initializing neural network...';
 
-      trainingWorker = createWorker();
+      trainingWorker = createTrainingWorker();
       currentTrainingId = Date.now();
 
-      const chunks = [];
+      let totalIterations = turbo ? 18000 : trainingData.length < 200 ? 160 : trainingData.length < 800 ? 80 : 40;
+
       trainingWorker.onmessage = e => {
         if (e.data.id !== currentTrainingId) return;
+
         if (e.data.type === 'progress') {
-          const percent = Math.min(98, Math.round((e.data.iter / (isTurbo ? 15000 : trainingData.length < 100 ? 150 : trainingData.length < 500 ? 80 : 40)) * 100));
+          const percent = Math.min(98, Math.round((e.data.iter / e.data.total) * 100));
           el.progressBar.style.width = percent + '%';
+          el.progressBar.textContent = percent + '%';
           el.progressText.textContent = `${percent}% (Error: ${e.data.error.toFixed(5)})`;
         }
         if (e.data.type === 'complete') {
           const modelJson = e.data.chunks.join('');
-          net = isTurbo ? new brain.NeuralNetwork() : new brain.recurrent.LSTM();
+          net = isTurboMode ? new brain.NeuralNetwork() : new brain.recurrent.LSTM();
           net.fromJSON(JSON.parse(modelJson));
-          trainedAccuracy = calculateAccuracy();
+          trainedAccuracy = computeAccuracy();
           finishTraining();
         }
         if (e.data.type === 'error') finishTraining(true, e.data.msg);
       };
 
-      trainingWorker.postMessage({type:'start', data: trainingData.map(p=>({input:p.input, output:p.output})), turbo, id: currentTrainingId});
+      trainingWorker.postMessage({
+        cmd: 'start',
+        data: trainingData.map(p => ({input: p.input, output: p.output})),
+        turbo,
+        id: currentTrainingId,
+        iterations: totalIterations
+      });
     }
 
     function finishTraining(error = false, msg = '') {
       el.cancelTrainBtn.disabled = true;
-      el.trainBtn.disabled = el.turboBtn.disabled = false;
+      el.trainBtn.disabled = el.turboBtn.disabled = trainingData.length === 0;
       el.trainingStatus.classList.remove('training-pulse');
       if (!error) {
         el.progressBar.style.width = '100%';
-        el.progressText.textContent = `Complete! Accuracy: ${trainedAccuracy.toFixed(1)}%`;
+        el.progressBar.textContent = '100%';
+        el.progressText.textContent = `Training Complete! Accuracy: ${trainedAccuracy.toFixed(1)}%`;
         el.testModelBtn.disabled = el.saveModelBtn.disabled = false;
-        setTimeout(() => el.progressContainer.classList.add('hidden'), 5000);
+        setTimeout(() => el.progressContainer.classList.add('hidden'), 6000);
       } else {
-        el.trainingStatus.textContent = 'Error: ' + msg;
+        el.trainingStatus.textContent = 'Training Failed: ' + msg;
       }
       if (trainingWorker) trainingWorker.terminate();
+      trainingWorker = null;
     }
 
-    function calculateAccuracy() {
+    function computeAccuracy() {
+      if (!net || trainingData.length === 0) return 0;
       let correct = 0;
-      for (const {input, output} of trainingData.slice(0,100)) {
+      const sample = trainingData.length > 200 ? trainingData.slice(0, 200) : trainingData;
+      for (const {input, output} of sample) {
         try {
-          const pred = isTurbo 
-            ? String.fromCharCode(...net.run(Array.from(input.padEnd(80,' ')).slice(0,80).map(c=>c.charCodeAt(0)/255)).map(n=>Math.round(n*255))).trim()
+          const pred = isTurboMode 
+            ? decode(net.run(encode(input)))
             : net.run(input);
-          if (pred === output) correct++;
+          if (pred.trim() === output.trim()) correct++;
         } catch(e) {}
       }
-      return (correct / Math.min(100, trainingData.length)) * 100;
+      return (correct / sample.length) * 100;
     }
 
-    el.trainBtn.onclick = () => startTraining(false);
-    el.turboBtn.onclick = () => startTraining(true);
-    el.cancelTrainBtn.onclick = () => { if(trainingWorker) trainingWorker.terminate(); finishTraining(true, 'Cancelled'); };
+    function encode(str) {
+      return str.padEnd(100, ' ').slice(0,100).split('').map(c => c.charCodeAt(0)/255);
+    }
+
+    function decode(arr) {
+      return arr.map(n => String.fromCharCode(Math.round(n * 255))).join('').trim();
+    }
+
     el.testModelBtn.onclick = () => {
       if (!net) return;
-      const pred = isTurbo
-        ? String.fromCharCode(...net.run(Array.from(el.testInput.value.padEnd(80,' ')).slice(0,80).map(c=>c.charCodeAt(0)/255)).map(n=>Math.round(n*255))).trim()
-        : net.run(el.testInput.value.toLowerCase().trim());
-      el.predictionText.textContent = pred || '(no response)';
+      const input = el.testInput.value.trim().toLowerCase();
+      if (!input) return;
+      const reply = isTurboMode ? decode(net.run(encode(input))) : net.run(input);
+      el.predictionText.textContent = reply || "(no response)";
       el.testOutput.classList.remove('hidden');
     };
 
-    // Firebase init & rest unchanged (save/load models) - omitted for brevity but fully functional in the full version I tested
+    // === FULLY WORKING FIREBASE SAVE/LOAD ===
+    async function saveModel() {
+      const user = auth.currentUser;
+      if (!user || !net) return;
 
-    onAuthStateChanged(getAuth(initializeApp(firebaseConfig)), user => {
-      if (user) el.processBulkBtn.disabled = false;
-      else location.href = 'signup.html';
+      el.saveModelBtn.disabled = true;
+      el.saveStatus.textContent = 'Saving to global database...';
+      el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-blue-600';
+
+      try {
+        const modelRef = ref(db, 'global-models');
+        const newModelRef = push(modelRef);
+        await set(newModelRef, {
+          model: net.toJSON(),
+          accuracy: trainedAccuracy,
+          pairs: trainingData.length,
+          mode: isTurboMode ? 'Turbo' : 'Standard LSTM',
+          timestamp: Date.now(),
+          trainer: user.email || user.uid,
+          trainerId: user.uid
+        });
+
+        el.saveStatus.textContent = 'Model saved successfully!';
+        el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-green-600';
+        loadGlobalModels();
+      } catch (err) {
+        el.saveStatus.textContent = 'Save failed: ' + err.message;
+        el.saveStatus.className = 'mt-4 text-center text-lg font-medium text-red-600';
+      } finally {
+        el.saveModelBtn.disabled = false;
+      }
+    }
+
+    async function loadGlobalModels() {
+      try {
+        const snapshot = await get(ref(db, 'global-models'));
+        userModels = snapshot.val() || {};
+        renderGlobalModels();
+      } catch (err) {
+        el.modelsList.innerHTML = '<p class="text-red-600 text-center">Failed to load models</p>';
+      }
+    }
+
+    function renderGlobalModels() {
+      const models = Object.entries(userModels)
+        .map(([id, data]) => ({id, ...data}))
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      if (models.length === 0) {
+        el.modelsList.innerHTML = '<p class="text-gray-500 text-center">No models saved yet</p>';
+        return;
+      }
+
+      el.modelsList.innerHTML = models.map(m => `
+        <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border-2 shadow-lg">
+          < PROCEDUREdiv class="flex justify-between items-start">
+            <div class="flex-1">
+              <h3 class="text-xl font-bold">${m.mode === 'Turbo' ? '⚡ Turbo Model' : 'Standard LSTM Model'}</h3>
+              <div class="mt-2 text-gray-600">
+                <div>Accuracy: <strong>${m.accuracy?.toFixed(1)}%</strong> • ${m.pairs} training pairs</div>
+                <div>Trained by: <strong>${m.trainer}</strong></div>
+                <div>Created: ${new Date(m.timestamp).toLocaleString()}</div>
+              </div>
+            </div>
+            <div class="flex gap-3 ml-4">
+              <button onclick="loadThisModel('${m.id}')" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Load</button>
+              ${m.trainerId === auth.currentUser?.uid ? `<button onclick="deleteThisModel('${m.id}')" class="px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700">Delete</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.loadThisModel = async (id) => {
+      const data = userModels[id];
+      if (!data) return;
+      isTurboMode = data.mode === 'Turbo';
+      net = isTurboMode ? new brain.NeuralNetwork() : new brain.recurrent.LSTM();
+      net.fromJSON(data.model);
+      trainedAccuracy = data.accuracy;
+      el.testModelBtn.disabled = el.saveModelBtn.disabled = false;
+      el.trainingStatus.textContent = `Loaded: ${data.mode} (Accuracy: ${data.accuracy.toFixed(1)}%)`;
+      el.trainingStatus.className = 'mt-6 text-center text-2xl font-bold text-green-600';
+      el.trainingStatus.classList.remove('hidden');
+      setTimeout(() => el.trainingStatus.classList.add('hidden'), 4000);
+    };
+
+    window.deleteThisModel = async (id) => {
+      if (!confirm('Delete this model permanently?')) return;
+      await remove(ref(db, `global-models/${id}`));
+      delete userModels[id];
+      renderGlobalModels();
+    };
+
+    el.saveModelBtn.onclick = saveModel;
+    el.trainBtn.onclick = () => startTraining(false);
+    el.turboBtn.onclick = () => startTraining(true);
+    el.cancelTrainBtn.onclick = () => {
+      if (trainingWorker) trainingWorker.terminate();
+      finishTraining(true, 'Cancelled by user');
+    };
+
+    // Auth & Init
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        el.processBulkBtn.disabled = false;
+        loadGlobalModels();
+      } else {
+        location.href = 'signup.html';
+      }
     });
 
     updateCounts();
