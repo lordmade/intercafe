@@ -1,4 +1,3 @@
-<!-- train.html: Enhanced Dashboard for Training with TensorFlow.js and WebGL -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,61 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vynix AI - Training Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> <!-- For CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
+    .training-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen py-4 sm:py-8">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8">Vynix AI Training Dashboard</h1>
+<body class="bg-gray-50 min-h-screen py-8">
+  <div class="max-w-4xl mx-auto px-4">
+    <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Training Dashboard</h1>
     
     <!-- Bulk Paste Section -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-      <h2 class="text-lg sm:text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
       <div class="space-y-4">
-        <textarea id="bulk-text" placeholder='Paste JSON array (e.g., [{"input": "hello", "output": "Hey!"}]) or CSV content here...' class="w-full p-2 border rounded h-24 sm:h-32 text-sm"></textarea>
-        <button id="process-bulk-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Process Bulk Data</button>
-        <p class="text-sm text-gray-600">Supports JSON (array of {input: "text", output: "response"}) or CSV (columns: input,output). Max 1000 pairs.</p>
+        <textarea id="bulk-text" placeholder='Paste JSON array or CSV content here...' class="w-full p-2 border rounded h-24 text-sm"></textarea>
+        <button id="process-bulk-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" disabled>Process Bulk Data</button>
+        <p class="text-sm text-gray-600">Supports JSON or CSV (input,output). Max 1000 pairs.</p>
       </div>
-      <div id="bulk-status" class="mt-4 text-sm text-gray-600 hidden"></div>
+      <div id="bulk-status" class="mt-4 text-sm hidden"></div>
     </div>
 
     <!-- Training Data Input -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-      <h2 class="text-lg sm:text-xl font-semibold mb-4">Add Individual Training Data</h2>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Add Individual Training Data</h2>
       <div id="training-data-form" class="space-y-4">
-        <div class="flex flex-col sm:flex-row gap-4">
-          <input type="text" id="input-text" placeholder="Input (e.g., 'hello')" class="flex-1 p-2 border rounded">
-          <input type="text" id="output-text" placeholder="Output (e.g., 'Hey there!')" class="flex-1 p-2 border rounded">
+        <div class="flex gap-4">
+          <input type="text" id="input-text" placeholder="Input" class="flex-1 p-2 border rounded">
+          <input type="text" id="output-text" placeholder="Output" class="flex-1 p-2 border rounded">
+          <button id="add-pair-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Pair</button>
         </div>
-        <button id="add-pair-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Pair</button>
       </div>
-      <div id="training-pairs" class="mt-4 space-y-2 max-h-32 sm:max-h-40 overflow-y-auto"></div>
-      <button id="load-defaults-btn" class="mt-4 w-full sm:w-auto px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Load Default Data</button>
+      <div id="training-pairs" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></div>
+      <button id="load-defaults-btn" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Load Default Data</button>
     </div>
 
     <!-- Train Button -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-      <button id="train-btn" class="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded hover:bg-green-600 disabled:opacity-50" disabled>
-        Train Model (0 pairs)
-      </button>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex gap-4">
+        <button id="train-btn" class="flex-1 px-6 py-3 bg-green-500 text-white font-semibold rounded hover:bg-green-600 disabled:opacity-50" disabled>
+          Train Model (0 pairs)
+        </button>
+        <button id="cancel-train-btn" class="px-6 py-3 bg-red-500 text-white font-semibold rounded hover:bg-red-600 disabled:opacity-50" disabled>
+          Cancel
+        </button>
+      </div>
       <div id="progress-container" class="mt-4 hidden">
         <div class="w-full bg-gray-200 rounded-full h-2.5">
           <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
         <p id="progress-text" class="text-sm text-gray-600 mt-2">0%</p>
       </div>
-      <div id="training-log" class="mt-4 text-sm text-gray-600 hidden"></div>
+      <div id="training-status" class="mt-4 text-sm text-gray-600 hidden"></div>
+      <div id="training-log" class="mt-4 text-sm text-gray-600 max-h-32 overflow-y-auto hidden"></div>
     </div>
 
     <!-- Model Preview Testing -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-      <h2 class="text-lg sm:text-xl font-semibold mb-4">Model Preview Testing</h2>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Model Preview Testing</h2>
       <div class="space-y-4">
-        <input type="text" id="test-input" placeholder="Enter test input (e.g., 'hello')" class="w-full p-2 border rounded">
+        <input type="text" id="test-input" placeholder="Enter test input" class="w-full p-2 border rounded">
         <button id="test-model-btn" class="w-full px-6 py-3 bg-indigo-500 text-white font-semibold rounded hover:bg-indigo-600 disabled:opacity-50" disabled>
           Test Model
         </button>
@@ -68,21 +74,20 @@
           <strong>Predicted Output:</strong> <span id="prediction-text"></span>
         </div>
       </div>
-      <p class="text-sm text-gray-600 mt-2">Test your trained model here. Enable after training or loading a model.</p>
     </div>
 
     <!-- Save Model -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
       <button id="save-model-btn" class="w-full px-6 py-3 bg-purple-500 text-white font-semibold rounded hover:bg-purple-600 disabled:opacity-50" disabled>
         Save Trained Model to Firebase
       </button>
-      <div id="save-status" class="mt-4 text-sm text-gray-600"></div>
+      <div id="save-status" class="mt-4 text-sm"></div>
     </div>
 
     <!-- Trained Models List -->
-    <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mt-6">
-      <h2 class="text-lg sm:text-xl font-semibold mb-4">Your Trained Models</h2>
-      <div id="models-list" class="space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold mb-4">Global Models</h2>
+      <div id="models-list" class="space-y-2 max-h-60 overflow-y-auto">
         <p class="text-gray-500">Loading models...</p>
       </div>
     </div>
@@ -91,7 +96,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import { getDatabase, ref, set, get, remove, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBOyZ3As4GTuNvjemvPF_SpsC6m6vqtNhc",
@@ -106,14 +111,13 @@
 
     let app, auth, db;
     let trainingData = [];
-    let model;
-    let charToIx = {};
-    let ixToChar = [];
-    let vocabSize = 0;
-    let seqLen = 20; // Reduced for faster training
+    let net = null; // Initialize only when needed
     let userModels = {};
     let trainedAccuracy = 0;
     let modelReady = false;
+    let trainingWorker = null;
+    let currentTrainingId = null;
+
     const MAX_PAIRS = 1000;
     const defaultTrainingData = [
       { input: "hello", output: "Hey there!" },
@@ -136,9 +140,11 @@
       trainingPairs: document.getElementById('training-pairs'),
       loadDefaultsBtn: document.getElementById('load-defaults-btn'),
       trainBtn: document.getElementById('train-btn'),
+      cancelTrainBtn: document.getElementById('cancel-train-btn'),
       progressContainer: document.getElementById('progress-container'),
       progressBar: document.getElementById('progress-bar'),
       progressText: document.getElementById('progress-text'),
+      trainingStatus: document.getElementById('training-status'),
       trainingLog: document.getElementById('training-log'),
       saveModelBtn: document.getElementById('save-model-btn'),
       saveStatus: document.getElementById('save-status'),
@@ -149,71 +155,6 @@
       predictionText: document.getElementById('prediction-text')
     };
 
-    // Build vocabulary from training data
-    function buildVocab() {
-      const allText = trainingData.flatMap(pair => pair.input + ' ' + pair.output).join(' ');
-      const uniqueChars = [...new Set(allText.split(''))];
-      vocabSize = uniqueChars.length;
-      charToIx = {};
-      ixToChar = [];
-      uniqueChars.forEach((char, ix) => {
-        charToIx[char] = ix;
-        ixToChar[ix] = char;
-      });
-    }
-
-    // Encode text to sequence of indices
-    function encodeText(text, maxLen = seqLen) {
-      const encoded = text.split('').map(char => charToIx[char] || 0);
-      while (encoded.length < maxLen) encoded.push(0);
-      return encoded.slice(0, maxLen);
-    }
-
-    // Decode sequence to text
-    function decodeSequence(encoded) {
-      return encoded.map(ix => ixToChar[ix] || '?').join('').trim();
-    }
-
-    // Prepare training data as sequences
-    function prepareData() {
-      if (trainingData.length === 0 || vocabSize === 0) return null;
-      const xs = [];
-      const ys = [];
-      trainingData.forEach(pair => {
-        const fullText = pair.input + ' ' + pair.output;
-        for (let i = 0; i < fullText.length - seqLen; i++) {
-          const x = encodeText(fullText.slice(i, i + seqLen));
-          const y = encodeText(fullText.slice(i + 1, i + seqLen + 1));
-          xs.push(x);
-          ys.push(y);
-        }
-      });
-      if (xs.length === 0) return null;
-      const xsTensor = tf.tensor2d(xs, [xs.length, seqLen]);
-      const ysTensor = tf.tensor2d(ys, [ys.length, seqLen]).expandDims(-1); // [batch, seq, 1] for sparse
-      return { xs: xsTensor, ys: ysTensor };
-    }
-
-    // Create smaller, faster LSTM model
-    function createModel() {
-      const model = tf.sequential({
-        layers: [
-          tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: seqLen }), // Reduced embedding dim
-          tf.layers.lstm({ units: 64, returnSequences: true }), // Reduced units, single layer
-          tf.layers.dropout({ rate: 0.2 }),
-          tf.layers.timeDistributed({
-            layer: tf.layers.dense({ units: vocabSize, activation: 'softmax' })
-          })
-        ]
-      });
-      model.compile({
-        optimizer: tf.train.adam(0.001), // Explicit Adam with LR
-        loss: 'sparseCategoricalCrossentropy',
-        metrics: ['accuracy']
-      });
-      return model;
-    }
-
     function normalizeText(text) {
       return text.toLowerCase().trim();
     }
@@ -223,7 +164,7 @@
       const normOutput = output.trim();
       if (!normInput || !normOutput) return false;
       if (trainingData.length >= MAX_PAIRS) {
-        alert(`Maximum ${MAX_PAIRS} pairs reached.`);
+        showStatus('Maximum pairs reached', 'error');
         return false;
       }
       trainingData.push({ input: normInput, output: normOutput });
@@ -231,7 +172,6 @@
         elements.inputText.value = '';
         elements.outputText.value = '';
       }
-      buildVocab(); // Rebuild vocab on add
       renderTrainingPairs();
       updateTrainButton();
       return true;
@@ -240,7 +180,9 @@
     function renderTrainingPairs() {
       elements.trainingPairs.innerHTML = trainingData.map((pair, index) => `
         <div class="flex justify-between items-center p-2 bg-gray-100 rounded">
-          <span class="truncate text-sm" title="${pair.input} → ${pair.output}">${pair.input} → ${pair.output}</span>
+          <span class="truncate" title="${pair.input} → ${pair.output}">
+            ${pair.input} → ${pair.output}
+          </span>
           <button onclick="removePair(${index})" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
         </div>
       `).join('');
@@ -248,7 +190,6 @@
 
     function removePair(index) {
       trainingData.splice(index, 1);
-      buildVocab();
       renderTrainingPairs();
       updateTrainButton();
     }
@@ -258,269 +199,419 @@
       elements.trainBtn.disabled = trainingData.length === 0;
     }
 
-    function updateModelReady() {
-      modelReady = true;
-      elements.testModelBtn.disabled = false;
-      elements.saveModelBtn.disabled = false;
+    function updateModelReady(state = true) {
+      modelReady = state;
+      elements.testModelBtn.disabled = !state;
+      elements.saveModelBtn.disabled = !state;
     }
 
     function loadDefaults() {
       trainingData = [...defaultTrainingData];
-      buildVocab();
       renderTrainingPairs();
       updateTrainButton();
-      elements.bulkStatus.classList.add('hidden');
+      updateModelReady(false);
+      hideStatus(elements.bulkStatus);
+    }
+
+    function showStatus(element, message, type = 'info') {
+      element.classList.remove('hidden', 'text-blue-600', 'text-green-600', 'text-red-600');
+      element.classList.add(type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-blue-600');
+      element.textContent = message;
+    }
+
+    function hideStatus(element) {
+      element.classList.add('hidden');
     }
 
     async function handleBulkText() {
       const text = elements.bulkText.value.trim();
       if (!text) return;
-      elements.bulkStatus.classList.remove('hidden');
-      elements.bulkStatus.textContent = 'Processing...';
-      elements.bulkStatus.classList.remove('text-green-600', 'text-red-600');
-      elements.bulkStatus.classList.add('text-blue-600');
+      
+      showStatus(elements.bulkStatus, 'Processing...', 'info');
+      elements.processBulkBtn.disabled = true;
 
       try {
         let newPairs = [];
-
         // Try JSON first
         try {
           const data = JSON.parse(text);
           if (Array.isArray(data)) {
-            newPairs = data.map(item => ({ input: item.input, output: item.output })).filter(Boolean);
+            newPairs = data.filter(item => item.input && item.output);
           }
-        } catch (jsonErr) {
-          // If JSON fails, try CSV
+        } catch {
+          // Try CSV
           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-          if (parsed.errors.length > 0) throw new Error('Parsing error: ' + parsed.errors[0].message);
-          newPairs = parsed.data.map(row => ({ input: row.input, output: row.output })).filter(row => row.input && row.output);
+          if (parsed.errors.length) throw new Error('CSV parse error');
+          newPairs = parsed.data.filter(row => row.input && row.output);
         }
 
-        if (newPairs.length === 0) throw new Error('No valid pairs found in pasted content.');
-
-        const addedCount = newPairs.reduce((count, pair) => {
-          if (trainingData.length >= MAX_PAIRS) return count;
-          return addTrainingPair(pair.input, pair.output, true) ? count + 1 : count;
-        }, 0);
-
-        elements.bulkStatus.textContent = `Added ${addedCount} new pairs (${newPairs.length - addedCount} skipped due to limits/errors).`;
-        elements.bulkStatus.classList.remove('text-blue-600');
-        elements.bulkStatus.classList.add('text-green-600');
-        elements.bulkText.value = ''; // Clear textarea after processing
+        if (!newPairs.length) throw new Error('No valid pairs found');
+        
+        const added = newPairs.reduce((count, pair) => 
+          addTrainingPair(pair.input, pair.output, true) ? count + 1 : count, 0
+        );
+        
+        showStatus(elements.bulkStatus, `Added ${added} new pairs`, 'success');
+        elements.bulkText.value = '';
       } catch (error) {
-        elements.bulkStatus.textContent = 'Error: ' + error.message;
-        elements.bulkStatus.classList.remove('text-blue-600');
-        elements.bulkStatus.classList.add('text-red-600');
+        showStatus(elements.bulkStatus, 'Error: ' + error.message, 'error');
+      } finally {
+        elements.processBulkBtn.disabled = false;
+        setTimeout(() => hideStatus(elements.bulkStatus), 3000);
+      }
+    }
+
+    // Web Worker for training
+    function createTrainingWorker() {
+      const workerScript = `
+        importScripts('https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js');
+        
+        let isTraining = false;
+        
+        self.onmessage = function(e) {
+          const { type, id, data, options } = e.data;
+          
+          if (type === 'train') {
+            if (isTraining) {
+              self.postMessage({ type: 'error', id, error: 'Training already in progress' });
+              return;
+            }
+            
+            isTraining = true;
+            
+            try {
+              const net = new brain.recurrent.LSTM();
+              
+              // Optimize for faster training
+              const trainOptions = {
+                ...options,
+                log: false,
+                callback: (stats) => {
+                  self.postMessage({
+                    type: 'progress',
+                    id,
+                    progress: Math.round((stats.iterations / options.iterations) * 100),
+                    iteration: stats.iterations,
+                    error: stats.error
+                  });
+                },
+                callbackPeriod: 5 // Update every 5 iterations for smoother UI
+              };
+              
+              const result = net.train(data, trainOptions);
+              
+              self.postMessage({
+                type: 'complete',
+                id,
+                model: net.toJSON(),
+                result
+              });
+              
+            } catch (error) {
+              self.postMessage({ type: 'error', id, error: error.message });
+            } finally {
+              isTraining = false;
+            }
+          }
+        };
+      `;
+      
+      const blob = new Blob([workerScript], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(blob));
+      
+      worker.onerror = (error) => {
+        console.error('Worker error:', error);
+        endTraining(true, 'Training failed: ' + error.message);
+      };
+      
+      return worker;
+    }
+
+    async function trainModel() {
+      if (trainingData.length === 0 || trainingWorker?.isTraining) return;
+      
+      // Disable training UI
+      elements.trainBtn.disabled = true;
+      elements.cancelTrainBtn.disabled = false;
+      elements.saveModelBtn.disabled = true;
+      elements.processBulkBtn.disabled = true;
+      elements.addPairBtn.disabled = true;
+      elements.loadDefaultsBtn.disabled = true;
+      
+      // Show progress
+      elements.progressContainer.classList.remove('hidden');
+      elements.trainingStatus.classList.remove('hidden');
+      elements.trainingLog.classList.remove('hidden');
+      elements.trainingLog.innerHTML = '';
+      elements.progressBar.style.width = '0%';
+      elements.progressText.textContent = 'Initializing...';
+      elements.trainingStatus.textContent = 'Training in background...';
+      elements.trainingStatus.classList.add('training-pulse');
+      
+      // Create worker if needed
+      if (!trainingWorker) {
+        trainingWorker = createTrainingWorker();
+      }
+      
+      // Generate unique ID for this training session
+      currentTrainingId = Date.now().toString();
+      
+      // Set up message handler
+      trainingWorker.onmessage = (e) => {
+        const { type, id, progress, iteration, error, model, result, error: errorMsg } = e.data;
+        
+        if (id !== currentTrainingId) return;
+        
+        switch (type) {
+          case 'progress':
+            elements.progressBar.style.width = `${progress}%`;
+            elements.progressText.textContent = `${progress}% (Iter: ${iteration}, Error: ${error.toFixed(4)})`;
+            elements.trainingLog.innerHTML += `Iteration ${iteration}: Error ${error.toFixed(4)}\n`;
+            elements.trainingLog.scrollTop = elements.trainingLog.scrollHeight;
+            break;
+            
+          case 'complete':
+            net = new brain.recurrent.LSTM();
+            net.fromJSON(model);
+            trainedAccuracy = computeAccuracy();
+            elements.trainingStatus.textContent = `Training complete! Accuracy: ${trainedAccuracy.toFixed(2)}%`;
+            elements.trainingStatus.classList.remove('training-pulse');
+            elements.trainingLog.innerHTML += `<br><strong>Final Error:</strong> ${result.error.toFixed(4)}`;
+            endTraining(false);
+            updateModelReady(true);
+            renderModels();
+            break;
+            
+          case 'error':
+            endTraining(true, errorMsg);
+            break;
+        }
+      };
+      
+      // Optimize training parameters based on data size
+      const iterations = Math.min(200, Math.max(50, trainingData.length * 10));
+      const options = {
+        iterations,
+        errorThresh: 0.01, // Slightly higher threshold for faster training
+        logPeriod: 10,
+        learningRate: 0.01
+      };
+      
+      // Send training data to worker
+      trainingWorker.postMessage({
+        type: 'train',
+        id: currentTrainingId,
+        data: trainingData,
+        options
+      });
+    }
+
+    function endTraining(errored = false, message = '') {
+      elements.trainBtn.disabled = false;
+      elements.cancelTrainBtn.disabled = true;
+      elements.processBulkBtn.disabled = false;
+      elements.addPairBtn.disabled = false;
+      elements.loadDefaultsBtn.disabled = false;
+      elements.trainingStatus.classList.remove('training-pulse');
+      
+      if (errored) {
+        elements.trainingStatus.textContent = message || 'Training failed';
+        elements.trainingStatus.classList.add('text-red-600');
+      } else {
+        setTimeout(() => {
+          elements.progressContainer.classList.add('hidden');
+          elements.trainingStatus.classList.add('hidden');
+          elements.trainingLog.classList.add('hidden');
+        }, 3000);
+      }
+      
+      currentTrainingId = null;
+    }
+
+    function cancelTraining() {
+      if (trainingWorker) {
+        trainingWorker.terminate();
+        trainingWorker = null;
+        endTraining(true, 'Training cancelled');
+        showStatus(elements.trainingStatus, 'Training cancelled', 'error');
       }
     }
 
     function computeAccuracy() {
-      if (!model || trainingData.length === 0) return 0;
+      if (!net || trainingData.length === 0) return 0;
+      
       let correct = 0;
-      trainingData.forEach(pair => {
-        const inputEncoded = tf.tidy(() => {
-          const x = tf.tensor2d([encodeText(pair.input)], [1, seqLen]);
-          const pred = model.predict(x);
-          const argmax = pred.argMax(-1).dataSync()[0];
-          x.dispose();
-          pred.dispose();
-          return argmax;
-        });
-        const decodedPred = decodeSequence(Array.from(inputEncoded).slice(0, pair.output.length));
-        if (decodedPred === pair.output) correct++;
+      trainingData.forEach(({ input, output }) => {
+        try {
+          const pred = net.run(input);
+          if (pred && pred.trim() === output.trim()) correct++;
+        } catch (e) {
+          // Prediction failed for this pair
+        }
       });
+      
       return (correct / trainingData.length) * 100;
     }
 
-    async function trainModel() {
-      if (trainingData.length === 0 || vocabSize === 0) return;
-      elements.trainBtn.disabled = true;
-      elements.progressContainer.classList.remove('hidden');
-      elements.trainingLog.classList.remove('hidden');
-      elements.trainingLog.innerHTML = 'Training started... Building model...';
-      elements.progressBar.style.width = '0%';
-      elements.progressText.textContent = '0%';
-
+    function testModel() {
+      const input = normalizeText(elements.testInput.value);
+      if (!input) {
+        showStatus(elements.testOutput, 'Please enter test input', 'error');
+        return;
+      }
+      
+      if (!net) {
+        showStatus(elements.testOutput, 'No model loaded', 'error');
+        return;
+      }
+      
       try {
-        model = createModel();
-        const data = prepareData();
-        if (!data) throw new Error('Failed to prepare data.');
-
-        const totalEpochs = 20; // Reduced for speed
-        elements.trainingLog.innerHTML += '<br>Training for ' + totalEpochs + ' epochs...';
-
-        const history = await model.fit(data.xs, data.ys, {
-          epochs: totalEpochs,
-          batchSize: 16, // Smaller batch for browser
-          validationSplit: 0.2,
-          shuffle: true, // Shuffle for better training
-          callbacks: {
-            onEpochEnd: (epoch, logs) => {
-              const progress = ((epoch + 1) / totalEpochs) * 100;
-              elements.progressBar.style.width = `${progress}%`;
-              elements.progressText.textContent = `${Math.round(progress)}%`;
-              elements.trainingLog.innerHTML += `<br>Epoch ${epoch + 1}: Loss ${logs.loss?.toFixed(4)}, Accuracy ${logs.acc?.toFixed(4)}`;
-            }
-          }
-        });
-
-        data.xs.dispose();
-        data.ys.dispose();
-        elements.progressBar.style.width = '100%';
-        elements.progressText.textContent = '100%';
-        trainedAccuracy = computeAccuracy();
-        elements.trainingLog.innerHTML += `<br>Training complete! Accuracy: ${trainedAccuracy.toFixed(2)}%`;
-        updateModelReady();
+        const prediction = net.run(input);
+        elements.predictionText.textContent = prediction;
+        elements.testOutput.classList.remove('hidden');
       } catch (error) {
-        elements.trainingLog.innerHTML += '<br>Error during training: ' + error.message;
-      } finally {
-        elements.trainBtn.disabled = false;
+        showStatus(elements.testOutput, 'Error: ' + error.message, 'error');
       }
     }
 
-    async function testModel() {
-      const input = normalizeText(elements.testInput.value);
-      if (!input || !model || vocabSize === 0) {
-        alert('Please enter test input and train/load a model first.');
-        return;
-      }
+    function cleanSerializable(obj) {
       try {
-        const decodedPred = tf.tidy(() => {
-          const inputEncoded = tf.tensor2d([encodeText(input)], [1, seqLen]);
-          const pred = model.predict(inputEncoded);
-          const argmax = pred.argMax(-1).dataSync()[0];
-          inputEncoded.dispose();
-          pred.dispose();
-          return decodeSequence(Array.from(argmax));
-        });
-        elements.predictionText.textContent = decodedPred;
-        elements.testOutput.classList.remove('hidden');
-      } catch (error) {
-        elements.predictionText.textContent = 'Error: ' + error.message;
-        elements.testOutput.classList.remove('hidden');
+        return JSON.parse(JSON.stringify(obj, (key, value) => {
+          if (typeof value === 'function' || value instanceof RegExp) return undefined;
+          if (value instanceof Date) return value.toISOString();
+          return value;
+        }));
+      } catch (err) {
+        throw new Error(`Serialization failed: ${err.message}`);
       }
     }
 
     async function saveModel() {
       const user = auth.currentUser;
-      if (!user || !model) {
-        elements.saveStatus.textContent = 'Please log in and train a model first.';
+      if (!user) {
+        showStatus(elements.saveStatus, 'Please log in to save', 'error');
         return;
       }
-
+      
+      if (!net) {
+        showStatus(elements.saveStatus, 'No trained model to save', 'error');
+        return;
+      }
+      
       elements.saveModelBtn.disabled = true;
-      elements.saveStatus.textContent = 'Saving...';
-      elements.saveStatus.classList.remove('text-green-600', 'text-red-600');
-      elements.saveStatus.classList.add('text-blue-600');
+      showStatus(elements.saveStatus, 'Saving model...', 'info');
+      
       try {
-        const modelJson = await model.toJSON();
-
-        // Global versioning
+        const cleanedModel = cleanSerializable(net.toJSON());
         const modelsRef = ref(db, 'global-models');
         const snapshot = await get(modelsRef);
         const currentModels = snapshot.val() || {};
+        
         const versions = Object.keys(currentModels).map(v => parseInt(v)).filter(Boolean);
         const nextVersion = versions.length ? Math.max(...versions) + 1 : 1;
-
+        
         const modelData = {
-          modelJson: modelJson,
-          vocabSize: vocabSize,
-          charToIx: charToIx,
-          ixToChar: ixToChar,
-          seqLen: seqLen,
+          model: cleanedModel,
           accuracy: trainedAccuracy,
           timestamp: Date.now(),
-          trainer: user.email
+          trainer: user.email,
+          trainingDataSize: trainingData.length
         };
-
+        
         await set(ref(db, `global-models/${nextVersion}`), modelData);
-
-        // Update local cache
+        
         userModels[nextVersion] = modelData;
         renderModels();
-
-        elements.saveStatus.textContent = `Global model saved as Version ${nextVersion}!`;
-        elements.saveStatus.classList.remove('text-blue-600');
-        elements.saveStatus.classList.add('text-green-600');
+        
+        showStatus(elements.saveStatus, `Model saved as Version ${nextVersion}!`, 'success');
       } catch (error) {
-        console.error('Save model error:', error);
-        elements.saveStatus.textContent = 'Error saving model: ' + error.message;
-        elements.saveStatus.classList.remove('text-blue-600');
-        elements.saveStatus.classList.add('text-red-600');
+        console.error('Save error:', error);
+        showStatus(elements.saveStatus, 'Save failed: ' + error.message, 'error');
       } finally {
         elements.saveModelBtn.disabled = false;
+        setTimeout(() => hideStatus(elements.saveStatus), 3000);
       }
     }
 
-    function setupRealtimeModels() {
-      const modelsRef = ref(db, 'global-models');
-      onValue(modelsRef, (snapshot) => {
+    async function loadModels() {
+      try {
+        const snapshot = await get(ref(db, 'global-models'));
         userModels = snapshot.val() || {};
         renderModels();
-      }, (error) => {
-        console.error('Realtime listener error:', error);
-        document.getElementById('models-list').innerHTML = '<p class="text-red-500">Error loading models.</p>';
-      });
+      } catch (error) {
+        console.error('Load models error:', error);
+        document.getElementById('models-list').innerHTML = '<p class="text-red-500">Error loading models</p>';
+      }
     }
 
     function renderModels() {
       const listEl = document.getElementById('models-list');
-      if (Object.keys(userModels).length === 0) {
-        listEl.innerHTML = '<p class="text-gray-500">No global models available yet.</p>';
+      const versions = Object.entries(userModels).sort(([a], [b]) => parseInt(b) - parseInt(a));
+      
+      if (!versions.length) {
+        listEl.innerHTML = '<p class="text-gray-500">No models available</p>';
         return;
       }
-      listEl.innerHTML = Object.entries(userModels)
-        .sort(([a], [b]) => parseInt(b) - parseInt(a)) // Newest first
-        .map(([version, data]) => `
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-100 rounded border gap-2">
-            <div class="w-full sm:w-auto">
-              <div class="font-medium">Global Version ${version}</div>
-              <div class="text-sm text-gray-600">Accuracy: ${(data.accuracy || 0).toFixed(2)}% | Trained by ${data.trainer || 'Unknown'} | ${new Date(data.timestamp).toLocaleString()}</div>
-            </div>
-            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-              <button onclick="loadModel(${version})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Load</button>
-              <button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600" ${data.trainer !== auth?.currentUser?.email ? 'disabled title="Only trainer can delete"' : ''}>Delete</button>
+      
+      listEl.innerHTML = versions.map(([version, data]) => `
+        <div class="flex justify-between items-center p-3 bg-gray-100 rounded border">
+          <div class="flex-1">
+            <div class="font-medium">Version ${version}</div>
+            <div class="text-sm text-gray-600">
+              Accuracy: ${(data.accuracy || 0).toFixed(2)}% | 
+              Pairs: ${data.trainingDataSize || 0} | 
+              ${new Date(data.timestamp).toLocaleString()}
             </div>
           </div>
-        `).join('');
+          <div class="flex gap-2">
+            <button onclick="loadModel(${version})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Load</button>
+            ${data.trainer === auth?.currentUser?.email ? 
+              `<button onclick="deleteModel(${version})" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">Delete</button>` : 
+              '<span class="text-xs text-gray-500 px-2">Read-only</span>'
+            }
+          </div>
+        </div>
+      `).join('');
     }
 
     window.loadModel = async function(version) {
       try {
-        const data = userModels[version];
-        if (!data.modelJson) throw new Error('Invalid model data.');
-        model = await tf.loadLayersModel(tf.Model.json(data.modelJson));
-        charToIx = data.charToIx || {};
-        ixToChar = data.ixToChar || [];
-        vocabSize = data.vocabSize || 0;
-        seqLen = data.seqLen || 20;
-        trainedAccuracy = data.accuracy || 0;
-        updateModelReady();
+        const modelData = userModels[version];
+        if (!modelData?.model) throw new Error('Model not found');
+        
+        if (!net) net = new brain.recurrent.LSTM();
+        net.fromJSON(modelData.model);
+        
+        trainedAccuracy = modelData.accuracy || 0;
+        updateModelReady(true);
         elements.testOutput.classList.add('hidden');
-        alert(`Loaded Global Version ${version}`);
+        
+        showStatus(elements.trainingStatus, `Loaded Version ${version}`, 'success');
+        setTimeout(() => hideStatus(elements.trainingStatus), 2000);
       } catch (e) {
-        alert('Error loading model: ' + e.message);
+        showStatus(elements.trainingStatus, 'Load failed: ' + e.message, 'error');
       }
     };
 
     window.deleteModel = async function(version) {
-      if (!confirm(`Delete Global Version ${version}?`)) return;
       const user = auth.currentUser;
-      if (!user) {
-        alert('Please log in to delete models.');
+      const modelData = userModels[version];
+      
+      if (!user || modelData?.trainer !== user.email) {
+        showStatus(elements.trainingStatus, 'Only the trainer can delete', 'error');
         return;
       }
-      if (userModels[version]?.trainer !== user.email) {
-        alert('Only the trainer who saved this model can delete it.');
-        return;
-      }
+      
+      if (!confirm(`Delete Version ${version}?`)) return;
+      
       try {
         await remove(ref(db, `global-models/${version}`));
-        // Local update will be handled by realtime listener
-        alert(`Global Version ${version} deleted successfully from Firebase.`);
+        delete userModels[version];
+        renderModels();
+        showStatus(elements.trainingStatus, 'Model deleted', 'success');
+        setTimeout(() => hideStatus(elements.trainingStatus), 2000);
       } catch (e) {
-        console.error('Delete error:', e);
-        alert('Error deleting model: ' + e.message);
+        showStatus(elements.trainingStatus, 'Delete failed: ' + e.message, 'error');
       }
     };
 
@@ -528,11 +619,12 @@
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
       db = getDatabase(app);
-
+      
       onAuthStateChanged(auth, async (user) => {
         if (user) {
-          console.log('Logged in as:', user.displayName);
-          setupRealtimeModels();  // Realtime listener for global models
+          console.log('Logged in:', user.email);
+          elements.processBulkBtn.disabled = false;
+          await loadModels();
         } else {
           window.location.href = 'signup.html';
         }
@@ -544,35 +636,35 @@
     elements.addPairBtn.addEventListener('click', () => addTrainingPair(elements.inputText.value, elements.outputText.value));
     elements.loadDefaultsBtn.addEventListener('click', loadDefaults);
     elements.trainBtn.addEventListener('click', trainModel);
+    elements.cancelTrainBtn.addEventListener('click', cancelTraining);
     elements.saveModelBtn.addEventListener('click', saveModel);
     elements.testModelBtn.addEventListener('click', testModel);
 
-    // Enter key to add pair
-    elements.inputText.addEventListener('keypress', (e) => {
+    // Enter key handlers
+    const enterHandler = (e, action) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (elements.outputText.value.trim()) addTrainingPair(elements.inputText.value, elements.outputText.value);
+        action();
       }
-    });
-    elements.outputText.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        addTrainingPair(elements.inputText.value, elements.outputText.value);
-      }
-    });
+    };
+    
+    elements.inputText.addEventListener('keypress', (e) => enterHandler(e, () => {
+      if (elements.outputText.value.trim()) addTrainingPair(elements.inputText.value, elements.outputText.value);
+    }));
+    
+    elements.outputText.addEventListener('keypress', (e) => enterHandler(e, () => {
+      addTrainingPair(elements.inputText.value, elements.outputText.value);
+    }));
+    
+    elements.testInput.addEventListener('keypress', (e) => enterHandler(e, testModel));
 
-    // Enter key to test model
-    elements.testInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        testModel();
-      }
-    });
-
-    // Global remove function for onclick
     window.removePair = removePair;
-
     document.addEventListener('DOMContentLoaded', initializeFirebase);
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (trainingWorker) trainingWorker.terminate();
+    });
   </script>
 </body>
 </html>
