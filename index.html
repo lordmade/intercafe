@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vynix AI - Training Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
     .training-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    .stuck-warning { animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; color: #f59e0b; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
   </style>
 </head>
@@ -117,8 +119,13 @@
     let modelReady = false;
     let trainingWorker = null;
     let currentTrainingId = null;
+    let lastProgressTime = Date.now();
+    let noProgressTimer = null;
 
     const MAX_PAIRS = 1000;
+    const STUCK_THRESHOLD_MS = 10000; // 10 seconds without progress = stuck
+    const EARLY_STOP_PATIENCE = 15; // Stop if no improvement for 15 iterations
+    
     const defaultTrainingData = [
       { input: "hello", output: "Hey there!" },
       { input: "how are you", output: "I'm doing great, thanks for asking!" },
@@ -214,8 +221,13 @@
     }
 
     function showStatus(element, message, type = 'info') {
-      element.classList.remove('hidden', 'text-blue-600', 'text-green-600', 'text-red-600');
-      element.classList.add(type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-blue-600');
+      element.classList.remove('hidden', 'text-blue-600', 'text-green-600', 'text-red-600', 'stuck-warning');
+      element.classList.add(
+        type === 'error' ? 'text-red-600' : 
+        type === 'success' ? 'text-green-600' : 
+        type === 'warning' ? 'stuck-warning' : 
+        'text-blue-600'
+      );
       element.textContent = message;
     }
 
@@ -261,7 +273,7 @@
       }
     }
 
-    // CRITICAL FIX: Sanitize data for Web Worker
+    // Sanitize data for Web Worker
     function sanitizeForWorker(data) {
       return JSON.parse(JSON.stringify(data));
     }
@@ -300,7 +312,8 @@
                     id,
                     progress: Math.round((stats.iterations / options.iterations) * 100),
                     iteration: stats.iterations,
-                    error: stats.error
+                    error: stats.error,
+                    isImproving: true
                   });
                 },
                 callbackPeriod: 5
@@ -366,8 +379,12 @@
       }
       
       currentTrainingId = Date.now().toString();
+      lastProgressTime = Date.now();
       
-      // Set up message handler
+      // Early stopping variables
+      let bestError = Infinity;
+      let noImprovementCount = 0;
+      
       trainingWorker.onmessage = (e) => {
         const { type, id, progress, iteration, error, model, result, error: errorMsg } = e.data;
         
@@ -375,9 +392,32 @@
         
         switch (type) {
           case 'progress':
+            // Update progress time tracker
+            lastProgressTime = Date.now();
+            
+            // Early stopping logic
+            if (error < bestError - 0.001) {
+              bestError = error;
+              noImprovementCount = 0;
+              elements.trainingStatus.textContent = 'Training in background...';
+              elements.trainingStatus.classList.remove('stuck-warning');
+            } else {
+              noImprovementCount++;
+              if (noImprovementCount > EARLY_STOP_PATIENCE) {
+                elements.trainingStatus.textContent = `No improvement for ${EARLY_STOP_PATIENCE} iterations, stopping early...`;
+                elements.trainingStatus.classList.add('stuck-warning');
+                // Force complete
+                setTimeout(() => {
+                  endTraining(false);
+                  updateModelReady(true);
+                }, 1000);
+                return;
+              }
+            }
+            
             elements.progressBar.style.width = `${progress}%`;
-            elements.progressText.textContent = `${progress}% (Iter: ${iteration}, Error: ${error.toFixed(4)})`;
-            elements.trainingLog.innerHTML += `Iteration ${iteration}: Error ${error.toFixed(4)}\n`;
+            elements.progressText.textContent = `${progress}% (Iter: ${iteration}/${result?.totalIterations || '?'}, Error: ${error.toFixed(4)})`;
+            elements.trainingLog.innerHTML += `Iteration ${iteration}: Error ${error.toFixed(4)} | Best: ${bestError.toFixed(4)}\n`;
             elements.trainingLog.scrollTop = elements.trainingLog.scrollHeight;
             break;
             
@@ -385,8 +425,8 @@
             net = new brain.recurrent.LSTM();
             net.fromJSON(model);
             trainedAccuracy = computeAccuracy();
-            elements.trainingStatus.textContent = `Training complete! Accuracy: ${trainedAccuracy.toFixed(2)}%`;
-            elements.trainingStatus.classList.remove('training-pulse');
+            elements.trainingStatus.textContent = `Training complete! Final Error: ${result.error.toFixed(4)} | Accuracy: ${trainedAccuracy.toFixed(2)}%`;
+            elements.trainingStatus.classList.remove('training-pulse', 'stuck-warning');
             elements.trainingLog.innerHTML += `<br><strong>Final Error:</strong> ${result.error.toFixed(4)}`;
             endTraining(false);
             updateModelReady(true);
@@ -398,15 +438,34 @@
         }
       };
       
-      // Optimized parameters
-      const iterations = Math.min(200, Math.max(50, trainingData.length * 10));
+      // Dynamic parameters based on data size
+      const iterations = Math.min(150, Math.max(40, trainingData.length * 8));
+      const errorThresh = trainingData.length < 20 ? 0.02 : 0.01; // Looser threshold for small datasets
+      const learningRate = trainingData.length < 20 ? 0.005 : 0.01; // Lower LR for small datasets
+      
       const options = {
         iterations,
-        errorThresh: 0.01,
-        learningRate: 0.01
+        errorThresh,
+        learningRate
       };
       
-      // CRITICAL: Sanitize data before sending to worker
+      // Stuck detection timer
+      noProgressTimer = setInterval(() => {
+        const timeSinceProgress = Date.now() - lastProgressTime;
+        if (timeSinceProgress > STUCK_THRESHOLD_MS) {
+          console.warn('Training appears stuck, forcing completion');
+          elements.trainingStatus.textContent = 'Training appears stuck, forcing completion...';
+          elements.trainingStatus.classList.add('stuck-warning');
+          if (trainingWorker) {
+            trainingWorker.terminate();
+            trainingWorker = null;
+          }
+          endTraining(true, 'Training stuck - try adjusting parameters or adding more data');
+          clearInterval(noProgressTimer);
+        }
+      }, 2000);
+      
+      // Send sanitized data to worker
       const sanitizedData = sanitizeForWorker(trainingData);
       
       trainingWorker.postMessage({
@@ -423,7 +482,12 @@
       elements.processBulkBtn.disabled = false;
       elements.addPairBtn.disabled = false;
       elements.loadDefaultsBtn.disabled = false;
-      elements.trainingStatus.classList.remove('training-pulse');
+      elements.trainingStatus.classList.remove('training-pulse', 'stuck-warning');
+      
+      if (noProgressTimer) {
+        clearInterval(noProgressTimer);
+        noProgressTimer = null;
+      }
       
       if (errored) {
         elements.trainingStatus.textContent = message || 'Training failed';
@@ -433,7 +497,7 @@
           elements.progressContainer.classList.add('hidden');
           elements.trainingStatus.classList.add('hidden');
           elements.trainingLog.classList.add('hidden');
-        }, 3000);
+        }, 4000);
       }
       
       currentTrainingId = null;
@@ -675,6 +739,7 @@
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
       if (trainingWorker) trainingWorker.terminate();
+      if (noProgressTimer) clearInterval(noProgressTimer);
     });
   </script>
 </body>
