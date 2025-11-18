@@ -23,11 +23,15 @@
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
       <h2 class="text-xl font-semibold mb-4">Paste Bulk Training Data</h2>
       <div class="space-y-4">
-        <textarea id="bulk-text" placeholder='Paste JSON array or CSV content here...' class="w-full p-2 border rounded h-24 text-sm"></textarea>
+        <textarea id="bulk-text" placeholder='Paste JSON array: [{"input":"hello","output":"Hi!"}]&#10;OR CSV with headers:&#10;input,output&#10;hello,Hi!' class="w-full p-2 border rounded h-24 text-sm"></textarea>
         <button id="process-bulk-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" disabled>Process Bulk Data</button>
-        <p class="text-sm text-gray-600">Supports JSON or CSV (input,output). Max 1000 pairs.</p>
+        <p class="text-sm text-gray-600">Supports JSON or CSV (input,output). Max 1000 pairs. See examples below.</p>
       </div>
       <div id="bulk-status" class="mt-4 text-sm hidden"></div>
+      <div id="format-examples" class="mt-4 text-xs text-gray-500 hidden">
+        <p><strong>JSON Example:</strong> [{"input":"hello","output":"Hi!"}]</p>
+        <p><strong>CSV Example:</strong> <code>input,output<br/>hello,Hi!</code></p>
+      </div>
     </div>
 
     <!-- Training Data Input -->
@@ -123,8 +127,8 @@
     let noProgressTimer = null;
 
     const MAX_PAIRS = 1000;
-    const STUCK_THRESHOLD_MS = 10000; // 10 seconds without progress = stuck
-    const EARLY_STOP_PATIENCE = 15; // Stop if no improvement for 15 iterations
+    const STUCK_THRESHOLD_MS = 10000;
+    const EARLY_STOP_PATIENCE = 15;
     
     const defaultTrainingData = [
       { input: "hello", output: "Hey there!" },
@@ -244,20 +248,32 @@
 
       try {
         let newPairs = [];
+        
         // Try JSON first
         try {
           const data = JSON.parse(text);
           if (Array.isArray(data)) {
             newPairs = data.filter(item => item.input && item.output);
           }
-        } catch {
-          // Try CSV
-          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-          if (parsed.errors.length) throw new Error('CSV parse error');
+        } catch (jsonErr) {
+          // If JSON fails, try CSV with detailed error reporting
+          const parsed = Papa.parse(text, { 
+            header: true, 
+            skipEmptyLines: true,
+            quoteChar: '"',
+            escapeChar: '"'
+          });
+          
+          if (parsed.errors.length > 0) {
+            // Show specific CSV errors
+            const errorMsg = parsed.errors.map(e => `Row ${e.row}: ${e.message}`).join(', ');
+            throw new Error(`CSV parse errors: ${errorMsg}`);
+          }
+          
           newPairs = parsed.data.filter(row => row.input && row.output);
         }
 
-        if (!newPairs.length) throw new Error('No valid pairs found');
+        if (!newPairs.length) throw new Error('No valid pairs found. Ensure your data has "input" and "output" fields.');
         
         const added = newPairs.reduce((count, pair) => 
           addTrainingPair(pair.input, pair.output, true) ? count + 1 : count, 0
@@ -267,9 +283,14 @@
         elements.bulkText.value = '';
       } catch (error) {
         showStatus(elements.bulkStatus, 'Error: ' + error.message, 'error');
+        // Show format examples on error
+        document.getElementById('format-examples').classList.remove('hidden');
       } finally {
         elements.processBulkBtn.disabled = false;
-        setTimeout(() => hideStatus(elements.bulkStatus), 3000);
+        setTimeout(() => {
+          hideStatus(elements.bulkStatus);
+          document.getElementById('format-examples').classList.add('hidden');
+        }, 5000);
       }
     }
 
@@ -386,7 +407,7 @@
       let noImprovementCount = 0;
       
       trainingWorker.onmessage = (e) => {
-        const { type, id, progress, iteration, error, model, result, error: errorMsg } = e.data;
+        const { type, id, progress, iteration, error, model, result } = e.data;
         
         if (id !== currentTrainingId) return;
         
@@ -433,15 +454,15 @@
             break;
             
           case 'error':
-            endTraining(true, errorMsg);
+            endTraining(true, e.data.error);
             break;
         }
       };
       
       // Dynamic parameters based on data size
       const iterations = Math.min(150, Math.max(40, trainingData.length * 8));
-      const errorThresh = trainingData.length < 20 ? 0.02 : 0.01; // Looser threshold for small datasets
-      const learningRate = trainingData.length < 20 ? 0.005 : 0.01; // Lower LR for small datasets
+      const errorThresh = trainingData.length < 20 ? 0.02 : 0.01;
+      const learningRate = trainingData.length < 20 ? 0.005 : 0.01;
       
       const options = {
         iterations,
