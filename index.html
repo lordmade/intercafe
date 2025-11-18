@@ -111,7 +111,7 @@
 
     let app, auth, db;
     let trainingData = [];
-    let net = null; // Initialize only when needed
+    let net = null;
     let userModels = {};
     let trainedAccuracy = 0;
     let modelReady = false;
@@ -164,7 +164,7 @@
       const normOutput = output.trim();
       if (!normInput || !normOutput) return false;
       if (trainingData.length >= MAX_PAIRS) {
-        showStatus('Maximum pairs reached', 'error');
+        showStatus(elements.trainingStatus, `Maximum ${MAX_PAIRS} pairs reached`, 'error');
         return false;
       }
       trainingData.push({ input: normInput, output: normOutput });
@@ -261,7 +261,11 @@
       }
     }
 
-    // Web Worker for training
+    // CRITICAL FIX: Sanitize data for Web Worker
+    function sanitizeForWorker(data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+
     function createTrainingWorker() {
       const workerScript = `
         importScripts('https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js');
@@ -282,9 +286,13 @@
             try {
               const net = new brain.recurrent.LSTM();
               
-              // Optimize for faster training
+              // Sanitize data inside worker
+              const cleanData = JSON.parse(JSON.stringify(data));
+              
               const trainOptions = {
-                ...options,
+                iterations: options.iterations,
+                errorThresh: options.errorThresh,
+                learningRate: options.learningRate,
                 log: false,
                 callback: (stats) => {
                   self.postMessage({
@@ -295,19 +303,23 @@
                     error: stats.error
                   });
                 },
-                callbackPeriod: 5 // Update every 5 iterations for smoother UI
+                callbackPeriod: 5
               };
               
-              const result = net.train(data, trainOptions);
+              const result = net.train(cleanData, trainOptions);
+              
+              // Sanitize model before sending
+              const cleanModel = JSON.parse(JSON.stringify(net.toJSON()));
               
               self.postMessage({
                 type: 'complete',
                 id,
-                model: net.toJSON(),
+                model: cleanModel,
                 result
               });
               
             } catch (error) {
+              console.error('Worker training error:', error);
               self.postMessage({ type: 'error', id, error: error.message });
             } finally {
               isTraining = false;
@@ -328,9 +340,9 @@
     }
 
     async function trainModel() {
-      if (trainingData.length === 0 || trainingWorker?.isTraining) return;
+      if (trainingData.length === 0) return;
       
-      // Disable training UI
+      // Disable UI
       elements.trainBtn.disabled = true;
       elements.cancelTrainBtn.disabled = false;
       elements.saveModelBtn.disabled = true;
@@ -348,12 +360,11 @@
       elements.trainingStatus.textContent = 'Training in background...';
       elements.trainingStatus.classList.add('training-pulse');
       
-      // Create worker if needed
+      // Create worker
       if (!trainingWorker) {
         trainingWorker = createTrainingWorker();
       }
       
-      // Generate unique ID for this training session
       currentTrainingId = Date.now().toString();
       
       // Set up message handler
@@ -379,7 +390,6 @@
             elements.trainingLog.innerHTML += `<br><strong>Final Error:</strong> ${result.error.toFixed(4)}`;
             endTraining(false);
             updateModelReady(true);
-            renderModels();
             break;
             
           case 'error':
@@ -388,20 +398,21 @@
         }
       };
       
-      // Optimize training parameters based on data size
+      // Optimized parameters
       const iterations = Math.min(200, Math.max(50, trainingData.length * 10));
       const options = {
         iterations,
-        errorThresh: 0.01, // Slightly higher threshold for faster training
-        logPeriod: 10,
+        errorThresh: 0.01,
         learningRate: 0.01
       };
       
-      // Send training data to worker
+      // CRITICAL: Sanitize data before sending to worker
+      const sanitizedData = sanitizeForWorker(trainingData);
+      
       trainingWorker.postMessage({
         type: 'train',
         id: currentTrainingId,
-        data: trainingData,
+        data: sanitizedData,
         options
       });
     }
@@ -446,7 +457,7 @@
           const pred = net.run(input);
           if (pred && pred.trim() === output.trim()) correct++;
         } catch (e) {
-          // Prediction failed for this pair
+          // Skip failed predictions
         }
       });
       
