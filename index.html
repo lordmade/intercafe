@@ -2,114 +2,89 @@
 <html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Vynix AI - Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vynix AI - Dashboard & Training</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #F7F7F8;
-      --card-bg: #1C2526;
-      --text-primary: #FFFFFF;
-      --text-secondary: #4B5EAA;
-      --border: #4A5568;
-      --highlight: #38B2AC;
-      --user-msg-bg: #E0E7FF;
-      --ai-msg-bg: #1C2526;
-    }
-    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text-secondary); min-height: 100vh; margin: 0; touch-action: manipulation; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    * { -webkit-tap-highlight-color: transparent; }
-    .header-container { position: fixed; top: 0; left: 0; right: 0; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--border); }
-    .menu-btn { background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 9999px; cursor: pointer; transition: background 0.3s; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
-    .menu-btn:hover { background: var(--highlight); }
-    .menu-btn svg { width: 1rem; height: 1rem; stroke: var(--text-primary); }
-    .v-logo { width: 36px; height: 36px; background: #000; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 4px; }
-    .v-logo svg { width: 22px; height: 22px; fill: white; }
-    .main-content { margin-top: 5rem; padding: 1.5rem; max-width: 800px; margin-left: auto; margin-right: auto; }
-    .card { background: white; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
-    .input-field { width: 100%; padding: 1rem 1.25rem; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 1rem; font-size: 1rem; transition: border 0.2s; }
+    body { font-family: 'Inter', sans-serif; background: #F7F7F8; margin: 0; }
+    .header { position: fixed; top: 0; left: 0; right: 0; padding: 1rem; display: flex; justify-content: center; align-items: center; background: white; border-bottom: 1px solid #e5e7eb; z-index: 10; }
+    .v-logo { width: 40px; height: 40px; background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    .v-logo svg { width: 24px; height: 24px; fill: white; }
+    .content { margin-top: 6rem; padding: 2rem; max-width: 1000px; margin-left: auto; margin-right: auto; }
+    .card { background: white; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+    .input-field { width: 100%; padding: 1rem 1.25rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 1rem; font-size: 1rem; }
     .input-field:focus { outline: none; border-color: #000; }
-    .btn-primary { background: linear-gradient(135deg, #000, #333); color: white; padding: 1rem 2rem; border-radius: 9999px; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
+    .btn { padding: 1rem 2rem; border-radius: 9999px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, #000, #333); color: white; }
     .btn-primary:hover { transform: scale(1.05); }
-    .pair-item { background: #f8f9fa; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
-    .delete-btn { background: #ef4444; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-    .delete-btn:hover { background: #dc2626; }
-    .sidebar { position: fixed; top: 0; left: -100%; width: 280px; height: 100vh; background: white; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: left 0.3s ease; z-index: 40; overflow-y: auto; }
-    .sidebar.open { left: 0; }
-    .sidebar-header { padding: 1.5rem; background: #000; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-    .sidebar-header .v-logo { width: 48px; height: 48px; }
-    .sidebar-header .v-logo svg { width: 28px; height: 28px; }
-    #custom-alert { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #1f2937; padding: 2rem; border-radius: 1.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.3); z-index: 100; max-width: 90%; text-align: center; display: none; }
-    #custom-alert.show { display: block; }
-    #alert-buttons { margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center; }
-    #alert-confirm { background: #ef4444; color: white; padding: 0.75rem 1.5rem; border-radius: 1rem; font-weight: 600; }
-    #alert-cancel { background: #6b7280; color: white; padding: 0.75rem 1.5rem; border-radius: 1rem; font-weight: 600; }
-    .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99; display: none; }
-    .overlay.show { display: block; }
+    .btn-train { background: linear-gradient(135deg, #7c3aed, #db2777); color: white; }
+    .pair-item { background: #f9fafb; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .progress-bar { height: 12px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin: 1rem 0; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #db2777); width: 0%; transition: width 0.3s; }
+    .training-status { text-align: center; font-weight: 600; margin: 1rem 0; }
   </style>
 </head>
 <body>
-  <!-- Header -->
-  <div class="header-container">
-    <button id="menu-btn" class="menu-btn">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-      <span>Menu</span>
-    </button>
+  <!-- Header with V logo -->
+  <div class="header">
     <div class="v-logo">
       <svg viewBox="0 0 24 24">
-        <path fill="#fff" d="M19.75 2.25h3L12 21.75h-3L1.25 2.25h3l7.5 17.19z"/>
+        <path d="M19.75 2.25h3L12 21.75h-3L1.25 2.25h3l7.5 17.19z"/>
       </svg>
     </div>
   </div>
 
-  <div class="main-content">
+  <div class="content">
     <div class="card">
-      <h1 class="text-2xl font-bold text-center mb-8">Vynix AI Contribution Dashboard</h1>
-      
-      <!-- Add Single -->
-      <div class="mb-10">
-        <h2 class="text-xl font-semibold mb-4">Add Response</h2>
-        <input type="text" id="trigger" placeholder="Trigger phrase..." class="input-field mb-4">
-        <input type="text" id="reply" placeholder="Bot reply..." class="input-field mb-4">
-        <button id="add-single" class="btn-primary w-full">Add to Global Brain</button>
+      <h1 class="text-3xl font-bold text-center mb-8">Vynix AI Dashboard & Training</h1>
+
+      <!-- Add Response -->
+      <div class="mb-12">
+        <h2 class="text-2xl font-semibold mb-6">Add Response</h2>
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+          <input type="text" id="trigger" placeholder="Trigger phrase..." class="input-field">
+          <input type="text" id="reply" placeholder="Bot reply..." class="input-field">
+        </div>
+        <button id="add-single" class="btn btn-primary w-full">Add to Global Brain</button>
       </div>
 
       <!-- Bulk Import -->
-      <div class="mb-10">
-        <h2 class="text-xl font-semibold mb-4">Bulk Import (JSON)</h2>
+      <div class="mb-12">
+        <h2 class="text-2xl font-semibold mb-6">Bulk Import (JSON)</h2>
         <textarea id="bulk-json" class="input-field h-48 font-mono text-sm" placeholder='[{"trigger":"hi","reply":"Hello!"}, ...]'></textarea>
-        <button id="bulk-import" class="btn-primary w-full mt-4">Import All</button>
+        <button id="bulk-import" class="btn btn-primary w-full mt-4">Import All</button>
         <div id="bulk-status" class="mt-4 text-center font-medium"></div>
+      </div>
+
+      <!-- Training Section -->
+      <div class="mb-12">
+        <h2 class="text-2xl font-semibold mb-6">Train Neural Model (Optional Fallback)</h2>
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+          <button id="train-lstm" class="btn btn-train p-8 text-left">
+            <div class="text-xl font-bold">Standard LSTM</div>
+            <div class="text-sm opacity-80 mt-2">Best quality • Slower training</div>
+            <div class="text-3xl font-bold mt-4" id="lstm-count">(0 pairs)</div>
+          </button>
+          <button id="train-turbo" class="btn btn-train p-8 text-left">
+            <div class="text-xl font-bold">⚡ Turbo Mode</div>
+            <div class="text-sm opacity-80 mt-2">10× faster • Still excellent</div>
+            <div class="text-3xl font-bold mt-4" id="turbo-count">(0 pairs)</div>
+          </button>
+        </div>
+        <div id="training-progress" class="hidden">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <div class="training-status" id="training-status">Preparing...</div>
+        </div>
+        <button id="save-model" class="btn btn-primary w-full mt-6" disabled>Save as New Global Brain</button>
       </div>
 
       <!-- Your Contributions -->
       <div>
-        <h2 class="text-xl font-semibold mb-4">Your Contributions (<span id="my-count">0</span>)</h2>
-        <div id="my-pairs"></div>
+        <h2 class="text-2xl font-semibold mb-6">Your Contributions (<span id="my-count">0</span>)</h2>
+        <div id="my-pairs" class="space-y-4"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Sidebar -->
-  <div id="sidebar" class="sidebar">
-    <div class="sidebar-header">
-      <div class="v-logo">
-        <svg viewBox="0 0 24 24">
-          <path fill="#fff" d="M19.75 2.25h3L12 21.75h-3L1.25 2.25h3l7.5 17.19z"/>
-        </svg>
-      </div>
-      <h2 class="text-xl font-bold">Dashboard</h2>
-    </div>
-  </div>
-
-  <!-- Custom Alert -->
-  <div id="overlay" class="overlay"></div>
-  <div id="custom-alert">
-    <h3 class="text-xl font-bold mb-4">Delete Response?</h3>
-    <p>This cannot be undone.</p>
-    <div id="alert-buttons">
-      <button id="alert-cancel">Cancel</button>
-      <button id="alert-confirm">Delete</button>
     </div>
   </div>
 
@@ -141,58 +116,57 @@
       bulkStatus: document.getElementById('bulk-status'),
       myPairs: document.getElementById('my-pairs'),
       myCount: document.getElementById('my-count'),
-      menuBtn: document.getElementById('menu-btn'),
-      sidebar: document.getElementById('sidebar'),
-      overlay: document.getElementById('overlay'),
-      alert: document.getElementById('custom-alert'),
-      alertCancel: document.getElementById('alert-cancel'),
-      alertConfirm: document.getElementById('alert-confirm')
+      trainLstm: document.getElementById('train-lstm'),
+      trainTurbo: document.getElementById('train-turbo'),
+      lstmCount: document.getElementById('lstm-count'),
+      turboCount: document.getElementById('turbo-count'),
+      trainingProgress: document.getElementById('training-progress'),
+      progressFill: document.getElementById('progress-fill'),
+      trainingStatus: document.getElementById('training-status'),
+      saveModel: document.getElementById('save-model')
     };
 
+    let pairs = [];
     let myUid = null;
-    let pendingDeleteId = null;
+    let trainedNet = null;
 
-    // Close sidebar on outside click
-    document.addEventListener('click', (e) => {
-      if (!el.sidebar.contains(e.target) && !el.menuBtn.contains(e.target)) {
-        el.sidebar.classList.remove('open');
-      }
-    });
-
-    el.menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      el.sidebar.classList.toggle('open');
-    });
-
-    // Render my contributions
-    onValue(ref(db, 'pairs'), (snap) => {
+    // Load all pairs
+    onValue(ref(db, 'pairs'), snap => {
+      pairs = [];
       const data = snap.val() || {};
-      const mine = Object.entries(data)
-        .filter(([id, p]) => p.uid === myUid)
-        .map(([id, p]) => ({id, ...p}));
-
-      el.myCount.textContent = mine.length;
-
-      el.myPairs.innerHTML = mine.map(p => `
-        <div class="pair-item">
-          <div>
-            <div class="font-mono text-sm opacity-70">"${p.trigger}"</div>
-            <div class="mt-1">${p.reply}</div>
-          </div>
-          <button class="delete-btn" onclick="showDeleteAlert('${p.id}')">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-          </button>
-        </div>
-      `).join('') || '<p class="text-center text-gray-500 py-8">No contributions yet</p>';
+      Object.values(data).forEach(p => {
+        if (p.trigger && p.reply) pairs.push({ trigger: p.trigger.trim(), reply: p.reply.trim() });
+      });
+      el.lstmCount.textContent = el.turboCount.textContent = `(${pairs.length} pairs)`;
+      renderMyContributions();
     });
+
+    function renderMyContributions() {
+      onValue(ref(db, 'pairs'), snap => {
+        const data = snap.val() || {};
+        const mine = Object.entries(data)
+          .filter(([id, p]) => p.uid === myUid)
+          .map(([id, p]) => ({id, ...p}));
+
+        el.myCount.textContent = mine.length;
+
+        el.myPairs.innerHTML = mine.map(p => `
+          <div class="pair-item">
+            <div>
+              <div class="font-mono text-sm opacity-70">"${p.trigger}"</div>
+              <div class="mt-1">${p.reply}</div>
+            </div>
+            <button class="bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center" onclick="deletePair('${p.id}')">×</button>
+          </div>
+        `).join('') || '<p class="text-center text-gray-500 py-8">No contributions yet</p>';
+      }, { onlyOnce: true });
+    }
 
     // Add single
     el.addSingle.onclick = async () => {
       const trigger = el.trigger.value.trim().toLowerCase();
       const reply = el.reply.value.trim();
-      if (!trigger || !reply) return alert("Both fields required");
+      if (!trigger || !reply) return;
 
       const newRef = push(ref(db, 'pairs'));
       await set(newRef, {
@@ -209,7 +183,7 @@
     el.bulkImport.onclick = async () => {
       try {
         const items = JSON.parse(el.bulkJson.value);
-        if (!Array.isArray(items)) throw "Not array";
+        if (!Array.isArray(items)) throw "Invalid";
 
         let added = 0;
         for (const item of items) {
@@ -236,29 +210,76 @@
       }
     };
 
-    // Delete
-    function showDeleteAlert(id) {
-      pendingDeleteId = id;
-      el.overlay.classList.add('show');
-      el.alert.classList.add('show');
+    // Training
+    let trainingWorker = null;
+
+    function startTraining(turbo = false) {
+      if (pairs.length === 0) return alert("No data to train on!");
+
+      el.trainingProgress.classList.remove('hidden');
+      el.progressFill.style.width = '0%';
+      el.trainingStatus.textContent = turbo ? "Training Turbo model..." : "Training Standard LSTM...";
+
+      const code = `
+        importScripts('https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.2/dist/brain-browser.min.js');
+        const encode = s => s.padEnd(200,' ').slice(0,200).split('').map(c=>c.charCodeAt(0)/255);
+        const decode = a => a.map(n=>String.fromCharCode(Math.round(n*255))).join('').trim();
+        self.onmessage = e => {
+          const data = e.data.pairs;
+          const turbo = e.data.turbo;
+          const net = turbo ? new brain.NeuralNetwork({hiddenLayers: [512,512,512]}) : new brain.recurrent.LSTM();
+          const formatted = turbo ? data.map(p=>({input:encode(p.trigger), output:encode(p.reply)})) : data.map(p=>({input:p.trigger, output:p.reply}));
+          net.train(formatted, { 
+            iterations: turbo ? 60000 : Math.min(200, data.length * 2),
+            log: true, 
+            logPeriod: 1000,
+            callback: s => self.postMessage({progress: s.iterations / (turbo ? 60000 : Math.min(200, data.length * 2))})
+          });
+          self.postMessage({done: net.toJSON()});
+        };
+      `;
+
+      trainingWorker = new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'})));
+      trainingWorker.postMessage({pairs, turbo});
+
+      trainingWorker.onmessage = e => {
+        if (e.data.progress !== undefined) {
+          el.progressFill.style.width = (e.data.progress * 100) + '%';
+        }
+        if (e.data.done) {
+          trainedNet = e.data.done;
+          el.trainingStatus.textContent = "Training complete! Ready to save.";
+          el.saveModel.disabled = false;
+          trainingWorker.terminate();
+        }
+      };
     }
 
-    function hideDeleteAlert() {
-      el.overlay.classList.remove('show');
-      el.alert.classList.remove('show');
-      pendingDeleteId = null;
-    }
+    el.trainLstm.onclick = () => startTraining(false);
+    el.trainTurbo.onclick = () => startTraining(true);
 
-    el.alertCancel.onclick = hideDeleteAlert;
-    el.alertConfirm.onclick = () => {
-      if (pendingDeleteId) {
-        remove(ref(db, `pairs/${pendingDeleteId}`));
-        hideDeleteAlert();
-      }
+    el.saveModel.onclick = async () => {
+      if (!trainedNet) return;
+      el.saveModel.disabled = true;
+      el.trainingStatus.textContent = "Saving global model...";
+
+      const newRef = push(ref(db, 'global-models'));
+      await set(newRef, {
+        model: trainedNet,
+        pairsUsed: pairs.length,
+        timestamp: Date.now(),
+        trainer: auth.currentUser.email || "Dashboard"
+      });
+
+      el.trainingStatus.textContent = "New global brain saved! Live worldwide.";
+      setTimeout(() => {
+        el.trainingProgress.classList.add('hidden');
+        el.saveModel.disabled = true;
+        trainedNet = null;
+      }, 3000);
     };
-    el.overlay.onclick = hideDeleteAlert;
 
-    window.showDeleteAlert = showDeleteAlert;
+    window.deletePair = (id) => remove(ref(db, `pairs/${id}`));
 
     onAuthStateChanged(auth, user => {
       if (user) myUid = user.uid;
