@@ -1,1 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Command Center | Enterprise Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+ 
+    <style>
+        body { background-color: #f3f4f6; }
+        .glass-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            margin: 1.5rem 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .glass-card {
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .glass-card:hover { transform: translateY(-6px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .modal { transition: opacity 0.25s ease; z-index: 100; }
+        body.modal-active { overflow-x: hidden; overflow-y: visible !important; }
+        .pill-btn { border-radius: 9999px; transition: all 0.3s ease; transform: scale(1); }
+        .pill-btn:hover { transform: translateY(-1px); filter: brightness(110%); }
+        .pill-btn:active { transform: scale(0.96); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .action-menu { display: none; position: absolute; background: white; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #f3f4f6; z-index: 50; width: 160px; }
+        .action-item:hover { background: #eff6ff; color: #2563eb; }
+        .modal-container { position: relative; }
+        .modal-close-btn {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f3f4f6;
+            color: #6b7280;
+            border-radius: 9999px;
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+        .modal-close-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        table { border-collapse: collapse; }
+        th, td { transition: background 0.2s; }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col overflow-hidden">
+    <header class="z-20">
+        <nav class="glass-header px-8 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <img src="https://i.postimg.cc/05BVVkbb/LOGO-removebg-preview.png" alt="Logo" class="h-9 w-auto">
+                <div>
+                    <h1 class="text-lg font-black tracking-tight leading-none">
+                        <span class="text-white">ATTENDANCE</span><span class="text-blue-500">HUB</span>
+                    </h1>
+                    <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Enterprise Analytics</p>
+                </div>
+            </div>
+         
+            <div class="flex gap-3">
+                <button onclick="startScanner()" class="pill-btn bg-violet-600 text-white px-5 py-2 text-[11px] font-black flex items-center gap-2 shadow-lg shadow-violet-500/20">
+                    <i class="fa-solid fa-qrcode"></i> SCAN QR
+                </button>
+                <button onclick="toggleLocationModal()" class="pill-btn bg-emerald-600 text-white px-5 py-2 text-[11px] font-black flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-location-dot"></i> OFFICE
+                </button>
+                <button onclick="generateGlobalReport()" class="pill-btn bg-white/5 text-white border border-white/10 hover:bg-white/20 px-5 py-2 text-[11px] font-black flex items-center gap-2">
+                    <i class="fa-solid fa-file-export"></i> EXPORT
+                </button>
+                <button onclick="toggleModal('addEmployeeModal')" class="pill-btn bg-blue-600 text-white px-5 py-2 text-[11px] font-black flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-plus"></i> ADD STAFF
+                </button>
+                <button onclick="showSignOutConfirm()" class="pill-btn bg-red-600 text-white px-5 py-2 text-[11px] font-black flex items-center gap-2 shadow-lg shadow-red-500/20">
+                    <i class="fa-solid fa-right-from-bracket"></i> SIGN OUT
+                </button>
+            </div>
+        </nav>
+    </header>
+    <main class="flex-1 flex overflow-hidden">
+        <aside class="w-1/3 bg-gray-50/50 p-6 pt-2 overflow-y-auto border-r border-gray-200 flex flex-col gap-6 custom-scroll">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="glass-card p-5 border-b-4 border-blue-500">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Staff</p>
+                    <h2 class="text-3xl font-black text-gray-800" id="totalEmployees">0</h2>
+                </div>
+                <div class="glass-card p-5 border-b-4 border-green-500">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Now</p>
+                    <h2 class="text-3xl font-black text-gray-800" id="presentToday">0</h2>
+                </div>
+            </div>
+            <div class="glass-card p-6">
+                <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Live Distribution</h3>
+                <canvas id="attendanceChart" height="240"></canvas>
+            </div>
+            <div class="glass-card flex-1 flex flex-col min-h-[400px]">
+                <div class="p-5 border-b border-gray-50 flex justify-between items-center">
+                    <h3 class="font-black text-gray-700 text-sm uppercase tracking-wider">Employee Directory</h3>
+                    <span class="bg-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 rounded-full" id="regCount">0</span>
+                </div>
+                <div class="overflow-y-auto p-3 custom-scroll" id="employeeList">
+                    <div class="text-center text-gray-300 py-10 font-medium">Loading Database...</div>
+                </div>
+            </div>
+        </aside>
+        <section class="flex-1 bg-gray-100/50 p-8 pt-2 overflow-y-auto custom-scroll">
+            <div class="glass-card min-h-full p-8">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <span class="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-lg">LIVE LOG</span>
+                        <h2 class="text-3xl font-black text-gray-900 mt-2">Attendance Feed</h2>
+                        <p id="dateDisplay" class="text-sm font-bold text-gray-400 mt-1"></p>
+                    </div>
+                    <div class="flex gap-2 bg-white p-2 rounded-2xl shadow-inner border border-gray-100">
+                        <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black">
+                            <div class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></div> WORKING
+                        </div>
+                        <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-50 text-yellow-600 text-[10px] font-black">
+                            <div class="w-2 h-2 rounded-full bg-yellow-400"></div> LUNCH
+                        </div>
+                        <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-[10px] font-black">
+                            <div class="w-2 h-2 rounded-full bg-red-500"></div> FINISHED
+                        </div>
+                    </div>
+                </div>
 
+                <!-- Date Range Filter -->
+                <div class="flex items-center gap-4 mb-8 bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div>
+                            <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">FROM</span>
+                            <input type="date" id="dateFrom" class="bg-white border border-gray-200 rounded-2xl px-5 py-3 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">TO</span>
+                            <input type="date" id="dateTo" class="bg-white border border-gray-200 rounded-2xl px-5 py-3 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                    <button onclick="applyFilter()" class="pill-btn bg-violet-600 hover:bg-violet-700 text-white px-7 py-3 text-xs font-black shadow-lg shadow-violet-500/30">APPLY FILTER</button>
+                    <button onclick="loadTodayLive()" class="pill-btn bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3 text-xs font-black shadow-lg shadow-emerald-500/30">TODAY LIVE</button>
+                </div>
+
+                <div class="overflow-x-auto relative">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 bg-gray-50">
+                                <th class="pb-3 px-3 w-24">Date</th>
+                                <th class="pb-3 px-3">Staff Member</th>
+                                <th class="pb-3 px-3">Clock In</th>
+                                <th class="pb-3 px-3">Lunch Break</th>
+                                <th class="pb-3 px-3 text-center">Compliance</th>
+                                <th class="pb-3 px-3">Clock Out</th>
+                                <th class="pb-3 px-3 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable" class="divide-y divide-gray-50 text-sm">
+                            <tr><td colspan="7" class="py-20 text-center text-gray-300">Awaiting stream...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[90]">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/90 backdrop-blur-md"></div>
+        <div class="modal-container bg-white w-full max-w-sm mx-auto rounded-[2.5rem] shadow-2xl z-50 relative p-10 text-center">
+            <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h2 class="text-3xl font-black text-gray-900 mb-2">Admin Portal</h2>
+            <p class="text-gray-500 text-sm mb-8">Sign in with your Google account to access the HR Command Center</p>
+            <button onclick="signInWithGoogle()" class="w-full pill-btn bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-black py-4 flex items-center justify-center gap-3 text-base">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" class="w-5 h-5" alt="Google">
+                Sign in with Google
+            </button>
+            <p class="text-xs text-gray-400 mt-8">Only employees registered as Admin can enter</p>
+        </div>
+    </div>
+    <!-- Sign Out Confirmation Modal -->
+    <div id="signOutConfirmModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[85]">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/60 backdrop-blur-md"></div>
+        <div class="modal-container bg-white w-full max-w-xs mx-auto rounded-[2.5rem] shadow-2xl z-50 relative overflow-hidden">
+            <button onclick="toggleModal('signOutConfirmModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="p-8 text-center">
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </div>
+                <h3 class="text-2xl font-black text-gray-900">Sign Out?</h3>
+                <p class="text-gray-500 text-sm mt-3 leading-relaxed">You will be logged out of the Admin Portal and returned to the login screen.</p>
+                <div class="flex flex-col gap-2 mt-8">
+                    <button onclick="confirmSignOut()" class="pill-btn bg-red-600 text-white font-black py-3.5 text-sm">YES, SIGN OUT</button>
+                    <button onclick="toggleModal('signOutConfirmModal')" class="pill-btn bg-gray-100 text-gray-500 font-black py-3.5 text-sm">CANCEL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[80]">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/90 backdrop-blur-md"></div>
+        <div class="modal-container bg-white w-full max-w-lg mx-auto rounded-[2rem] shadow-2xl z-50 overflow-hidden relative">
+            <div class="p-6 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-black text-gray-800 text-lg">Scan Attendance QR</h3>
+                <button onclick="stopScanner()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 bg-black">
+                <div id="reader" class="w-full h-64 bg-black"></div>
+            </div>
+            <div class="p-6 text-center">
+                <p class="text-sm text-gray-500 font-bold mb-2">Point scanner at employee QR code</p>
+                <div id="scanStatus" class="text-xs font-mono text-blue-500">Ready to scan...</div>
+            </div>
+        </div>
+    </div>
+    <!-- Office Location Modal -->
+    <div id="locationModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/40 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-md mx-auto rounded-[2.5rem] shadow-2xl z-50 relative">
+            <button onclick="toggleModal('locationModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="p-10">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-gray-900">Appoint Office Location</h2>
+                    <p class="text-gray-400 text-sm font-bold">Employees can only clock in within this radius</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Latitude</label>
+                        <input type="number" id="officeLat" step="0.000001" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-emerald-500/10 outline-none border transition-all" placeholder="-26.2041">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Longitude</label>
+                        <input type="number" id="officeLng" step="0.000001" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-emerald-500/10 outline-none border transition-all" placeholder="28.0473">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Radius (meters)</label>
+                        <input type="number" id="officeRadius" value="150" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-emerald-500/10 outline-none border transition-all">
+                    </div>
+                    <div class="pt-6 flex gap-3">
+                        <button onclick="getCurrentLocationForOffice()" class="flex-1 pill-btn bg-gray-100 text-gray-700 font-black py-4">USE CURRENT GPS</button>
+                        <button onclick="saveOfficeLocation()" class="flex-1 pill-btn bg-emerald-600 text-white font-black py-4 shadow-xl shadow-emerald-500/20">SAVE LOCATION</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Stats Modal -->
+    <div id="statsModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/60 backdrop-blur-md"></div>
+        <div class="modal-container bg-white w-full max-w-4xl mx-auto rounded-[2rem] shadow-2xl z-50 relative">
+            <button onclick="toggleModal('statsModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div id="statsContent" class="p-10">
+                <div class="flex justify-between items-center mb-10">
+                    <div class="flex gap-6 items-center">
+                        <div id="statAvatar" class="w-20 h-20 rounded-3xl bg-blue-600 text-white flex items-center justify-center text-4xl font-black shadow-2xl shadow-blue-200"></div>
+                        <div>
+                            <h2 id="statName" class="text-4xl font-black text-gray-900">Name</h2>
+                            <p id="statIdRole" class="text-blue-600 font-black uppercase tracking-widest text-xs mt-1"></p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="downloadPersonalPDF()" class="pill-btn bg-blue-50 text-blue-600 px-6 py-3 text-xs font-black">
+                            <i class="fa-solid fa-download mr-2"></i> EXPORT PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-4 mb-10">
+                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                        <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Total Hours</p>
+                        <p class="text-3xl font-black text-gray-900" id="statTotalHours">0.0</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                        <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Avg Clock-In</p>
+                        <p class="text-3xl font-black text-gray-900" id="statAvgClockIn">--:--</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                        <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Punctuality Score</p>
+                        <p class="text-3xl font-black text-gray-900" id="statPunctuality">0%</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                        <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Lunch Compliance</p>
+                        <p class="text-3xl font-black text-blue-600" id="statBreakComp">0%</p>
+                    </div>
+                </div>
+                <div class="h-64 rounded-3xl bg-gray-50/50 p-6 border border-gray-100">
+                    <canvas id="personalTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Add Employee Modal -->
+    <div id="addEmployeeModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/40 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-sm sm:max-w-md mx-4 sm:mx-auto rounded-[2.5rem] shadow-2xl z-50 relative max-h-[92vh] overflow-hidden">
+            <button onclick="toggleModal('addEmployeeModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="p-6 sm:p-10 overflow-y-auto max-h-[calc(92vh-3.5rem)]">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-gray-900">New Registration</h2>
+                    <p class="text-gray-400 text-sm font-bold">Automatic ID generation enabled.</p>
+                </div>
+                <form id="addEmployeeForm" class="space-y-5">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Full Legal Name</label>
+                        <input type="text" id="newEmpName" required placeholder="e.g. John Doe" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none border transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Job Title / Department</label>
+                        <input type="text" id="newEmpRole" required placeholder="e.g. Senior Analyst" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none border transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">User Type</label>
+                        <select id="newEmpType" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none border transition-all">
+                            <option value="employee">Employee</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Work Email (required for clock-in)</label>
+                        <input type="email" id="newEmpEmail" required placeholder="employee@company.com" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none border transition-all">
+                    </div>
+                    <div class="pt-6 flex gap-3">
+                        <button type="button" onclick="toggleModal('addEmployeeModal')" class="flex-1 pill-btn bg-gray-100 text-gray-500 font-black py-4">CANCEL</button>
+                        <button type="submit" class="flex-1 pill-btn bg-blue-600 text-white font-black py-4 shadow-xl shadow-blue-500/20">SAVE STAFF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Employee Modal (NEW) -->
+    <div id="editEmployeeModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/40 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-sm sm:max-w-md mx-4 sm:mx-auto rounded-[2.5rem] shadow-2xl z-50 relative max-h-[92vh] overflow-hidden">
+            <button onclick="toggleModal('editEmployeeModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="p-6 sm:p-10 overflow-y-auto max-h-[calc(92vh-3.5rem)]">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
+                        <i class="fa-solid fa-pen"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-gray-900">Edit Staff</h2>
+                    <p class="text-gray-400 text-sm font-bold">Update employee details</p>
+                </div>
+                <form id="editEmployeeForm" class="space-y-5">
+                    <input type="hidden" id="editEmpId">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Full Legal Name</label>
+                        <input type="text" id="editEmpName" required class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-amber-500/10 outline-none border transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Job Title / Department</label>
+                        <input type="text" id="editEmpRole" required class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-amber-500/10 outline-none border transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">User Type</label>
+                        <select id="editEmpType" class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-amber-500/10 outline-none border transition-all">
+                            <option value="employee">Employee</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-2 mb-2">Work Email</label>
+                        <input type="email" id="editEmpEmail" required class="w-full rounded-2xl border-gray-100 bg-gray-50 px-6 py-4 text-sm focus:ring-4 focus:ring-amber-500/10 outline-none border transition-all">
+                    </div>
+                    <div class="pt-6 flex gap-3">
+                        <button type="button" onclick="toggleModal('editEmployeeModal')" class="flex-1 pill-btn bg-gray-100 text-gray-500 font-black py-4">CANCEL</button>
+                        <button type="submit" class="flex-1 pill-btn bg-amber-600 text-white font-black py-4 shadow-xl shadow-amber-500/20">UPDATE STAFF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirmDeleteModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[70]">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/60 backdrop-blur-md"></div>
+        <div class="modal-container bg-white w-full max-w-xs mx-auto rounded-[2.5rem] shadow-2xl z-50 relative">
+            <button onclick="toggleModal('confirmDeleteModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="p-8 text-center">
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 class="text-xl font-black text-gray-900">Are you sure?</h3>
+                <p class="text-gray-500 text-xs mt-2 leading-relaxed">This will remove <span id="deleteTargetName" class="font-bold text-gray-800"></span> from the registry. This action is irreversible.</p>
+                <div class="flex flex-col gap-2 mt-8">
+                    <button id="finalDeleteBtn" class="pill-btn bg-red-600 text-white font-black py-3 text-sm">DELETE PERMANENTLY</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Success / QR Modal -->
+    <div id="successModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[60]">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900/60 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-sm mx-auto rounded-[2rem] shadow-2xl z-50 p-8 text-center relative">
+            <button onclick="toggleModal('successModal')" class="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3 id="successTitle" class="text-xl font-black text-gray-900">Success!</h3>
+            <p id="successMessage" class="text-gray-500 text-sm mt-2 mb-4">
+                Employee added. Save this QR code.<br>
+                <strong>Use the same QR code every day</strong> to clock in, take lunch, and clock out.
+            </p>
+         
+            <div class="flex justify-center mb-6">
+                <div id="qrCodeContainer" class="p-3 bg-white border border-gray-100 rounded-xl shadow-lg"></div>
+            </div>
+            <p class="text-xs text-gray-600 mb-6">
+                Tip: Open the saved QR PDF on your phone → set screen brightness to maximum → hold steady when scanning.
+            </p>
+            <div class="flex flex-col gap-2">
+                <a id="downloadQrBtn" href="#" class="w-full pill-btn bg-blue-600 text-white font-black py-3 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> DOWNLOAD QR (PDF)
+                </a>
+            </div>
+        </div>
+    </div>
+    <div id="adminActionMenu" class="action-menu py-2 overflow-hidden">
+        <div onclick="adminSetAction('Clock In')" class="action-item px-4 py-2 text-xs font-black cursor-pointer border-b border-gray-50">CLOCK IN</div>
+        <div onclick="adminSetAction('Lunch Out')" class="action-item px-4 py-2 text-xs font-black cursor-pointer">LUNCH OUT</div>
+        <div onclick="adminSetAction('Lunch Back')" class="action-item px-4 py-2 text-xs font-black cursor-pointer border-b border-gray-50">LUNCH BACK</div>
+        <div onclick="adminSetAction('Clock Out')" class="action-item px-4 py-2 text-xs font-black cursor-pointer text-red-500">CLOCK OUT</div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxBT0oESoL62oz_x_Z8cMtdENWZPx4tMI",
+            authDomain: "pinotp-d7ef5.firebaseapp.com",
+            databaseURL: "https://pinotp-d7ef5-default-rtdb.firebaseio.com",
+            projectId: "pinotp-d7ef5",
+            storageBucket: "pinotp-d7ef5.firebasestorage.app",
+            messagingSenderId: "708458917827",
+            appId: "1:708458917827:web:375de278577df0adcf9776"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('dateDisplay').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const LATE_THRESHOLD = "09:00";
+        let personalChart = null;
+        let selectedEmpId = null;
+        let pendingDeleteId = null;
+        let activeAdminId = null;
+        let html5QrCode = null;
+        let officeLocation = null;
+        let attendanceListener = null;
+        let editingEmpId = null;
+
+        db.ref('settings/officeLocation').on('value', snap => {
+            officeLocation = snap.val() || null;
+        });
+
+        const gCtx = document.getElementById('attendanceChart').getContext('2d');
+        const globalChart = new Chart(gCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Working', 'Lunch', 'Clocked Out'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#2563eb', '#fbbf24', '#ef4444'],
+                    hoverOffset: 15,
+                    borderWidth: 0,
+                    borderRadius: 8
+                }]
+            },
+            options: { cutout: '80%', plugins: { legend: { display: true, position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold', size: 10 } } } } }
+        });
+
+        db.ref('employees').on('value', snap => {
+            const list = document.getElementById('employeeList');
+            const data = snap.val();
+            list.innerHTML = '';
+            if (!data) return;
+            document.getElementById('totalEmployees').innerText = Object.keys(data).length;
+            document.getElementById('regCount').innerText = Object.keys(data).length;
+            Object.values(data).forEach(emp => {
+                const row = document.createElement('div');
+                row.className = "flex items-center gap-4 p-4 hover:bg-white hover:shadow-xl hover:shadow-gray-200/50 rounded-2xl cursor-pointer transition-all group mb-1";
+                row.innerHTML = `
+                    <div onclick="fetchEmployeeHistory('${emp.id}', '${emp.name}', '${emp.role}')" class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center font-black text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner">
+                        ${emp.name.charAt(0)}
+                    </div>
+                    <div onclick="fetchEmployeeHistory('${emp.id}', '${emp.name}', '${emp.role}')" class="flex-1">
+                        <p class="text-sm font-black text-gray-800">${emp.name}</p>
+                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">${emp.role}</p>
+                    </div>
+                    <button onclick="showEmployeeQR('${emp.id}', '${emp.name}')" class="opacity-0 group-hover:opacity-100 p-2 text-blue-400 hover:text-blue-600 transition-all">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </button>
+                    <button onclick="editEmployee('${emp.id}', '${emp.name.replace(/'/g, "\\'")}', '${emp.role.replace(/'/g, "\\'")}', '${emp.email}', ${emp.isAdmin})" class="opacity-0 group-hover:opacity-100 p-2 text-amber-400 hover:text-amber-600 transition-all">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button onclick="promptDelete('${emp.id}', '${emp.name}')" class="opacity-0 group-hover:opacity-100 p-2 text-red-400 hover:text-red-600 transition-all">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                `;
+                list.appendChild(row);
+            });
+        });
+
+        function renderAttendanceTable(rawData, singleDate) {
+            const tbody = document.getElementById('attendanceTable');
+            tbody.innerHTML = '';
+            let stats = { working: 0, lunch: 0, out: 0, total: 0 };
+            const entries = Object.values(rawData || {});
+            if (entries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-20 text-center text-gray-300">No records found in selected range</td></tr>`;
+                document.getElementById('presentToday').innerText = 0;
+                globalChart.data.datasets[0].data = [0, 0, 0];
+                globalChart.update();
+                return;
+            }
+            entries.forEach(log => {
+                const displayDate = log._date || singleDate || todayStr;
+                stats.total++;
+                let statusLabel = 'OFFLINE', statusCol = 'bg-gray-50 text-gray-400', pulse = '';
+                let complianceHtml = '<span class="text-gray-200">-</span>';
+                let clockInHtml = log.TimeIn || '--:--';
+                if (log.TimeIn && log.TimeIn > LATE_THRESHOLD) {
+                    clockInHtml = `<span class="text-red-600 font-black">${log.TimeIn}</span> <span class="bg-red-50 text-red-500 text-[8px] px-1 rounded">LATE</span>`;
+                }
+                if (log.LunchOut && log.LunchBack) {
+                    const dur = calculateDuration(log.LunchOut, log.LunchBack) * 60;
+                    complianceHtml = dur > 60 ? `<span class="text-red-600 font-black">OVER (${Math.round(dur)}m)</span>` : `<span class="text-green-600 font-black">PASS</span>`;
+                }
+                if (log.lastAction?.includes('In') || log.lastAction === 'Lunch Back') {
+                    stats.working++; statusLabel = 'WORKING'; statusCol = 'bg-blue-50 text-blue-600'; pulse = 'animate-pulse';
+                } else if (log.lastAction === 'Lunch Out') {
+                    stats.lunch++; statusLabel = 'LUNCH'; statusCol = 'bg-yellow-50 text-yellow-700';
+                } else if (log.TimeOut) {
+                    stats.out++; statusLabel = 'FINISHED'; statusCol = 'bg-red-50 text-red-700';
+                }
+                tbody.innerHTML += `
+                    <tr class="group hover:bg-gray-50/70 transition-colors">
+                        <td class="p-3.5 font-mono text-xs text-gray-500">${displayDate}</td>
+                        <td class="p-3.5 font-black text-gray-800 flex items-center gap-3">
+                            <div>${log.name || 'User'} <br><span class="text-[10px] text-gray-300 font-bold">${log.id}</span></div>
+                            <button onclick="showAdminActions(event, '${log.id}')" class="p-1.5 bg-blue-50 text-blue-500 rounded-lg hover:bg-blue-500 hover:text-white transition-all">
+                                <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                            </button>
+                        </td>
+                        <td class="p-3.5 font-mono font-bold text-gray-500">${clockInHtml}</td>
+                        <td class="p-3.5 text-[11px] font-bold">
+                            ${log.LunchOut ? `<span class="text-red-400">OUT: ${log.LunchOut}</span>` : ''}
+                            ${log.LunchBack ? `<br><span class="text-green-500">BACK: ${log.LunchBack}</span>` : ''}
+                        </td>
+                        <td class="p-3.5 text-center text-xs">${complianceHtml}</td>
+                        <td class="p-3.5 font-mono font-bold text-gray-500">${log.TimeOut || '--:--'}</td>
+                        <td class="p-3.5 text-center">
+                            <span class="${statusCol} ${pulse} px-4 py-2 rounded-xl text-[10px] font-black border border-current opacity-80">${statusLabel}</span>
+                        </td>
+                    </tr>`;
+            });
+            document.getElementById('presentToday').innerText = stats.total;
+            globalChart.data.datasets[0].data = [stats.working, stats.lunch, stats.out];
+            globalChart.update();
+        }
+
+        function loadAttendanceData(fromDate, toDate) {
+            if (attendanceListener) {
+                attendanceListener.off();
+                attendanceListener = null;
+            }
+            if (fromDate === toDate && fromDate === todayStr) {
+                attendanceListener = db.ref('attendance/' + todayStr);
+                attendanceListener.on('value', snap => {
+                    renderAttendanceTable(snap.val(), todayStr);
+                });
+            } else {
+                db.ref('attendance').orderByKey().startAt(fromDate).endAt(toDate).once('value').then(snap => {
+                    let combined = {};
+                    snap.forEach(child => {
+                        const dayKey = child.key;
+                        const dayData = child.val() || {};
+                        Object.keys(dayData).forEach(empId => {
+                            combined[`${dayKey}_${empId}`] = { ...dayData[empId], _date: dayKey };
+                        });
+                    });
+                    renderAttendanceTable(combined, null);
+                });
+            }
+        }
+
+        function applyFilter() {
+            let from = document.getElementById('dateFrom').value;
+            let to = document.getElementById('dateTo').value;
+            if (!from) from = todayStr;
+            if (!to || to < from) to = from;
+            loadAttendanceData(from, to);
+        }
+
+        function loadTodayLive() {
+            document.getElementById('dateFrom').value = todayStr;
+            document.getElementById('dateTo').value = todayStr;
+            loadAttendanceData(todayStr, todayStr);
+        }
+
+        function signInWithGoogle() {
+            auth.signInWithPopup(provider).then(async (result) => {
+                const user = result.user;
+                const snap = await db.ref('employees').orderByChild('email').equalTo(user.email.toLowerCase()).once('value');
+                let isAdminUser = false;
+                snap.forEach(child => {
+                    if (child.val().isAdmin === true) isAdminUser = true;
+                });
+                if (isAdminUser) {
+                    toggleModal('adminLoginModal');
+                } else {
+                    await auth.signOut();
+                    alert("Access denied: This Google account is not registered as an Admin.");
+                }
+            }).catch(err => {
+                console.error(err);
+                alert("Google sign-in failed: " + err.message);
+            });
+        }
+        function showSignOutConfirm() { toggleModal('signOutConfirmModal'); }
+        function confirmSignOut() { toggleModal('signOutConfirmModal'); signOutAdmin(); }
+        function signOutAdmin() {
+            auth.signOut().then(() => toggleModal('adminLoginModal')).catch(err => alert("Sign out failed: " + err.message));
+        }
+        auth.onAuthStateChanged(async (user) => {
+            const loginModal = document.getElementById('adminLoginModal');
+            if (user) {
+                const snap = await db.ref('employees').orderByChild('email').equalTo(user.email.toLowerCase()).once('value');
+                let isAdminUser = false;
+                snap.forEach(child => { if (child.val().isAdmin === true) isAdminUser = true; });
+                if (!isAdminUser) await auth.signOut();
+            }
+            if (!user || document.getElementById('adminLoginModal').classList.contains('opacity-0')) toggleModal('adminLoginModal');
+        });
+        function startScanner() {
+            toggleModal('scannerModal');
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess).catch(err => console.error(err));
+        }
+        function stopScanner() {
+            if (html5QrCode) html5QrCode.stop().then(() => toggleModal('scannerModal'));
+            else toggleModal('scannerModal');
+        }
+        function onScanSuccess(decodedText) {
+            html5QrCode.pause();
+            document.getElementById('scanStatus').innerText = `Processing: ${decodedText}...`;
+            db.ref('employees/' + decodedText).once('value').then(snap => {
+                if (snap.exists()) processScanLogic(decodedText, snap.val().name);
+                else {
+                    alert("Invalid QR Code");
+                    html5QrCode.resume();
+                }
+            });
+        }
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        async function isWithinOfficeLocation() {
+            return new Promise((resolve, reject) => {
+                if (!officeLocation) return reject(new Error("Office location not set"));
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, officeLocation.lat, officeLocation.lng);
+                    resolve(dist <= officeLocation.radius);
+                }, reject, { enableHighAccuracy: true });
+            });
+        }
+        async function processScanLogic(id, name) {
+            try { await isWithinOfficeLocation(); } catch (e) { alert(e.message); html5QrCode.resume(); return; }
+            const saveTodayStr = new Date().toISOString().split('T')[0];
+            const path = `attendance/${saveTodayStr}/${id}`;
+            const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            db.ref(path).once('value').then(snap => {
+                const data = snap.val() || {};
+
+                if (data.lastActionTime) {
+                    const timeSinceLast = Date.now() - data.lastActionTime;
+                    if (timeSinceLast < 15 * 60 * 1000) {
+                        const minutesLeft = Math.ceil((15 * 60 * 1000 - timeSinceLast) / 60000);
+                        alert(`Please wait ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''} before your next scan.`);
+                        html5QrCode.resume();
+                        return;
+                    }
+                }
+
+                let update = { 
+                    id: id, 
+                    name: name,
+                    date: saveTodayStr,
+                    day: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+                    lastActionTime: Date.now()
+                };
+                let actionTaken = "";
+
+                if (!data.TimeIn) {
+                    update.TimeIn = now;
+                    update.lastAction = "Clock In";
+                    actionTaken = "CLOCKED IN";
+                } else if (!data.LunchOut) {
+                    update.LunchOut = now;
+                    update.lastAction = "Lunch Out";
+                    actionTaken = "LUNCH OUT";
+                } else if (!data.LunchBack) {
+                    update.LunchBack = now;
+                    update.lastAction = "Lunch Back";
+                    actionTaken = "LUNCH BACK";
+                } else if (!data.TimeOut) {
+                    update.TimeOut = now;
+                    update.lastAction = "Clock Out";
+                    actionTaken = "CLOCKED OUT";
+                } else {
+                    alert(`${name} has already completed all 4 scans for today.`);
+                    html5QrCode.resume();
+                    return;
+                }
+                db.ref(path).update(update).then(() => {
+                    alert(`${actionTaken}: ${name}`);
+                    html5QrCode.resume();
+                });
+            });
+        }
+        function showAdminActions(e, id) {
+            e.stopPropagation();
+            activeAdminId = id;
+            const menu = document.getElementById('adminActionMenu');
+            menu.style.display = 'block';
+            menu.style.left = (e.pageX - 10) + 'px';
+            menu.style.top = (e.pageY + 10) + 'px';
+        }
+        window.onclick = () => document.getElementById('adminActionMenu').style.display = 'none';
+        function adminSetAction(action) {
+            if (!activeAdminId) return;
+            const saveTodayStr = new Date().toISOString().split('T')[0];
+            const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const path = `attendance/${saveTodayStr}/${activeAdminId}`;
+            let update = { lastAction: action, date: saveTodayStr, day: new Date().toLocaleDateString('en-US', { weekday: 'long' }) };
+            if (action === 'Clock In') update.TimeIn = now;
+            else if (action === 'Lunch Out') update.LunchOut = now;
+            else if (action === 'Lunch Back') update.LunchBack = now;
+            else if (action === 'Clock Out') update.TimeOut = now;
+            db.ref(path).update(update);
+        }
+        function promptDelete(id, name) {
+            pendingDeleteId = id;
+            document.getElementById('deleteTargetName').innerText = name;
+            toggleModal('confirmDeleteModal');
+        }
+        document.getElementById('finalDeleteBtn').onclick = () => {
+            if (pendingDeleteId) {
+                db.ref('employees/' + pendingDeleteId).remove();
+                db.ref('attendance/' + todayStr + '/' + pendingDeleteId).remove().then(() => {
+                    toggleModal('confirmDeleteModal');
+                    pendingDeleteId = null;
+                });
+            }
+        };
+        function formatTime(minutes) {
+            if (isNaN(minutes) || minutes < 0) return "--:--";
+            const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+            const m = Math.floor(minutes % 60).toString().padStart(2, '0');
+            return `${h}:${m}`;
+        }
+        function timeToMinutes(timeStr) {
+            if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return NaN;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        }
+        async function fetchEmployeeHistory(id, name, role) {
+            selectedEmpId = id;
+            document.getElementById('statName').innerText = name;
+            document.getElementById('statIdRole').innerText = `${id} • ${role}`;
+            document.getElementById('statAvatar').innerText = name.charAt(0);
+            const historySnap = await db.ref('attendance').once('value');
+            const allDays = historySnap.val() || {};
+            let totalHours = 0, daysWorked = 0, chartLabels = [], chartData = [], totalBreaks = 0, okBreaks = 0, punctDays = 0, clockInMinutes = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - i);
+                const dStr = d.toISOString().split('T')[0];
+                chartLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+                const dayData = allDays[dStr]?.[id];
+                if (dayData) {
+                    daysWorked++;
+                    const duration = calculateDuration(dayData.TimeIn, dayData.TimeOut);
+                    totalHours += duration;
+                    chartData.push(duration);
+                    if (dayData.TimeIn && dayData.TimeIn <= LATE_THRESHOLD) punctDays++;
+                    if (dayData.LunchOut && dayData.LunchBack) {
+                        totalBreaks++;
+                        const breakMin = calculateDuration(dayData.LunchOut, dayData.LunchBack) * 60;
+                        if (breakMin <= 60 && breakMin > 0) okBreaks++;
+                    }
+                    const minutes = timeToMinutes(dayData.TimeIn);
+                    if (!isNaN(minutes)) clockInMinutes.push(minutes);
+                } else chartData.push(0);
+            }
+            let avgClockInDisplay = "--:--";
+            if (clockInMinutes.length > 0) {
+                const avgMinutes = clockInMinutes.reduce((a, b) => a + b, 0) / clockInMinutes.length;
+                avgClockInDisplay = formatTime(avgMinutes);
+            }
+            document.getElementById('statTotalHours').innerText = totalHours.toFixed(1);
+            document.getElementById('statAvgClockIn').innerText = avgClockInDisplay;
+            document.getElementById('statPunctuality').innerText = daysWorked ? Math.round((punctDays / daysWorked) * 100) + '%' : '0%';
+            document.getElementById('statBreakComp').innerText = totalBreaks ? Math.round((okBreaks / totalBreaks) * 100) + '%' : '0%';
+            toggleModal('statsModal');
+            renderPersonalChart(chartLabels, chartData);
+        }
+        function calculateDuration(inT, outT) {
+            const inMin = timeToMinutes(inT), outMin = timeToMinutes(outT);
+            if (isNaN(inMin) || isNaN(outMin) || outMin <= inMin) return 0;
+            return (outMin - inMin) / 60;
+        }
+        function renderPersonalChart(labels, data) {
+            if (personalChart) personalChart.destroy();
+            personalChart = new Chart(document.getElementById('personalTrendChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Hours', data, backgroundColor: '#2563eb', borderRadius: 8 }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+        async function downloadPersonalPDF() {
+            const canvas = await html2canvas(document.getElementById('statsContent'), { scale: 2 });
+            const doc = new jspdf.jsPDF('p', 'mm', 'a4');
+            doc.text(`Performance Report: ${document.getElementById('statName').innerText}`, 15, 15);
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 25, 190, 110);
+            doc.save(`Report_${selectedEmpId}.pdf`);
+        }
+        async function generateGlobalReport() {
+            const doc = new jspdf.jsPDF();
+            doc.setFontSize(22);
+            doc.text("Global Operations Report", 20, 25);
+            doc.text(`Active Employees: ${document.getElementById('totalEmployees').innerText}`, 20, 45);
+            doc.save("Global_Report.pdf");
+        }
+        document.getElementById('addEmployeeForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = `EMP-${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
+            const name = document.getElementById('newEmpName').value.trim();
+            const role = document.getElementById('newEmpRole').value.trim();
+            const email = document.getElementById('newEmpEmail').value.trim().toLowerCase();
+            const isAdmin = document.getElementById('newEmpType').value === 'admin';
+            db.ref('employees/' + id).set({ id, name, role, email, isAdmin, createdAt: firebase.database.ServerValue.TIMESTAMP }).then(() => {
+                toggleModal('addEmployeeModal');
+                document.getElementById('addEmployeeForm').reset();
+                showEmployeeQR(id, name);
+            });
+        });
+
+        // === EDIT EMPLOYEE FUNCTIONALITY ===
+        function editEmployee(id, name, role, email, isAdmin) {
+            editingEmpId = id;
+            document.getElementById('editEmpId').value = id;
+            document.getElementById('editEmpName').value = name;
+            document.getElementById('editEmpRole').value = role;
+            document.getElementById('editEmpEmail').value = email;
+            document.getElementById('editEmpType').value = isAdmin ? 'admin' : 'employee';
+            toggleModal('editEmployeeModal');
+        }
+
+        document.getElementById('editEmployeeForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!editingEmpId) return;
+            const name = document.getElementById('editEmpName').value.trim();
+            const role = document.getElementById('editEmpRole').value.trim();
+            const email = document.getElementById('editEmpEmail').value.trim().toLowerCase();
+            const isAdmin = document.getElementById('editEmpType').value === 'admin';
+            db.ref('employees/' + editingEmpId).update({
+                name: name,
+                role: role,
+                email: email,
+                isAdmin: isAdmin
+            }).then(() => {
+                toggleModal('editEmployeeModal');
+                editingEmpId = null;
+            });
+        });
+
+        function showEmployeeQR(id, name) {
+            const qrContainer = document.getElementById('qrCodeContainer');
+            qrContainer.innerHTML = '';
+            new QRCode(qrContainer, { text: id, width: 220, height: 220, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+            setTimeout(() => {
+                const qrCanvas = qrContainer.querySelector('canvas');
+                if (qrCanvas) {
+                    const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'px', format: [280, 280] });
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(0, 0, 280, 280, 'F');
+                    pdf.addImage(qrCanvas.toDataURL('image/png'), 'PNG', 30, 30, 220, 220);
+                    const pdfBlob = pdf.output('blob');
+                    const pdfUrl = URL.createObjectURL(pdfBlob);
+                    const dlBtn = document.getElementById('downloadQrBtn');
+                    dlBtn.href = pdfUrl;
+                    dlBtn.download = `QR_${name.replace(' ', '_')}.pdf`;
+                }
+                document.getElementById('successTitle').textContent = "QR Code Ready";
+                document.getElementById('successMessage').innerHTML = `Permanent QR for <strong>${name}</strong><br><strong>Use this same QR code every day</strong>`;
+                toggleModal('successModal');
+            }, 300);
+        }
+        function toggleModal(id) {
+            const m = document.getElementById(id);
+            m.classList.toggle('opacity-0');
+            m.classList.toggle('pointer-events-none');
+            document.body.classList.toggle('modal-active');
+        }
+        function toggleLocationModal() {
+            if (officeLocation) {
+                document.getElementById('officeLat').value = officeLocation.lat || '';
+                document.getElementById('officeLng').value = officeLocation.lng || '';
+                document.getElementById('officeRadius').value = officeLocation.radius || 150;
+            }
+            toggleModal('locationModal');
+        }
+        function getCurrentLocationForOffice() {
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('officeLat').value = pos.coords.latitude.toFixed(6);
+                document.getElementById('officeLng').value = pos.coords.longitude.toFixed(6);
+            }, err => alert("Unable to retrieve location"));
+        }
+        function saveOfficeLocation() {
+            const lat = parseFloat(document.getElementById('officeLat').value);
+            const lng = parseFloat(document.getElementById('officeLng').value);
+            const radius = parseFloat(document.getElementById('officeRadius').value) || 150;
+            if (isNaN(lat) || isNaN(lng)) return alert("Please enter valid coordinates");
+            db.ref('settings/officeLocation').set({ lat, lng, radius }).then(() => {
+                alert("Office location saved");
+                toggleModal('locationModal');
+            });
+        }
+
+        window.onload = () => {
+            document.getElementById('dateFrom').value = todayStr;
+            document.getElementById('dateTo').value = todayStr;
+            loadTodayLive();
+        };
+    </script>
+</body>
+</html>
