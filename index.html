@@ -57,7 +57,7 @@
                     <i class="fa-solid fa-rotate text-lg"></i>
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
                 </div>
-                <button onclick="exportFullReport()" 
+                <button onclick="exportFullReport()"
                         class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
                     <i class="fa-solid fa-file-export"></i>
                     <span class="hidden sm:inline">EXPORT</span>
@@ -65,7 +65,6 @@
             </div>
         </nav>
     </header>
-
     <main class="flex flex-1 overflow-hidden flex-col lg:flex-row">
         <!-- LEFT SIDEBAR -->
         <div class="w-full lg:w-96 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-700 p-6 flex flex-col overflow-y-auto custom-scroll">
@@ -81,14 +80,11 @@
                     </div>
                 </div>
             </div>
-
             <div class="uppercase text-xs font-bold tracking-widest text-slate-400 mb-4 flex items-center gap-2">
                 <span>CONNECTED SYSTEMS</span>
                 <div class="flex-1 h-px bg-slate-700"></div>
             </div>
-
             <div id="systemsList" class="flex-1 space-y-3 overflow-y-auto custom-scroll"></div>
-
             <div class="mt-8 glass-card p-5 rounded-3xl text-xs">
                 <div class="flex justify-between mb-3">
                     <span class="text-slate-400">Avg Performance</span>
@@ -98,7 +94,6 @@
                     <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-full transition-all duration-500"></div>
                 </div>
             </div>
-
             <!-- LIVE ACTIVE STAFF -->
             <div class="mt-8">
                 <div class="flex justify-between items-center mb-3">
@@ -107,7 +102,6 @@
                 <div id="activeList" class="max-h-80 overflow-y-auto custom-scroll space-y-2 text-sm"></div>
             </div>
         </div>
-
         <!-- CENTER CONTENT -->
         <div class="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden">
             <div class="flex justify-between items-center mb-6 lg:mb-8">
@@ -120,7 +114,6 @@
                     <span id="currentTime" class="font-mono"></span>
                 </div>
             </div>
-
             <!-- CHARTS -->
             <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
                 <!-- Doughnut -->
@@ -132,7 +125,6 @@
                         <canvas id="userDoughnut" class="max-h-[260px]"></canvas>
                     </div>
                 </div>
-
                 <!-- Fluctuating Live Data -->
                 <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col">
                     <div class="flex justify-between items-center mb-6">
@@ -143,14 +135,12 @@
                     </div>
                 </div>
             </div>
-
             <!-- HEALTH -->
             <div class="mt-6 glass-card rounded-3xl p-6">
                 <div class="text-lg font-semibold mb-5">System Health</div>
                 <div id="healthBars" class="grid grid-cols-1 gap-6"></div>
             </div>
         </div>
-
         <!-- RIGHT THREATS -->
         <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
             <div class="p-6 border-b border-slate-700">
@@ -165,9 +155,7 @@
                     <div id="threatCounter" class="text-5xl font-black text-red-500">0</div>
                 </div>
             </div>
-
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
-
             <div class="p-4 border-t border-slate-700 bg-slate-950">
                 <div onclick="clearThreats()" class="text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2">
                     <i class="fa-solid fa-trash"></i> CLEAR LOG
@@ -175,7 +163,6 @@
             </div>
         </div>
     </main>
-
     <!-- MODERN THREAT MODAL -->
     <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4">
         <div class="glass-card w-full max-w-md mx-auto rounded-3xl p-8 shadow-2xl modern-modal">
@@ -187,18 +174,17 @@
             </div>
             <div id="modalThreatContent" class="space-y-6 text-sm"></div>
             <div class="mt-10 flex gap-3">
-                <button onclick="closeThreatModal()" 
+                <button onclick="closeThreatModal()"
                         class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all active:scale-95">
                     DISMISS
                 </button>
-                <button onclick="blockIP()" 
+                <button onclick="blockIP()"
                         class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all active:scale-95">
                     BLOCK IP
                 </button>
             </div>
         </div>
     </div>
-
     <!-- THREAT ALERT TOAST -->
     <div id="threatToast">
         <div class="flex items-center gap-3">
@@ -209,7 +195,6 @@
             </div>
         </div>
     </div>
-
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyAxBT0oESoL62oz_x_Z8cMtdENWZPx4tMI",
@@ -222,14 +207,12 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let threats = [];
         let liveActivityData = Array(20).fill(0);
         let threatData = Array(20).fill(0);
         let liveActivityLabels = Array(20).fill('').map((_, i) => `-${i}m`);
-
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             container.innerHTML = `
@@ -252,7 +235,6 @@
                 </div>
             `;
         }
-
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
             container.innerHTML = `
@@ -263,7 +245,6 @@
                 </div>
             `;
         }
-
         function initCharts() {
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
@@ -282,7 +263,6 @@
                     plugins: { legend: { display: false } }
                 }
             });
-
             const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
             fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
@@ -315,7 +295,6 @@
                 }
             });
         }
-
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
@@ -339,7 +318,6 @@
             });
             document.getElementById('threatCounter').textContent = threats.length;
         }
-
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             modal.classList.remove('hidden');
@@ -361,20 +339,16 @@
                 </div>
             `;
         }
-
         function closeThreatModal() {
             document.getElementById('threatModal').classList.add('hidden');
         }
-
         function blockIP() {
             alert("IP blocked and added to Firebase security rules");
             closeThreatModal();
         }
-
         function refreshAll() {
             loadAllData();
         }
-
         function exportFullReport() {
             const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nUnauthorized Attempts: ${threats.length}`;
             const blob = new Blob([report], {type: 'text/plain'});
@@ -383,23 +357,19 @@
             a.download = `firebase-report-${new Date().toISOString().slice(0,10)}.txt`;
             a.click();
         }
-
         function clearThreats() {
             if (confirm("Clear all unauthorized login logs from Firebase?")) {
                 db.ref('unauthorized_attempts').remove();
             }
         }
-
         function updateClock() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
         }
-
         function loadAllData() {
             db.ref('employees').on('value', snap => {
                 const total = Object.keys(snap.val() || {}).length;
                 renderSystems(total, 0);
             });
-
             db.ref('attendance/' + todayStr).on('value', snap => {
                 const data = snap.val() || {};
                 let working = 0, lunch = 0, out = 0;
@@ -424,7 +394,6 @@
                 `;
             });
         }
-
         // Real data listeners for graph
         db.ref('attendance/' + todayStr).on('child_added', () => {
             liveActivityData.shift();
@@ -436,14 +405,12 @@
                 // When clock out, perhaps adjust, but since it's added, no need for graph
             }
         });
-
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             threatData.shift();
             threatData.push((threatData[threatData.length - 1] || 0) + 1);
             fluctuatingChart.update();
             showThreatAlert(snap.val());
         });
-
         // Unauthorized attempts
         db.ref('unauthorized_attempts').on('value', snap => {
             threats = [];
@@ -454,14 +421,12 @@
             threats = threats.slice(0, 12);
             renderThreats();
         });
-
         function showThreatAlert(threat) {
             const toast = document.getElementById('threatToast');
             document.getElementById('toastEmail').textContent = threat.attemptedEmail;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
-
         window.onload = () => {
             initCharts();
             loadAllData();
