@@ -2,199 +2,218 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYSTEMS COMMAND CENTER • Firebase Oversight</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <title>Employee Attendance Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-        body { font-family: 'Inter', system-ui, sans-serif; background-color: #0f172a; }
-        .glass-header { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); }
-        .glass-card { background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(148, 163, 184, 0.15); }
-        .neon-text { text-shadow: 0 0 15px rgb(34 211 238); }
-        .threat-critical { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
-        .modern-modal { animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        @keyframes modalPop { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        #threatToast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #ef4444;
-            color: white;
-            padding: 16px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            z-index: 1000;
-            max-width: 300px;
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+            overscroll-behavior-y: contain;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
-        #threatToast.show {
-            opacity: 1;
+        .bg-gradient {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 0% 0%, #1e293b 0%, transparent 50%),
+                        radial-gradient(circle at 100% 100%, #1e3a8a 0%, transparent 50%),
+                        radial-gradient(circle at 100% 0%, #0f172a 0%, transparent 50%),
+                        radial-gradient(circle at 0% 100%, #312e81 0%, transparent 50%);
+            background-color: #020617;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 2rem;
+        }
+        #login-view {
+            transition: all 0.5s ease-in-out;
+            transform: translateY(100%);
+            opacity: 0;
+            z-index: 100;
+            position: fixed;
+            inset: 0;
+            display: none;
+            overflow-y: auto;
+        }
+        #login-view.active {
+            display: flex;
             transform: translateY(0);
+            opacity: 1;
+        }
+        #app-content {
+            transition: filter 0.5s ease;
+            width: 100%;
+            max-width: 28rem;
+        }
+        .blur-locked {
+            filter: blur(15px);
+            pointer-events: none;
+        }
+        #reader {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background: #000;
+        }
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+            display: block;
+        }
+        .location-lock {
+            background: rgba(2, 6, 23, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 50;
+        }
+        .debug-info {
+            font-size: 10px;
+            color: #64748b;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-top: 12px;
+            text-align: left;
+            word-break: break-all;
+        }
+        button {
+            min-height: 48px;
+            -webkit-appearance: none;
+        }
+        #toast {
+            bottom: max(24px, env(safe-area-inset-bottom));
+        }
+        .log-pill {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
-<body class="h-screen flex flex-col text-slate-200 overflow-hidden">
-    <header class="glass-header border-b border-slate-700 z-50">
-        <nav class="px-6 md:px-8 py-5 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg">S</div>
-                <div>
-                    <h1 class="text-3xl font-black tracking-tighter neon-text">SYSTEMS<span class="text-cyan-400">COMMAND</span></h1>
-                    <p class="text-[10px] font-mono uppercase tracking-[3px] text-slate-400 -mt-1">REAL-TIME FIREBASE MONITOR</p>
+<body class="min-h-screen flex flex-col items-center p-4 relative">
+    <div class="bg-gradient"></div>
+    <div id="app-content" class="flex-1 flex flex-col z-10 w-full max-w-md">
+        <div class="pt-4 pb-6 flex justify-between items-center px-2">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600/20 p-2 rounded-lg border border-blue-500/30">
+                    <i class="fa-solid fa-fingerprint text-blue-400 text-xl"></i>
                 </div>
+                <span class="font-extrabold text-white tracking-widest text-sm uppercase">Attendance<span class="text-blue-500">Hub</span></span>
             </div>
-            <div class="flex items-center gap-6">
-                <div onclick="refreshAll()" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-colors text-sm">
-                    <i class="fa-solid fa-rotate text-lg"></i>
-                    <span class="hidden md:inline font-medium">REFRESH ALL</span>
-                </div>
-                <button onclick="exportFullReport()"
-                        class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
-                    <i class="fa-solid fa-file-export"></i>
-                    <span class="hidden sm:inline">EXPORT</span>
-                </button>
-            </div>
-        </nav>
-    </header>
-    <main class="flex flex-1 overflow-hidden flex-col lg:flex-row">
-        <!-- LEFT SIDEBAR -->
-        <div class="w-full lg:w-96 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-700 p-6 flex flex-col overflow-y-auto custom-scroll">
-            <div class="mb-8">
-                <div class="flex justify-between items-end">
-                    <div>
-                        <div class="text-xs font-mono text-emerald-400">LIVE</div>
-                        <div class="text-5xl font-black text-white" id="totalActiveUsers">0</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xs text-slate-400">SYSTEMS ONLINE</div>
-                        <div class="text-4xl font-black text-emerald-400">1</div>
-                    </div>
-                </div>
-            </div>
-            <div class="uppercase text-xs font-bold tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                <span>CONNECTED SYSTEMS</span>
-                <div class="flex-1 h-px bg-slate-700"></div>
-            </div>
-            <div id="systemsList" class="flex-1 space-y-3 overflow-y-auto custom-scroll"></div>
-            <div class="mt-8 glass-card p-5 rounded-3xl text-xs">
-                <div class="flex justify-between mb-3">
-                    <span class="text-slate-400">Avg Performance</span>
-                    <span class="font-mono text-emerald-400" id="avgPerf">100%</span>
-                </div>
-                <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-full transition-all duration-500"></div>
-                </div>
-            </div>
-            <!-- LIVE ACTIVE STAFF -->
-            <div class="mt-8">
-                <div class="flex justify-between items-center mb-3">
-                    <span class="uppercase text-xs font-bold tracking-widest text-slate-400">LIVE ACTIVE STAFF</span>
-                </div>
-                <div id="activeList" class="max-h-80 overflow-y-auto custom-scroll space-y-2 text-sm"></div>
-            </div>
+            <div class="text-[10px] font-bold font-mono text-blue-100 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-full" id="clock">00:00:00</div>
         </div>
-        <!-- CENTER CONTENT -->
-        <div class="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden">
-            <div class="flex justify-between items-center mb-6 lg:mb-8">
-                <div>
-                    <h2 class="text-3xl lg:text-4xl font-black tracking-tight">Attendance Hub Monitor</h2>
-                    <p class="text-slate-400 mt-1 text-sm">Firebase Project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span></p>
-                </div>
-                <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-clock"></i>
-                    <span id="currentTime" class="font-mono"></span>
-                </div>
-            </div>
-            <!-- CHARTS -->
-            <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
-                <!-- Doughnut -->
-                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="font-semibold text-lg">Live Status Distribution</div>
-                    </div>
-                    <div class="flex-1 flex items-center">
-                        <canvas id="userDoughnut" class="max-h-[260px]"></canvas>
-                    </div>
-                </div>
-                <!-- Fluctuating Live Data -->
-                <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="font-semibold text-lg">Live Data Incoming to Admin</div>
-                    </div>
-                    <div class="flex-1">
-                        <canvas id="fluctuatingChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <!-- HEALTH -->
-            <div class="mt-6 glass-card rounded-3xl p-6">
-                <div class="text-lg font-semibold mb-5">System Health</div>
-                <div id="healthBars" class="grid grid-cols-1 gap-6"></div>
-            </div>
-        </div>
-        <!-- RIGHT THREATS -->
-        <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
-            <div class="p-6 border-b border-slate-700">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl"></i>
-                        <div>
-                            <div class="font-bold text-xl">Unauthorized Logins</div>
-                            <div class="text-xs text-red-400 font-mono">LIVE FEED • REAL ATTEMPTS</div>
+        <div id="view-scan" class="glass-card p-6 text-center space-y-4 relative overflow-hidden flex-1 flex flex-col justify-start">
+          
+            <div id="location-overlay" class="absolute inset-0 location-lock flex items-center justify-center p-4">
+                <div class="glass-card p-8 text-center space-y-6 w-full max-w-[320px] border-blue-500/30 border-2">
+                    <div class="flex justify-center">
+                        <div class="bg-blue-600/20 p-5 rounded-3xl border border-blue-500/30">
+                            <i class="fa-solid fa-location-crosshairs text-blue-400 text-5xl animate-pulse"></i>
                         </div>
                     </div>
-                    <div id="threatCounter" class="text-5xl font-black text-red-500">0</div>
+                    <div>
+                        <h3 class="text-2xl font-black text-white tracking-tight">Location Locked</h3>
+                        <p class="text-white/60 mt-2 text-sm leading-relaxed">Verification is required to ensure you are at the designated site.</p>
+                    </div>
+                    <div class="space-y-4">
+                        <button onclick="detectAndVerifyLocation()" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                            Verify GPS
+                        </button>
+                        <button onclick="signOutUser()" class="w-full text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] hover:text-white transition-colors">
+                            Sign Out Account
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
-            <div class="p-4 border-t border-slate-700 bg-slate-950">
-                <div onclick="clearThreats()" class="text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-trash"></i> CLEAR LOG
+            <div id="success-modal" class="absolute inset-0 z-[110] flex items-center justify-center bg-emerald-950/40 backdrop-blur-xl hidden p-4">
+                <div class="glass-card p-8 text-center space-y-6 w-full max-w-[300px] border-emerald-500/30 border-2 bg-emerald-500/10">
+                    <div class="flex justify-center">
+                        <div class="bg-emerald-500/20 p-5 rounded-full border border-emerald-500/30">
+                            <i class="fa-solid fa-check text-emerald-400 text-5xl"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-3xl font-black text-white uppercase tracking-tighter" id="modal-action-text">Success</h3>
+                        <p class="text-emerald-200/60 text-xs font-bold uppercase tracking-widest mt-2">Log Recorded</p>
+                    </div>
                 </div>
             </div>
-        </div>
-    </main>
-    <!-- MODERN THREAT MODAL -->
-    <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4">
-        <div class="glass-card w-full max-w-md mx-auto rounded-3xl p-8 shadow-2xl modern-modal">
-            <div class="flex justify-between items-start mb-6">
-                <div id="modalThreatTitle" class="text-2xl font-black text-white"></div>
-                <button onclick="closeThreatModal()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-colors">
-                    <i class="fa-solid fa-xmark text-2xl"></i>
-                </button>
+            <div class="py-2">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-extrabold text-white">Identity Scanner</h2>
+                    <button onclick="signOutUser()" class="bg-white/5 border border-white/10 text-white px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-tighter">
+                        Sign Out
+                    </button>
+                </div>
             </div>
-            <div id="modalThreatContent" class="space-y-6 text-sm"></div>
-            <div class="mt-10 flex gap-3">
-                <button onclick="closeThreatModal()"
-                        class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all active:scale-95">
-                    DISMISS
-                </button>
-                <button onclick="blockIP()"
-                        class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all active:scale-95">
-                    BLOCK IP
-                </button>
+      
+            <div class="flex justify-center">
+                <div id="reader-container" class="p-1 bg-white/5 rounded-[2rem] w-full aspect-square max-w-[260px] overflow-hidden relative border border-white/10 min-h-[260px]">
+                    <div id="reader"></div>
+                </div>
+            </div>
+            <div class="space-y-2 mt-4">
+                <p class="text-[9px] uppercase tracking-widest text-blue-400/50 font-black text-left ml-1">Today's Logs</p>
+                <div id="daily-logs" class="grid grid-cols-2 gap-2">
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">In</span><span id="log-in" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Out</span><span id="log-lout" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Back</span><span id="log-lback" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">Out</span><span id="log-out" class="text-xs text-white font-mono">--:--</span></div>
+                </div>
+            </div>
+            <div id="debug-info" class="debug-info hidden">
+                ID: <span id="logged-id" class="font-mono text-emerald-400"></span>
             </div>
         </div>
     </div>
-    <!-- THREAT ALERT TOAST -->
-    <div id="threatToast">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-exclamation-triangle text-xl"></i>
+    <div id="login-view" class="flex-col justify-center items-center p-4">
+        <div class="glass-card p-10 text-center space-y-6 w-full max-w-md shadow-2xl border-blue-500/30 border-2 my-auto">
+            <div class="flex justify-center">
+                <div class="bg-blue-600/20 p-5 rounded-3xl border border-blue-500/30">
+                    <i class="fa-brands fa-google text-blue-400 text-6xl"></i>
+                </div>
+            </div>
             <div>
-                <div class="font-bold">New Threat Detected</div>
-                <div id="toastEmail" class="text-sm"></div>
+                <h1 class="text-3xl font-black text-white tracking-tight">Sign In Required</h1>
+                <p class="text-white/60 mt-2">Use your Google account registered by Admin</p>
             </div>
+            <button onclick="signInWithGoogle()"
+                    class="w-full py-5 bg-white hover:bg-gray-100 active:scale-95 transition-all text-slate-900 rounded-2xl font-semibold flex items-center justify-center gap-4 text-lg shadow-xl">
+                <i class="fa-brands fa-google text-2xl"></i>
+                Continue with Google
+            </button>
+            <p class="text-xs text-white/40 pt-6">
+                Only accounts pre-approved by Admin can access the scanner
+            </p>
         </div>
     </div>
+    <div id="toast" class="fixed bottom-6 left-4 right-4 bg-white text-slate-900 px-6 py-4 rounded-xl shadow-2xl transition-all duration-500 opacity-0 translate-y-10 pointer-events-none z-[200] font-bold text-[10px] uppercase text-center flex justify-center items-center">
+        <span id="toastMsg" class="max-w-full break-words">Notification</span>
+    </div>
+  
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyAxBT0oESoL62oz_x_Z8cMtdENWZPx4tMI",
@@ -207,234 +226,168 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let userDoughnutChart, fluctuatingChart;
-        let todayStr = new Date().toISOString().split('T')[0];
-        let threats = [];
-        let liveActivityData = Array(20).fill(0);
-        let threatData = Array(20).fill(0);
-        let liveActivityLabels = Array(20).fill('').map((_, i) => `-${i}m`);
-        function renderSystems(totalEmployees, presentToday) {
-            const container = document.getElementById('systemsList');
-            container.innerHTML = `
-                <div class="glass-card p-6 rounded-3xl">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
-                            <div>
-                                <div class="font-semibold">Attendance Hub</div>
-                                <div class="text-xs text-slate-400 font-mono">att-hub</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-3xl font-black text-white">${presentToday}</div>
-                            <div class="text-xs text-emerald-400">active now</div>
-                        </div>
-                    </div>
-                    <div class="mt-6 text-xs text-slate-400">Total Registered Staff</div>
-                    <div class="text-5xl font-black text-white">${totalEmployees}</div>
-                </div>
-            `;
+        const auth = firebase.auth();
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      
+        let currentUserData = null;
+        let html5QrCode = null;
+      
+        function showPortal() {
+            document.getElementById('login-view').classList.add('active');
+            document.getElementById('app-content').classList.add('blur-locked');
         }
-        function renderHealthBars() {
-            const container = document.getElementById('healthBars');
-            container.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="text-emerald-400 text-6xl mb-2">✓</div>
-                    <div class="font-black text-2xl">All Systems Healthy</div>
-                    <div class="text-xs text-slate-400 mt-1">Real-time Firebase Sync Active</div>
-                </div>
-            `;
+      
+        function closePortal() {
+            document.getElementById('login-view').classList.remove('active');
+            document.getElementById('app-content').classList.remove('blur-locked');
         }
-        function initCharts() {
-            const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
-            userDoughnutChart = new Chart(doughnutCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Working', 'Lunch', 'Clocked Out'],
-                    datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: ['#22d3ee', '#fbbf24', '#ef4444'],
-                        borderColor: '#0f172a',
-                        borderWidth: 5
-                    }]
-                },
-                options: {
-                    cutout: '78%',
-                    plugins: { legend: { display: false } }
-                }
-            });
-            const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
-            fluctuatingChart = new Chart(fluctCtx, {
-                type: 'line',
-                data: {
-                    labels: liveActivityLabels,
-                    datasets: [{
-                        label: 'Incoming Scans',
-                        data: liveActivityData,
-                        borderColor: '#22d3ee',
-                        tension: 0.4,
-                        borderWidth: 4,
-                        pointBackgroundColor: '#0f172a',
-                        pointRadius: 4
-                    }, {
-                        label: 'Threats',
-                        data: threatData,
-                        borderColor: '#ef4444',
-                        tension: 0.4,
-                        borderWidth: 4,
-                        pointBackgroundColor: '#0f172a',
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: '#334155' }, ticks: { color: '#64748b', stepSize: 2, beginAtZero: true } },
-                        x: { grid: { color: '#334155' }, ticks: { color: '#64748b' } }
-                    }
-                }
-            });
-        }
-        function renderThreats() {
-            const container = document.getElementById('threatsFeed');
-            container.innerHTML = '';
-            threats.forEach(threat => {
-                const div = document.createElement('div');
-                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-4 ${threat.severity === 'critical' ? 'threat-critical' : ''}`;
-                div.innerHTML = `
-                    <div class="w-12 text-center">
-                        <div class="text-xs font-mono text-slate-400">${threat.time}</div>
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-semibold text-white">${threat.attemptedEmail}</div>
-                        <div class="text-xs text-slate-400">Unauthorized Admin Login</div>
-                    </div>
-                    <div class="text-right text-xs">
-                        <div class="font-mono">${threat.device || 'Unknown Device'}</div>
-                    </div>
-                `;
-                div.onclick = () => showThreatDetail(threat);
-                container.appendChild(div);
-            });
-            document.getElementById('threatCounter').textContent = threats.length;
-        }
-        function showThreatDetail(threat) {
-            const modal = document.getElementById('threatModal');
-            modal.classList.remove('hidden');
-            document.getElementById('modalThreatTitle').innerHTML = `UNAUTHORIZED LOGIN`;
-            document.getElementById('modalThreatContent').innerHTML = `
-                <div class="text-3xl font-black text-red-400 mb-6">${threat.attemptedEmail}</div>
-                <div class="grid grid-cols-2 gap-6 text-sm">
-                    <div>
-                        <div class="text-slate-400 text-xs">TIME</div>
-                        <div class="font-mono">${threat.time}</div>
-                    </div>
-                    <div>
-                        <div class="text-slate-400 text-xs">DEVICE</div>
-                        <div>${threat.device || 'Unknown'}</div>
-                    </div>
-                </div>
-                <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
-                    Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}
-                </div>
-            `;
-        }
-        function closeThreatModal() {
-            document.getElementById('threatModal').classList.add('hidden');
-        }
-        function blockIP() {
-            alert("IP blocked and added to Firebase security rules");
-            closeThreatModal();
-        }
-        function refreshAll() {
-            loadAllData();
-        }
-        function exportFullReport() {
-            const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nUnauthorized Attempts: ${threats.length}`;
-            const blob = new Blob([report], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `firebase-report-${new Date().toISOString().slice(0,10)}.txt`;
-            a.click();
-        }
-        function clearThreats() {
-            if (confirm("Clear all unauthorized login logs from Firebase?")) {
-                db.ref('unauthorized_attempts').remove();
+        async function signOutUser() {
+            try {
+                if (html5QrCode) await html5QrCode.stop().catch(() => {});
+                await auth.signOut();
+                currentUserData = null;
+                document.getElementById('location-overlay').classList.remove('hidden');
+                document.getElementById('debug-info').classList.add('hidden');
+                showPortal();
+            } catch (error) {
+                showToast("Sign out failed");
             }
         }
-        function updateClock() {
-            document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+      
+        async function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try { await auth.signInWithPopup(provider); } catch (error) { showToast("Login failed"); }
         }
-        function loadAllData() {
-            db.ref('employees').on('value', snap => {
-                const total = Object.keys(snap.val() || {}).length;
-                renderSystems(total, 0);
-            });
-            db.ref('attendance/' + todayStr).on('value', snap => {
+      
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const snap = await db.ref('employees').orderByChild('email').equalTo(user.email.toLowerCase()).once('value');
+                if (snap.exists()) {
+                    const data = snap.val();
+                    const key = Object.keys(data)[0];
+                    currentUserData = { ...data[key], id: key };
+                    closePortal();
+                    document.getElementById('logged-id').textContent = currentUserData.id;
+                    document.getElementById('debug-info').classList.remove('hidden');
+                    listenToAttendance();
+                } else {
+                    showToast("Not registered");
+                    // Log unauthorized attempt
+                    db.ref('unauthorized_attempts').push({
+                        attemptedEmail: user.email,
+                        time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                        timestamp: firebase.database.ServerValue.TIMESTAMP,
+                        device: navigator.userAgent,
+                        severity: 'critical' // Optional, to match dashboard styling if needed
+                    });
+                    await auth.signOut();
+                    showPortal();
+                }
+            } else { showPortal(); }
+        });
+        function listenToAttendance() {
+            if (!currentUserData) return;
+            const today = new Date().toISOString().split('T')[0];
+            db.ref(`attendance/${today}/${currentUserData.id}`).on('value', (snap) => {
                 const data = snap.val() || {};
-                let working = 0, lunch = 0, out = 0;
-                let active = 0;
-                Object.values(data).forEach(log => {
-                    if (log.TimeOut) out++;
-                    else if (log.LunchOut && !log.LunchBack) lunch++;
-                    else if (log.TimeIn) working++;
-                });
-                active = working + lunch;
-                document.getElementById('totalActiveUsers').textContent = active;
-                if (userDoughnutChart) {
-                    userDoughnutChart.data.datasets[0].data = [working, lunch, out];
-                    userDoughnutChart.update();
+                document.getElementById('log-in').innerText = data.TimeIn || '--:--';
+                document.getElementById('log-lout').innerText = data.LunchOut || '--:--';
+                document.getElementById('log-lback').innerText = data.LunchBack || '--:--';
+                document.getElementById('log-out').innerText = data.TimeOut || '--:--';
+            });
+        }
+      
+        async function detectAndVerifyLocation() {
+            showToast("Detecting...");
+            if (!navigator.geolocation) return showToast("GPS Not Supported");
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const userLat = pos.coords.latitude;
+                const userLon = pos.coords.longitude;
+                const snap = await db.ref('settings/officeLocation').once('value');
+                if (!snap.exists()) return showToast("Office location not set");
+                const adminConfig = snap.val();
+                const distance = calculateDistance(userLat, userLon, adminConfig.lat, adminConfig.lng);
+                if (distance <= (adminConfig.radius || 150)) {
+                    showToast("Location Verified ✓");
+                    document.getElementById('location-overlay').classList.add('hidden');
+                    startScanner();
+                } else {
+                    showToast(`Outside Range (${Math.round(distance)}m)`);
                 }
-                // Update active number
-                document.getElementById('activeList').innerHTML = `
-                    <div class="glass-card p-6 rounded-3xl text-center">
-                        <div class="text-8xl font-black text-emerald-400">${active}</div>
-                        <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
-                    </div>
-                `;
-            });
+            }, (err) => { showToast("Grant GPS permission"); }, { enableHighAccuracy: true });
         }
-        // Real data listeners for graph
-        db.ref('attendance/' + todayStr).on('child_added', () => {
-            liveActivityData.shift();
-            liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
-            fluctuatingChart.update();
-        });
-        db.ref('attendance/' + todayStr).on('child_changed', (snap) => {
-            if (snap.val().TimeOut) {
-                // When clock out, perhaps adjust, but since it's added, no need for graph
+      
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+      
+        async function startScanner() {
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            try { await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 220, aspectRatio: 1.0 }, onScanSuccess); } catch (e) {}
+        }
+      
+        function onScanSuccess(decodedText) {
+            const scannedId = decodedText.trim();
+            if (!currentUserData || scannedId !== currentUserData.id) {
+                if (!window.errorToastThrottled) {
+                    showToast(`ID Mismatch`);
+                    window.errorToastThrottled = true;
+                    setTimeout(() => window.errorToastThrottled = false, 3000);
+                }
+                return;
             }
-        });
-        db.ref('unauthorized_attempts').on('child_added', (snap) => {
-            threatData.shift();
-            threatData.push((threatData[threatData.length - 1] || 0) + 1);
-            fluctuatingChart.update();
-            showThreatAlert(snap.val());
-        });
-        // Unauthorized attempts
-        db.ref('unauthorized_attempts').on('value', snap => {
-            threats = [];
-            const data = snap.val() || {};
-            Object.keys(data).forEach(key => {
-                threats.unshift(data[key]);
+            const now = Date.now();
+            const lastScanKey = 'lastScanTime_' + currentUserData.id;
+            const lastScan = localStorage.getItem(lastScanKey);
+            const cooldownTime = 15 * 60 * 1000;
+            if (lastScan && (now - parseInt(lastScan)) < cooldownTime) {
+                if (!window.cooldownToastThrottled) {
+                    const remainingMinutes = Math.ceil((cooldownTime - (now - parseInt(lastScan))) / 60000);
+                    showToast(`Wait ${remainingMinutes}m`);
+                    window.cooldownToastThrottled = true;
+                    setTimeout(() => window.cooldownToastThrottled = false, 5000);
+                }
+                return;
+            }
+            if (window.isProcessingScan) return;
+            window.isProcessingScan = true;
+            const today = new Date().toISOString().split('T')[0];
+            const nowTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+          
+            db.ref(`attendance/${today}/${currentUserData.id}`).once('value', (attSnap) => {
+                let update = { name: currentUserData.name || "Employee", timestamp: firebase.database.ServerValue.TIMESTAMP };
+                const att = attSnap.val();
+                let actionLabel = "Logged";
+              
+                if (!att) { actionLabel = "Time In"; update.TimeIn = nowTime; }
+                else if (!att.LunchOut) { actionLabel = "Lunch Out"; update.LunchOut = nowTime; }
+                else if (!att.LunchBack) { actionLabel = "Lunch Back"; update.LunchBack = nowTime; }
+                else if (!att.TimeOut) { actionLabel = "Time Out"; update.TimeOut = nowTime; }
+                else { window.isProcessingScan = false; return showToast("Shift complete"); }
+              
+                db.ref(`attendance/${today}/${currentUserData.id}`).update(update).then(() => {
+                    localStorage.setItem(lastScanKey, Date.now());
+                    document.getElementById('modal-action-text').innerText = actionLabel;
+                    document.getElementById('success-modal').classList.remove('hidden');
+                    setTimeout(() => { document.getElementById('success-modal').classList.add('hidden'); window.isProcessingScan = false; }, 2800);
+                }).catch(() => { window.isProcessingScan = false; });
             });
-            threats = threats.slice(0, 12);
-            renderThreats();
-        });
-        function showThreatAlert(threat) {
-            const toast = document.getElementById('threatToast');
-            document.getElementById('toastEmail').textContent = threat.attemptedEmail;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 5000);
         }
-        window.onload = () => {
-            initCharts();
-            loadAllData();
-            setInterval(updateClock, 1000);
-            updateClock();
-            setInterval(loadAllData, 15000);
-            renderHealthBars();
-        };
+      
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerHTML = msg;
+            t.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+            setTimeout(() => t.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none'), 4000);
+        }
+      
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        }, 1000);
     </script>
 </body>
 </html>
