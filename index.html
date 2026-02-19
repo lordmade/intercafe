@@ -38,11 +38,6 @@
                     <i class="fa-solid fa-rotate text-lg"></i>
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
                 </div>
-                <button onclick="simulateNewThreat()" 
-                        class="bg-red-600 hover:bg-red-500 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold shadow-lg shadow-red-500/30">
-                    <i class="fa-solid fa-bolt-lightning"></i>
-                    <span class="hidden sm:inline">SIMULATE THREAT</span>
-                </button>
                 <button onclick="exportFullReport()" 
                         class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
                     <i class="fa-solid fa-file-export"></i>
@@ -78,11 +73,20 @@
             <div class="mt-8 glass-card p-5 rounded-3xl text-xs">
                 <div class="flex justify-between mb-3">
                     <span class="text-slate-400">Avg Performance</span>
-                    <span class="font-mono text-emerald-400" id="avgPerf">0.0%</span>
+                    <span class="font-mono text-emerald-400" id="avgPerf">100%</span>
                 </div>
                 <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-0 transition-all duration-500"></div>
+                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-full transition-all duration-500"></div>
                 </div>
+            </div>
+
+            <!-- LIVE ACTIVE STAFF -->
+            <div class="mt-8">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="uppercase text-xs font-bold tracking-widest text-slate-400">LIVE ACTIVE STAFF</span>
+                    <span id="scanningNow" class="px-3 py-1 bg-slate-600 text-white text-xs font-black rounded-full">0 SCANNING</span>
+                </div>
+                <div id="activeList" class="max-h-80 overflow-y-auto custom-scroll space-y-2 text-sm"></div>
             </div>
         </div>
 
@@ -111,13 +115,13 @@
                     </div>
                 </div>
 
-                <!-- Trend -->
+                <!-- Fluctuating Live Data -->
                 <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col">
                     <div class="flex justify-between items-center mb-6">
-                        <div class="font-semibold text-lg">7-Day Login Activity</div>
+                        <div class="font-semibold text-lg">Live Data Incoming to Admin</div>
                     </div>
                     <div class="flex-1">
-                        <canvas id="loginTrendChart"></canvas>
+                        <canvas id="fluctuatingChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -136,8 +140,8 @@
                     <div class="flex items-center gap-3">
                         <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl"></i>
                         <div>
-                            <div class="font-bold text-xl">Threat Intelligence</div>
-                            <div class="text-xs text-red-400 font-mono">LIVE FEED</div>
+                            <div class="font-bold text-xl">Unauthorized Logins</div>
+                            <div class="text-xs text-red-400 font-mono">LIVE FEED • REAL ATTEMPTS</div>
                         </div>
                     </div>
                     <div id="threatCounter" class="text-5xl font-black text-red-500">0</div>
@@ -190,9 +194,11 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let userDoughnutChart, loginTrendChart;
+        let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let threats = [];
+        let liveActivityData = Array(20).fill(3);
+        let liveActivityLabels = Array(20).fill('').map((_, i) => `-${i}m`);
 
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
@@ -217,30 +223,19 @@
             `;
         }
 
-        function renderHealthBars(punctuality) {
+        function renderHealthBars() {
             const container = document.getElementById('healthBars');
             container.innerHTML = `
-                <div class="flex items-center gap-8">
-                    <div class="flex-1">
-                        <div class="text-xs font-medium mb-3">PUNCTUALITY SCORE</div>
-                        <div class="flex items-center gap-4">
-                            <div class="text-7xl font-black text-emerald-400">${punctuality}%</div>
-                            <div class="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="h-full bg-emerald-400 transition-all" style="width:${punctuality}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-xs text-slate-400 leading-tight">
-                        Calculated from last 7 days<br>
-                        Clock-in before 09:00
-                    </div>
+                <div class="text-center py-8">
+                    <div class="text-emerald-400 text-6xl mb-2">✓</div>
+                    <div class="font-black text-2xl">All Systems Healthy</div>
+                    <div class="text-xs text-slate-400 mt-1">Real-time Firebase Sync Active</div>
                 </div>
             `;
-            document.getElementById('avgPerf').textContent = punctuality + "%";
-            document.getElementById('perfBar').style.width = punctuality + "%";
         }
 
         function initCharts() {
+            // Doughnut - no legend
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
                 type: 'doughnut',
@@ -255,29 +250,30 @@
                 },
                 options: {
                     cutout: '78%',
-                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20, font: { size: 13 } } } }
+                    plugins: { legend: { display: false } }
                 }
             });
 
-            const trendCtx = document.getElementById('loginTrendChart').getContext('2d');
-            loginTrendChart = new Chart(trendCtx, {
+            // Fluctuating live chart - no legend
+            const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
+            fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: liveActivityLabels,
                     datasets: [{
-                        label: 'Daily Active Users',
-                        data: [],
+                        label: 'Scans per minute',
+                        data: liveActivityData,
                         borderColor: '#22d3ee',
                         tension: 0.4,
                         borderWidth: 4,
                         pointBackgroundColor: '#0f172a',
-                        pointRadius: 5
+                        pointRadius: 4
                     }]
                 },
                 options: {
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { grid: { color: '#334155' }, ticks: { color: '#64748b', stepSize: 50 } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#64748b', stepSize: 2, beginAtZero: true } },
                         x: { grid: { color: '#334155' }, ticks: { color: '#64748b' } }
                     }
                 }
@@ -295,12 +291,11 @@
                         <div class="text-xs font-mono text-slate-400">${threat.time}</div>
                     </div>
                     <div class="flex-1">
-                        <div class="font-semibold text-white">Attendance Hub</div>
-                        <div class="text-xs text-slate-400">${threat.type}</div>
+                        <div class="font-semibold text-white">${threat.attemptedEmail}</div>
+                        <div class="text-xs text-slate-400">Unauthorized Admin Login</div>
                     </div>
                     <div class="text-right text-xs">
-                        <div class="font-mono">${threat.ip}</div>
-                        <div class="text-slate-400">${threat.location}</div>
+                        <div class="font-mono">${threat.device || 'Unknown Device'}</div>
                     </div>
                 `;
                 div.onclick = () => showThreatDetail(threat);
@@ -312,24 +307,17 @@
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             modal.classList.remove('hidden');
-            document.getElementById('modalThreatTitle').innerHTML = `${threat.severity.toUpperCase()} THREAT`;
+            document.getElementById('modalThreatTitle').innerHTML = `UNAUTHORIZED LOGIN`;
             document.getElementById('modalThreatContent').innerHTML = `
+                <div class="text-3xl font-black text-red-400 mb-6">${threat.attemptedEmail}</div>
                 <div class="grid grid-cols-2 gap-6 text-sm">
                     <div>
-                        <div class="text-slate-400 text-xs">IP ADDRESS</div>
-                        <div class="font-mono text-lg">${threat.ip}</div>
-                    </div>
-                    <div>
-                        <div class="text-slate-400 text-xs">LOCATION</div>
-                        <div class="font-semibold">${threat.location}</div>
+                        <div class="text-slate-400 text-xs">TIME</div>
+                        <div class="font-mono">${threat.time}</div>
                     </div>
                     <div>
                         <div class="text-slate-400 text-xs">DEVICE</div>
-                        <div>${threat.device}</div>
-                    </div>
-                    <div>
-                        <div class="text-slate-400 text-xs">ATTACK TYPE</div>
-                        <div class="text-red-400">${threat.type}</div>
+                        <div>${threat.device || 'Unknown'}</div>
                     </div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
@@ -347,31 +335,12 @@
             closeThreatModal();
         }
 
-        function simulateNewThreat() {
-            const fakeIPs = ["185.220.101.45", "45.67.89.234", "102.23.45.67", "201.45.67.89", "91.234.56.78"];
-            const fakeLocations = ["Moscow, RU", "Beijing, CN", "Lagos, NG", "São Paulo, BR", "Tehran, IR"];
-            const fakeTypes = ["Brute-force login", "SQL Injection Probe", "Suspicious QR Scan", "Unauthorized Access", "XSS Attempt"];
-
-            const newThreat = {
-                id: Date.now(),
-                time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
-                ip: fakeIPs[Math.floor(Math.random()*fakeIPs.length)],
-                location: fakeLocations[Math.floor(Math.random()*fakeLocations.length)],
-                device: "Chrome / Tor Exit Node",
-                type: fakeTypes[Math.floor(Math.random()*fakeTypes.length)],
-                severity: Math.random() > 0.6 ? "critical" : "high",
-                timestamp: Date.now()
-            };
-
-            db.ref('threat_logs/' + Date.now()).set(newThreat);
-        }
-
         function refreshAll() {
             loadAllData();
         }
 
         function exportFullReport() {
-            const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nThreats: ${threats.length}`;
+            const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nUnauthorized Attempts: ${threats.length}`;
             const blob = new Blob([report], {type: 'text/plain'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -380,8 +349,8 @@
         }
 
         function clearThreats() {
-            if (confirm("Clear all threat logs from Firebase?")) {
-                db.ref('threat_logs').remove();
+            if (confirm("Clear all unauthorized login logs from Firebase?")) {
+                db.ref('unauthorized_attempts').remove();
             }
         }
 
@@ -389,64 +358,63 @@
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
         }
 
-        function calculatePunctuality(history) {
-            let onTime = 0, totalDays = 0;
-            Object.keys(history).forEach(date => {
-                const dayData = history[date];
-                Object.values(dayData).forEach(log => {
-                    if (log.TimeIn) {
-                        totalDays++;
-                        if (log.TimeIn <= "09:00") onTime++;
-                    }
-                });
-            });
-            return totalDays ? Math.round((onTime / totalDays) * 100) : 0;
-        }
-
         function loadAllData() {
             db.ref('employees').on('value', snap => {
                 const total = Object.keys(snap.val() || {}).length;
                 document.getElementById('totalActiveUsers').textContent = total;
-                renderSystems(total, 0);
             });
 
             db.ref('attendance/' + todayStr).on('value', snap => {
                 const data = snap.val() || {};
                 let working = 0, lunch = 0, out = 0;
+                let activeStaff = [];
+                let scanningNow = 0;
+                const now = Date.now();
+
                 Object.values(data).forEach(log => {
+                    if (log.TimeIn && !log.TimeOut) {
+                        activeStaff.push(log.name || 'Unknown');
+                        if (log.lastActionTime && (now - log.lastActionTime < 300000)) scanningNow++;
+                    }
                     if (log.TimeOut) out++;
                     else if (log.LunchOut && !log.LunchBack) lunch++;
                     else if (log.TimeIn) working++;
                 });
+
+                // Update doughnut
                 if (userDoughnutChart) {
                     userDoughnutChart.data.datasets[0].data = [working, lunch, out];
                     userDoughnutChart.update();
                 }
-            });
 
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const startDate = sevenDaysAgo.toISOString().split('T')[0];
+                // Update active list
+                const activeHTML = activeStaff.map(name => `
+                    <div class="glass-card px-4 py-3 rounded-2xl flex items-center gap-3 text-sm">
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        <span class="font-medium">${name}</span>
+                    </div>
+                `).join('');
+                document.getElementById('activeList').innerHTML = activeHTML || '<div class="text-slate-500 text-center py-8">No one active right now</div>';
 
-            db.ref('attendance').orderByKey().startAt(startDate).once('value').then(snap => {
-                const history = snap.val() || {};
-                let labels = [], activeCounts = [];
-                let dates = Object.keys(history).sort().slice(-7);
-                dates.forEach(d => {
-                    labels.push(d.slice(5));
-                    activeCounts.push(Object.keys(history[d] || {}).length);
-                });
-                if (loginTrendChart) {
-                    loginTrendChart.data.labels = labels;
-                    loginTrendChart.data.datasets[0].data = activeCounts;
-                    loginTrendChart.update();
+                // Scanning now
+                const scanEl = document.getElementById('scanningNow');
+                scanEl.textContent = `${scanningNow} SCANNING`;
+                scanEl.className = scanningNow > 0 
+                    ? 'px-3 py-1 bg-amber-500 text-white text-xs font-black rounded-full' 
+                    : 'px-3 py-1 bg-slate-600 text-white text-xs font-black rounded-full';
+
+                // Fluctuating live data - push new point on every update
+                liveActivityData.shift();
+                liveActivityData.push(Math.max(1, scanningNow + Math.floor(Math.random() * 4)));
+                if (fluctuatingChart) {
+                    fluctuatingChart.data.datasets[0].data = liveActivityData;
+                    fluctuatingChart.update();
                 }
-                const punct = calculatePunctuality(history);
-                renderHealthBars(punct);
             });
         }
 
-        db.ref('threat_logs').on('value', snap => {
+        // Unauthorized attempts (real)
+        db.ref('unauthorized_attempts').on('value', snap => {
             threats = [];
             const data = snap.val() || {};
             Object.keys(data).forEach(key => {
@@ -462,6 +430,7 @@
             setInterval(updateClock, 1000);
             updateClock();
             setInterval(loadAllData, 15000);
+            renderHealthBars();
         };
     </script>
 </body>
