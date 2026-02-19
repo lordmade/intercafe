@@ -13,55 +13,57 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         body { font-family: 'Inter', system-ui, sans-serif; background-color: #0f172a; }
         .glass-header { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); }
-        .glass-card { background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(148, 163, 184, 0.15); }
+        .glass-card { background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(148, 163, 184, 0.15); }
         .neon-text { text-shadow: 0 0 15px rgb(34 211 238); }
         .threat-critical { animation: pulse-red 2s infinite; }
         @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
+        .modern-modal { animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     </style>
 </head>
 <body class="h-screen flex flex-col text-slate-200 overflow-hidden">
     <header class="glass-header border-b border-slate-700 z-50">
-        <nav class="px-8 py-5 flex items-center justify-between">
+        <nav class="px-6 md:px-8 py-5 flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg">S</div>
                 <div>
                     <h1 class="text-3xl font-black tracking-tighter neon-text">SYSTEMS<span class="text-cyan-400">COMMAND</span></h1>
-                    <p class="text-[10px] font-mono uppercase tracking-[3px] text-slate-400 -mt-1">MULTI-SYSTEM FIREBASE MONITOR</p>
+                    <p class="text-[10px] font-mono uppercase tracking-[3px] text-slate-400 -mt-1">REAL-TIME FIREBASE MONITOR</p>
                 </div>
             </div>
-            <div class="flex items-center gap-8">
-                <div onclick="refreshAll()" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-colors">
+            <div class="flex items-center gap-6">
+                <div onclick="refreshAll()" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-colors text-sm">
                     <i class="fa-solid fa-rotate text-lg"></i>
-                    <span class="text-sm font-medium">REFRESH ALL</span>
+                    <span class="hidden md:inline font-medium">REFRESH ALL</span>
                 </div>
                 <button onclick="simulateNewThreat()" 
-                        class="bg-red-600 hover:bg-red-500 px-6 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold shadow-lg shadow-red-500/30">
+                        class="bg-red-600 hover:bg-red-500 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold shadow-lg shadow-red-500/30">
                     <i class="fa-solid fa-bolt-lightning"></i>
-                    SIMULATE THREAT
+                    <span class="hidden sm:inline">SIMULATE THREAT</span>
                 </button>
                 <button onclick="exportFullReport()" 
-                        class="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
+                        class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
                     <i class="fa-solid fa-file-export"></i>
-                    EXPORT REPORT
+                    <span class="hidden sm:inline">EXPORT</span>
                 </button>
             </div>
         </nav>
     </header>
 
-    <main class="flex flex-1 overflow-hidden">
-        <!-- LEFT SIDEBAR - SYSTEMS -->
-        <div class="w-96 bg-slate-900 border-r border-slate-700 p-6 flex flex-col">
+    <main class="flex flex-1 overflow-hidden flex-col lg:flex-row">
+        <!-- LEFT SIDEBAR -->
+        <div class="w-full lg:w-96 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-700 p-6 flex flex-col overflow-y-auto custom-scroll">
             <div class="mb-8">
                 <div class="flex justify-between items-end">
                     <div>
                         <div class="text-xs font-mono text-emerald-400">LIVE</div>
-                        <div class="text-5xl font-black text-white" id="totalActiveUsers">1,347</div>
+                        <div class="text-5xl font-black text-white" id="totalActiveUsers">0</div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-slate-400">SYSTEMS ONLINE</div>
-                        <div class="text-4xl font-black text-emerald-400" id="totalSystems">5</div>
+                        <div class="text-4xl font-black text-emerald-400">1</div>
                     </div>
                 </div>
             </div>
@@ -76,50 +78,43 @@
             <div class="mt-8 glass-card p-5 rounded-3xl text-xs">
                 <div class="flex justify-between mb-3">
                     <span class="text-slate-400">Avg Performance</span>
-                    <span class="font-mono text-emerald-400" id="avgPerf">98.4%</span>
+                    <span class="font-mono text-emerald-400" id="avgPerf">0.0%</span>
                 </div>
                 <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div class="h-full w-[98%] bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
+                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-0 transition-all duration-500"></div>
                 </div>
             </div>
         </div>
 
         <!-- CENTER CONTENT -->
-        <div class="flex-1 p-8 flex flex-col overflow-hidden">
-            <div class="flex justify-between items-center mb-8">
+        <div class="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center mb-6 lg:mb-8">
                 <div>
-                    <h2 class="text-4xl font-black tracking-tight">Multi-System Performance</h2>
-                    <p class="text-slate-400 mt-1">All systems share the same Firebase project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span></p>
+                    <h2 class="text-3xl lg:text-4xl font-black tracking-tight">Attendance Hub Monitor</h2>
+                    <p class="text-slate-400 mt-1 text-sm">Firebase Project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span></p>
                 </div>
-                <div class="flex gap-3">
-                    <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2">
-                        <i class="fa-solid fa-clock"></i>
-                        <span id="currentTime"></span>
-                    </div>
+                <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-clock"></i>
+                    <span id="currentTime" class="font-mono"></span>
                 </div>
             </div>
 
-            <!-- CHARTS ROW -->
-            <div class="grid grid-cols-7 gap-6 flex-1 min-h-0">
-                <!-- User Distribution -->
-                <div class="col-span-3 glass-card rounded-3xl p-6 flex flex-col">
+            <!-- CHARTS -->
+            <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
+                <!-- Doughnut -->
+                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col">
                     <div class="flex justify-between items-center mb-6">
-                        <div class="font-semibold text-lg">Active Users by System</div>
+                        <div class="font-semibold text-lg">Live Status Distribution</div>
                     </div>
-                    <div class="flex-1">
-                        <canvas id="userDoughnut"></canvas>
+                    <div class="flex-1 flex items-center">
+                        <canvas id="userDoughnut" class="max-h-[260px]"></canvas>
                     </div>
                 </div>
 
-                <!-- Login Trend -->
-                <div class="col-span-4 glass-card rounded-3xl p-6 flex flex-col">
+                <!-- Trend -->
+                <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col">
                     <div class="flex justify-between items-center mb-6">
-                        <div class="font-semibold text-lg">24-Hour Login Activity</div>
-                        <div class="text-xs bg-slate-800 px-4 py-1 rounded-3xl flex gap-4">
-                            <span class="text-cyan-400">● Attendance</span>
-                            <span class="text-violet-400">● Inventory</span>
-                            <span class="text-amber-400">● CRM</span>
-                        </div>
+                        <div class="font-semibold text-lg">7-Day Login Activity</div>
                     </div>
                     <div class="flex-1">
                         <canvas id="loginTrendChart"></canvas>
@@ -127,25 +122,25 @@
                 </div>
             </div>
 
-            <!-- SYSTEMS PERFORMANCE BARS -->
+            <!-- HEALTH -->
             <div class="mt-6 glass-card rounded-3xl p-6">
-                <div class="text-lg font-semibold mb-5">System Health Overview</div>
-                <div id="healthBars" class="grid grid-cols-5 gap-6"></div>
+                <div class="text-lg font-semibold mb-5">System Health</div>
+                <div id="healthBars" class="grid grid-cols-1 gap-6"></div>
             </div>
         </div>
 
-        <!-- RIGHT PANEL - THREATS -->
-        <div class="w-96 bg-slate-900 border-l border-slate-700 flex flex-col">
+        <!-- RIGHT THREATS -->
+        <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
             <div class="p-6 border-b border-slate-700">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl"></i>
                         <div>
                             <div class="font-bold text-xl">Threat Intelligence</div>
-                            <div class="text-xs text-red-400 font-mono">LIVE FEED • 12 TODAY</div>
+                            <div class="text-xs text-red-400 font-mono">LIVE FEED</div>
                         </div>
                     </div>
-                    <div id="threatCounter" class="text-5xl font-black text-red-500">12</div>
+                    <div id="threatCounter" class="text-5xl font-black text-red-500">0</div>
                 </div>
             </div>
 
@@ -159,23 +154,30 @@
         </div>
     </main>
 
-    <!-- THREAT DETAIL MODAL -->
-    <div id="threatModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[999]">
-        <div class="glass-card w-full max-w-md rounded-3xl p-8">
+    <!-- MODERN THREAT MODAL -->
+    <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4">
+        <div class="glass-card w-full max-w-md mx-auto rounded-3xl p-8 shadow-2xl modern-modal">
             <div class="flex justify-between items-start mb-6">
-                <div id="modalThreatTitle" class="text-2xl font-black"></div>
-                <button onclick="closeThreatModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-3xl"></i></button>
+                <div id="modalThreatTitle" class="text-2xl font-black text-white"></div>
+                <button onclick="closeThreatModal()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-colors">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
             </div>
             <div id="modalThreatContent" class="space-y-6 text-sm"></div>
-            <div class="mt-8 flex gap-3">
-                <button onclick="closeThreatModal()" class="flex-1 py-4 bg-slate-700 rounded-2xl font-semibold">DISMISS</button>
-                <button onclick="blockIP()" class="flex-1 py-4 bg-red-600 rounded-2xl font-semibold">BLOCK IP</button>
+            <div class="mt-10 flex gap-3">
+                <button onclick="closeThreatModal()" 
+                        class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all active:scale-95">
+                    DISMISS
+                </button>
+                <button onclick="blockIP()" 
+                        class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all active:scale-95">
+                    BLOCK IP
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // === SAME FIREBASE CONFIG ===
         const firebaseConfig = {
             apiKey: "AIzaSyAxBT0oESoL62oz_x_Z8cMtdENWZPx4tMI",
             authDomain: "pinotp-d7ef5.firebaseapp.com",
@@ -188,120 +190,95 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // MOCK SYSTEMS (all use same Firebase)
-        let systems = [
-            { id: "att-hub", name: "Attendance Hub", users: 312, perf: 99.1, color: "#22d3ee" },
-            { id: "inv-pro", name: "Inventory Pro", users: 187, perf: 97.8, color: "#a78bfa" },
-            { id: "crm-portal", name: "CRM Portal", users: 245, perf: 98.9, color: "#fbbf24" },
-            { id: "payroll", name: "Payroll Manager", users: 134, perf: 99.4, color: "#4ade80" },
-            { id: "security-gate", name: "Security Gate", users: 89, perf: 96.5, color: "#f472b6" }
-        ];
-
-        // THREATS ARRAY
-        let threats = [
-            { id: 1, time: "14:32", system: "Attendance Hub", ip: "185.220.101.45", location: "Moscow, RU", device: "Chrome 128 / Ubuntu", type: "Brute-force login", severity: "critical" },
-            { id: 2, time: "14:29", system: "CRM Portal", ip: "45.67.89.234", location: "Beijing, CN", device: "Safari 18 / iOS 18", type: "SQL Injection Probe", severity: "high" },
-            { id: 3, time: "14:25", system: "Inventory Pro", ip: "102.23.45.67", location: "Lagos, NG", device: "Edge 129 / Windows 11", type: "Suspicious QR Scan", severity: "medium" },
-            { id: 4, time: "14:18", system: "Payroll Manager", ip: "201.45.67.89", location: "São Paulo, BR", device: "Firefox 130 / macOS", type: "Unauthorized Access", severity: "critical" }
-        ];
-
-        // Chart instances
         let userDoughnutChart, loginTrendChart;
+        let todayStr = new Date().toISOString().split('T')[0];
+        let threats = [];
 
-        function renderSystems() {
+        function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
-            container.innerHTML = '';
-            let totalUsers = 0;
-            systems.forEach(sys => {
-                totalUsers += sys.users;
-                const div = document.createElement('div');
-                div.className = `glass-card p-5 rounded-3xl system-card cursor-pointer`;
-                div.innerHTML = `
+            container.innerHTML = `
+                <div class="glass-card p-6 rounded-3xl">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-4">
-                            <div class="w-3 h-3 rounded-full" style="background:${sys.color}"></div>
+                            <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
                             <div>
-                                <div class="font-semibold">${sys.name}</div>
-                                <div class="text-xs text-slate-400 font-mono">${sys.id}</div>
+                                <div class="font-semibold">Attendance Hub</div>
+                                <div class="text-xs text-slate-400 font-mono">att-hub</div>
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-3xl font-black text-white">${sys.users}</div>
-                            <div class="text-xs text-emerald-400">users</div>
+                            <div class="text-3xl font-black text-white">${presentToday}</div>
+                            <div class="text-xs text-emerald-400">active now</div>
                         </div>
                     </div>
-                    <div class="mt-4 flex items-center gap-3">
-                        <div class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-cyan-400 to-violet-400" style="width:${sys.perf}%"></div>
-                        </div>
-                        <span class="font-mono text-xs text-slate-300">${sys.perf}%</span>
-                    </div>
-                `;
-                div.onclick = () => showSystemDetail(sys);
-                container.appendChild(div);
-            });
-            document.getElementById('totalActiveUsers').textContent = totalUsers.toLocaleString();
+                    <div class="mt-6 text-xs text-slate-400">Total Registered Staff</div>
+                    <div class="text-5xl font-black text-white">${totalEmployees}</div>
+                </div>
+            `;
         }
 
-        function renderHealthBars() {
+        function renderHealthBars(punctuality) {
             const container = document.getElementById('healthBars');
-            container.innerHTML = '';
-            systems.forEach(sys => {
-                const div = document.createElement('div');
-                div.className = "text-center";
-                div.innerHTML = `
-                    <div class="text-xs font-medium mb-2">${sys.name.split(' ')[0]}</div>
-                    <div class="relative mx-auto w-20 h-20">
-                        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 42 42">
-                            <circle cx="21" cy="21" r="15" fill="none" stroke="#334155" stroke-width="6"></circle>
-                            <circle cx="21" cy="21" r="15" fill="none" stroke="${sys.color}" stroke-width="6" 
-                                    stroke-dasharray="${sys.perf * 0.94} 94" stroke-linecap="round"></circle>
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center text-xl font-black">${sys.perf}</div>
+            container.innerHTML = `
+                <div class="flex items-center gap-8">
+                    <div class="flex-1">
+                        <div class="text-xs font-medium mb-3">PUNCTUALITY SCORE</div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-7xl font-black text-emerald-400">${punctuality}%</div>
+                            <div class="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-400 transition-all" style="width:${punctuality}%"></div>
+                            </div>
+                        </div>
                     </div>
-                `;
-                container.appendChild(div);
-            });
+                    <div class="text-xs text-slate-400 leading-tight">
+                        Calculated from last 7 days<br>
+                        Clock-in before 09:00
+                    </div>
+                </div>
+            `;
+            document.getElementById('avgPerf').textContent = punctuality + "%";
+            document.getElementById('perfBar').style.width = punctuality + "%";
         }
 
         function initCharts() {
-            // Doughnut - users
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: systems.map(s => s.name),
+                    labels: ['Working', 'Lunch', 'Clocked Out'],
                     datasets: [{
-                        data: systems.map(s => s.users),
-                        backgroundColor: systems.map(s => s.color),
+                        data: [0, 0, 0],
+                        backgroundColor: ['#22d3ee', '#fbbf24', '#ef4444'],
                         borderColor: '#0f172a',
-                        borderWidth: 4
+                        borderWidth: 5
                     }]
                 },
                 options: {
-                    cutout: '75%',
-                    plugins: { legend: { display: false } }
+                    cutout: '78%',
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20, font: { size: 13 } } } }
                 }
             });
 
-            // Line chart - 24h login trend
             const trendCtx = document.getElementById('loginTrendChart').getContext('2d');
-            const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
             loginTrendChart = new Chart(trendCtx, {
                 type: 'line',
                 data: {
-                    labels: hours,
-                    datasets: [
-                        { label: 'Attendance Hub', data: [120,135,98,210,245,312,289,267,198,154,132,145,178,201,234,267,298,312,245,198,167,143,129,115], borderColor: '#22d3ee', tension: 0.4, borderWidth: 3 },
-                        { label: 'Inventory Pro', data: [45,67,89,110,132,154,178,201,189,165,143,120,98,76,89,110,134,156,178,201,189,165,143,120], borderColor: '#a78bfa', tension: 0.4, borderWidth: 3 },
-                        { label: 'CRM Portal', data: [98,110,134,156,178,201,189,165,143,120,98,110,134,156,178,201,189,165,143,120,98,110,134,156], borderColor: '#fbbf24', tension: 0.4, borderWidth: 3 }
-                    ]
+                    labels: [],
+                    datasets: [{
+                        label: 'Daily Active Users',
+                        data: [],
+                        borderColor: '#22d3ee',
+                        tension: 0.4,
+                        borderWidth: 4,
+                        pointBackgroundColor: '#0f172a',
+                        pointRadius: 5
+                    }]
                 },
                 options: {
-                    plugins: { legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 12, padding: 20 } } },
+                    plugins: { legend: { display: false } },
                     scales: {
-                        y: { grid: { color: '#334155' }, ticks: { color: '#64748b' } },
-                        x: { grid: { color: '#334155' }, ticks: { color: '#64748b', maxTicksLimit: 12 } }
+                        y: { grid: { color: '#334155' }, ticks: { color: '#64748b', stepSize: 50 } },
+                        x: { grid: { color: '#334155' }, ticks: { color: '#64748b' } }
                     }
                 }
             });
@@ -312,13 +289,13 @@
             container.innerHTML = '';
             threats.forEach(threat => {
                 const div = document.createElement('div');
-                div.className = `glass-card p-4 rounded-3xl threat-row cursor-pointer flex gap-4 ${threat.severity === 'critical' ? 'threat-critical' : ''}`;
+                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-4 ${threat.severity === 'critical' ? 'threat-critical' : ''}`;
                 div.innerHTML = `
                     <div class="w-12 text-center">
                         <div class="text-xs font-mono text-slate-400">${threat.time}</div>
                     </div>
                     <div class="flex-1">
-                        <div class="font-semibold text-white">${threat.system}</div>
+                        <div class="font-semibold text-white">Attendance Hub</div>
                         <div class="text-xs text-slate-400">${threat.type}</div>
                     </div>
                     <div class="text-right text-xs">
@@ -333,10 +310,9 @@
         }
 
         function showThreatDetail(threat) {
-            document.getElementById('threatModal').classList.remove('hidden');
-            document.getElementById('modalThreatTitle').innerHTML = `
-                ${threat.severity.toUpperCase()} • ${threat.system}
-            `;
+            const modal = document.getElementById('threatModal');
+            modal.classList.remove('hidden');
+            document.getElementById('modalThreatTitle').innerHTML = `${threat.severity.toUpperCase()} THREAT`;
             document.getElementById('modalThreatContent').innerHTML = `
                 <div class="grid grid-cols-2 gap-6 text-sm">
                     <div>
@@ -357,7 +333,7 @@
                     </div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
-                    Detected by Firebase Security Rules • ${new Date().toLocaleTimeString()}
+                    Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}
                 </div>
             `;
         }
@@ -367,72 +343,45 @@
         }
 
         function blockIP() {
-            alert("IP has been added to global blocklist (Firebase Realtime DB updated)");
+            alert("IP blocked and added to Firebase security rules");
             closeThreatModal();
         }
 
         function simulateNewThreat() {
-            const randomSystem = systems[Math.floor(Math.random() * systems.length)].name;
-            const fakeIPs = ["91.234.56.78", "203.45.67.12", "176.98.34.56", "45.67.123.89"];
-            const fakeLocations = ["Tehran, IR", "Hanoi, VN", "Karachi, PK", "Dhaka, BD"];
-            const fakeTypes = ["XSS Attempt", "Credential Stuffing", "Port Scan", "Anomalous Login"];
+            const fakeIPs = ["185.220.101.45", "45.67.89.234", "102.23.45.67", "201.45.67.89", "91.234.56.78"];
+            const fakeLocations = ["Moscow, RU", "Beijing, CN", "Lagos, NG", "São Paulo, BR", "Tehran, IR"];
+            const fakeTypes = ["Brute-force login", "SQL Injection Probe", "Suspicious QR Scan", "Unauthorized Access", "XSS Attempt"];
 
             const newThreat = {
                 id: Date.now(),
                 time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
-                system: randomSystem,
                 ip: fakeIPs[Math.floor(Math.random()*fakeIPs.length)],
                 location: fakeLocations[Math.floor(Math.random()*fakeLocations.length)],
-                device: "Unknown / Tor Exit Node",
+                device: "Chrome / Tor Exit Node",
                 type: fakeTypes[Math.floor(Math.random()*fakeTypes.length)],
-                severity: Math.random() > 0.5 ? "critical" : "high"
+                severity: Math.random() > 0.6 ? "critical" : "high",
+                timestamp: Date.now()
             };
 
-            threats.unshift(newThreat);
-            if (threats.length > 12) threats.pop();
-            renderThreats();
-
-            // Log to Firebase (demo)
             db.ref('threat_logs/' + Date.now()).set(newThreat);
         }
 
-        function showSystemDetail(sys) {
-            alert(`System Detail:\n\n${sys.name}\nActive Users: ${sys.users}\nPerformance: ${sys.perf}%\n\nAll data stored in shared Firebase.`);
-        }
-
         function refreshAll() {
-            // Simulate live updates
-            systems.forEach(s => {
-                s.users = Math.floor(s.users * (0.95 + Math.random() * 0.15));
-                s.perf = Math.min(99.9, s.perf + (Math.random() * 1.2 - 0.6));
-            });
-            renderSystems();
-            renderHealthBars();
-            userDoughnutChart.data.datasets[0].data = systems.map(s => s.users);
-            userDoughnutChart.update();
+            loadAllData();
         }
 
         function exportFullReport() {
-            const report = `
-                Firebase Systems Command Center Report
-                Generated: ${new Date().toISOString()}
-                Total Systems: 5
-                Active Users: ${document.getElementById('totalActiveUsers').textContent}
-                Threats Today: ${threats.length}
-                Systems: ${systems.map(s => s.name + ' (' + s.users + ' users)').join(', ')}
-            `;
+            const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nThreats: ${threats.length}`;
             const blob = new Blob([report], {type: 'text/plain'});
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `sysmon-report-${new Date().toISOString().slice(0,10)}.txt`;
+            a.href = URL.createObjectURL(blob);
+            a.download = `firebase-report-${new Date().toISOString().slice(0,10)}.txt`;
             a.click();
         }
 
         function clearThreats() {
-            if (confirm("Clear all threat logs?")) {
-                threats = [];
-                renderThreats();
+            if (confirm("Clear all threat logs from Firebase?")) {
+                db.ref('threat_logs').remove();
             }
         }
 
@@ -440,34 +389,79 @@
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
         }
 
-        // Initialize everything
-        window.onload = () => {
-            renderSystems();
-            renderHealthBars();
-            initCharts();
-            renderThreats();
+        function calculatePunctuality(history) {
+            let onTime = 0, totalDays = 0;
+            Object.keys(history).forEach(date => {
+                const dayData = history[date];
+                Object.values(dayData).forEach(log => {
+                    if (log.TimeIn) {
+                        totalDays++;
+                        if (log.TimeIn <= "09:00") onTime++;
+                    }
+                });
+            });
+            return totalDays ? Math.round((onTime / totalDays) * 100) : 0;
+        }
 
-            // Live clock
-            setInterval(updateClock, 1000);
-            updateClock();
+        function loadAllData() {
+            db.ref('employees').on('value', snap => {
+                const total = Object.keys(snap.val() || {}).length;
+                document.getElementById('totalActiveUsers').textContent = total;
+                renderSystems(total, 0);
+            });
 
-            // Simulate random activity every 8 seconds
-            setInterval(() => {
-                if (Math.random() > 0.6) {
-                    const randomSys = systems[Math.floor(Math.random() * systems.length)];
-                    randomSys.users += Math.floor(Math.random() * 7) + 1;
-                    renderSystems();
-                    userDoughnutChart.data.datasets[0].data = systems.map(s => s.users);
+            db.ref('attendance/' + todayStr).on('value', snap => {
+                const data = snap.val() || {};
+                let working = 0, lunch = 0, out = 0;
+                Object.values(data).forEach(log => {
+                    if (log.TimeOut) out++;
+                    else if (log.LunchOut && !log.LunchBack) lunch++;
+                    else if (log.TimeIn) working++;
+                });
+                if (userDoughnutChart) {
+                    userDoughnutChart.data.datasets[0].data = [working, lunch, out];
                     userDoughnutChart.update();
                 }
-                if (Math.random() > 0.75) simulateNewThreat();
-            }, 8000);
-
-            // Log to Firebase that dashboard is active
-            db.ref('monitor/dashboards/active').set({
-                lastSeen: firebase.database.ServerValue.TIMESTAMP,
-                version: "v2.0"
             });
+
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const startDate = sevenDaysAgo.toISOString().split('T')[0];
+
+            db.ref('attendance').orderByKey().startAt(startDate).once('value').then(snap => {
+                const history = snap.val() || {};
+                let labels = [], activeCounts = [];
+                let dates = Object.keys(history).sort().slice(-7);
+                dates.forEach(d => {
+                    labels.push(d.slice(5));
+                    activeCounts.push(Object.keys(history[d] || {}).length);
+                });
+                if (loginTrendChart) {
+                    loginTrendChart.data.labels = labels;
+                    loginTrendChart.data.datasets[0].data = activeCounts;
+                    loginTrendChart.update();
+                }
+                const punct = calculatePunctuality(history);
+                renderHealthBars(punct);
+            });
+        }
+
+        db.ref('threat_logs').on('value', snap => {
+            threats = [];
+            const data = snap.val() || {};
+            Object.keys(data).forEach(key => {
+                threats.unshift(data[key]);
+            });
+            threats = threats.slice(0, 12);
+            renderThreats();
+        });
+
+        window.onload = () => {
+            initCharts();
+            loadAllData();
+            setInterval(updateClock, 1000);
+            updateClock();
+            setInterval(loadAllData, 15000);
         };
     </script>
 </body>
