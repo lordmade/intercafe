@@ -84,7 +84,6 @@
             <div class="mt-8">
                 <div class="flex justify-between items-center mb-3">
                     <span class="uppercase text-xs font-bold tracking-widest text-slate-400">LIVE ACTIVE STAFF</span>
-                    <span id="scanningNow" class="px-3 py-1 bg-slate-600 text-white text-xs font-black rounded-full">0 SCANNING</span>
                 </div>
                 <div id="activeList" class="max-h-80 overflow-y-auto custom-scroll space-y-2 text-sm"></div>
             </div>
@@ -197,7 +196,8 @@
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let threats = [];
-        let liveActivityData = Array(20).fill(3);
+        let liveActivityData = Array(20).fill(0);
+        let threatData = Array(20).fill(0);
         let liveActivityLabels = Array(20).fill('').map((_, i) => `-${i}m`);
 
         function renderSystems(totalEmployees, presentToday) {
@@ -235,7 +235,6 @@
         }
 
         function initCharts() {
-            // Doughnut - no legend
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
                 type: 'doughnut',
@@ -254,16 +253,23 @@
                 }
             });
 
-            // Fluctuating live chart - no legend
             const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
             fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
                 data: {
                     labels: liveActivityLabels,
                     datasets: [{
-                        label: 'Scans per minute',
+                        label: 'Incoming Scans',
                         data: liveActivityData,
                         borderColor: '#22d3ee',
+                        tension: 0.4,
+                        borderWidth: 4,
+                        pointBackgroundColor: '#0f172a',
+                        pointRadius: 4
+                    }, {
+                        label: 'Threats',
+                        data: threatData,
+                        borderColor: '#ef4444',
                         tension: 0.4,
                         borderWidth: 4,
                         pointBackgroundColor: '#0f172a',
@@ -361,59 +367,53 @@
         function loadAllData() {
             db.ref('employees').on('value', snap => {
                 const total = Object.keys(snap.val() || {}).length;
-                document.getElementById('totalActiveUsers').textContent = total;
+                renderSystems(total, 0);
             });
 
             db.ref('attendance/' + todayStr).on('value', snap => {
                 const data = snap.val() || {};
                 let working = 0, lunch = 0, out = 0;
-                let activeStaff = [];
-                let scanningNow = 0;
-                const now = Date.now();
-
+                let active = 0;
                 Object.values(data).forEach(log => {
-                    if (log.TimeIn && !log.TimeOut) {
-                        activeStaff.push(log.name || 'Unknown');
-                        if (log.lastActionTime && (now - log.lastActionTime < 300000)) scanningNow++;
-                    }
                     if (log.TimeOut) out++;
                     else if (log.LunchOut && !log.LunchBack) lunch++;
                     else if (log.TimeIn) working++;
                 });
-
-                // Update doughnut
+                active = working + lunch;
+                document.getElementById('totalActiveUsers').textContent = active;
                 if (userDoughnutChart) {
                     userDoughnutChart.data.datasets[0].data = [working, lunch, out];
                     userDoughnutChart.update();
                 }
-
-                // Update active list
-                const activeHTML = activeStaff.map(name => `
-                    <div class="glass-card px-4 py-3 rounded-2xl flex items-center gap-3 text-sm">
-                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                        <span class="font-medium">${name}</span>
+                // Update active number
+                document.getElementById('activeList').innerHTML = `
+                    <div class="glass-card p-6 rounded-3xl text-center">
+                        <div class="text-8xl font-black text-emerald-400">${active}</div>
+                        <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
                     </div>
-                `).join('');
-                document.getElementById('activeList').innerHTML = activeHTML || '<div class="text-slate-500 text-center py-8">No one active right now</div>';
-
-                // Scanning now
-                const scanEl = document.getElementById('scanningNow');
-                scanEl.textContent = `${scanningNow} SCANNING`;
-                scanEl.className = scanningNow > 0 
-                    ? 'px-3 py-1 bg-amber-500 text-white text-xs font-black rounded-full' 
-                    : 'px-3 py-1 bg-slate-600 text-white text-xs font-black rounded-full';
-
-                // Fluctuating live data - push new point on every update
-                liveActivityData.shift();
-                liveActivityData.push(Math.max(1, scanningNow + Math.floor(Math.random() * 4)));
-                if (fluctuatingChart) {
-                    fluctuatingChart.data.datasets[0].data = liveActivityData;
-                    fluctuatingChart.update();
-                }
+                `;
             });
         }
 
-        // Unauthorized attempts (real)
+        // Real data listeners for graph
+        db.ref('attendance/' + todayStr).on('child_added', () => {
+            liveActivityData.shift();
+            liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
+            fluctuatingChart.update();
+        });
+        db.ref('attendance/' + todayStr).on('child_changed', (snap) => {
+            if (snap.val().TimeOut) {
+                // When clock out, perhaps adjust, but since it's added, no need for graph
+            }
+        });
+
+        db.ref('unauthorized_attempts').on('child_added', () => {
+            threatData.shift();
+            threatData.push((threatData[threatData.length - 1] || 0) + 1);
+            fluctuatingChart.update();
+        });
+
+        // Unauthorized attempts
         db.ref('unauthorized_attempts').on('value', snap => {
             threats = [];
             const data = snap.val() || {};
