@@ -8,6 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
@@ -61,7 +63,40 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .slide-up { animation: slideUp 0.4s ease-out; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .filter-btn { transition: all 0.2s ease; }
+        .filter-btn.active { background: #ef4444; color: white; }
+        .filter-btn:hover:not(.active) { background: rgba(239, 68, 68, 0.2); }
+        .system-item { cursor: pointer; transition: all 0.2s ease; }
+        .system-item:hover { background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.3); }
+        .system-item.active { background: rgba(34, 211, 238, 0.15); border-color: #22d3ee; }
+        .data-notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 1px solid #22d3ee;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(34, 211, 238, 0.3);
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 1001;
+            max-width: 320px;
+        }
+        .data-notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .device-icon { font-size: 1.2rem; }
+        .device-android { color: #3ddc84; }
+        .device-iphone { color: #007aff; }
+        .device-macos { color: #a2aaad; }
+        .device-windows { color: #00a4ef; }
+        .device-linux { color: #fcc624; }
     </style>
+<base target="_blank">
 </head>
 <body class="h-screen flex flex-col text-slate-200 overflow-hidden">
     <header class="glass-header border-b border-slate-700 z-50">
@@ -79,8 +114,8 @@
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
                 </div>
                 <button onclick="exportFullReport()" class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold btn-hover transition-all">
-                    <i class="fa-solid fa-file-export"></i>
-                    <span class="hidden sm:inline">EXPORT</span>
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span class="hidden sm:inline">EXPORT PDF</span>
                 </button>
             </div>
         </nav>
@@ -140,13 +175,14 @@
             <!-- CHARTS -->
             <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
                 <!-- Doughnut -->
-                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col btn-hover">
+                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col btn-hover" id="statusDistributionCard">
                     <div class="flex justify-between items-center mb-6">
                         <div class="font-semibold text-lg">Live Status Distribution</div>
                         <div class="flex gap-2">
-                            <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
-                            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
-                            <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                            <span class="w-3 h-3 rounded-full bg-cyan-400" title="Systems Online"></span>
+                            <span class="w-3 h-3 rounded-full bg-emerald-400" title="Active Users"></span>
+                            <span class="w-3 h-3 rounded-full bg-red-400" title="Threats"></span>
+                            <span class="w-3 h-3 rounded-full bg-amber-400" title="Lunch"></span>
                         </div>
                     </div>
                     <div class="flex-1 flex items-center justify-center">
@@ -168,10 +204,10 @@
                 </div>
             </div>
             <!-- HEALTH -->
-            <div class="mt-6 glass-card rounded-3xl p-6 btn-hover">
+            <div class="mt-6 glass-card rounded-3xl p-6 btn-hover" id="healthCard">
                 <div class="text-lg font-semibold mb-5 flex items-center gap-2">
                     <i class="fa-solid fa-heart-pulse text-emerald-400"></i>
-                    System Health
+                    <span id="healthTitle">System Health - All Systems</span>
                 </div>
                 <div id="healthBars" class="grid grid-cols-1 gap-6"></div>
             </div>
@@ -188,6 +224,15 @@
                         </div>
                     </div>
                     <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
+                </div>
+            </div>
+            <!-- Time Filters -->
+            <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
+                <div class="flex gap-2">
+                    <button onclick="setThreatFilter('today')" class="filter-btn active flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="today">TODAY</button>
+                    <button onclick="setThreatFilter('week')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="week">WEEK</button>
+                    <button onclick="setThreatFilter('month')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="month">MONTH</button>
+                    <button onclick="setThreatFilter('all')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="all">ALL</button>
                 </div>
             </div>
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
@@ -231,6 +276,16 @@
             </div>
         </div>
     </div>
+    <!-- DATA NOTIFICATION -->
+    <div id="dataNotification" class="data-notification">
+        <div class="flex items-center gap-3">
+            <i id="dataNotifyIcon" class="fa-solid fa-bell text-cyan-400"></i>
+            <div>
+                <div id="dataNotifyTitle" class="font-bold text-sm">New Data</div>
+                <div id="dataNotifyMsg" class="text-xs text-slate-400"></div>
+            </div>
+        </div>
+    </div>
     <!-- NOTIFICATION TOAST -->
     <div id="notifyToast" class="fixed top-20 right-6 bg-slate-800 border border-slate-600 text-white px-6 py-4 rounded-xl shadow-2xl transition-all duration-300 opacity-0 translate-x-10 pointer-events-none z-[1000] flex items-center gap-3">
         <i id="notifyIcon" class="fa-solid fa-check-circle text-emerald-400"></i>
@@ -251,11 +306,54 @@
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let threats = [];
+        let allThreats = [];
         let liveActivityData = Array(20).fill(0);
         let threatData = Array(20).fill(0);
         let liveActivityLabels = Array(20).fill('').map((_, i) => `-${19-i}m`);
         let isRefreshing = false;
         let blockedIPs = new Set();
+        let currentThreatFilter = 'today';
+        let selectedSystem = null;
+        
+        // System health data
+        const systemHealthData = {
+            'att-hub': {
+                name: 'Attendance Hub',
+                metrics: [
+                    { name: 'Firebase Realtime DB', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Authentication Service', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Attendance API', status: 'Operational', health: 98, color: 'cyan' },
+                    { name: 'Threat Detection', status: 'Active', health: 100, color: 'emerald' }
+                ]
+            },
+            'user-mgmt': {
+                name: 'User Management',
+                metrics: [
+                    { name: 'User Database', status: 'Operational', health: 99, color: 'emerald' },
+                    { name: 'Auth Provider', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Session Manager', status: 'Operational', health: 97, color: 'cyan' },
+                    { name: 'Profile Service', status: 'Operational', health: 100, color: 'emerald' }
+                ]
+            },
+            'reporting': {
+                name: 'Reporting Engine',
+                metrics: [
+                    { name: 'Report Generator', status: 'Operational', health: 95, color: 'cyan' },
+                    { name: 'Export Service', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Chart Renderer', status: 'Operational', health: 98, color: 'emerald' },
+                    { name: 'Data Aggregator', status: 'Operational', health: 96, color: 'cyan' }
+                ]
+            },
+            'notifications': {
+                name: 'Notification Service',
+                metrics: [
+                    { name: 'Push Service', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Email Gateway', status: 'Operational', health: 99, color: 'emerald' },
+                    { name: 'SMS Provider', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Queue Manager', status: 'Operational', health: 97, color: 'cyan' }
+                ]
+            }
+        };
         
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notifyToast');
@@ -263,12 +361,26 @@
             const msg = document.getElementById('notifyMsg');
             
             msg.textContent = message;
-            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : 'fa-solid fa-exclamation-circle text-amber-400';
+            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : 
+                            type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' :
+                            'fa-solid fa-info-circle text-cyan-400';
             
             toast.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
             }, 3000);
+        }
+        
+        function showDataNotification(title, message, iconClass = 'fa-bell') {
+            const notification = document.getElementById('dataNotification');
+            document.getElementById('dataNotifyTitle').textContent = title;
+            document.getElementById('dataNotifyMsg').textContent = message;
+            document.getElementById('dataNotifyIcon').className = `fa-solid ${iconClass} text-cyan-400`;
+            
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
         }
         
         function animateNumber(elementId, targetValue, duration = 500) {
@@ -290,41 +402,77 @@
             requestAnimationFrame(update);
         }
         
+        function getDeviceIcon(userAgent) {
+            if (!userAgent) return { icon: 'fa-desktop', class: 'device-windows', name: 'Unknown' };
+            const ua = userAgent.toLowerCase();
+            if (ua.includes('android')) return { icon: 'fa-android', class: 'device-android', name: 'Android' };
+            if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ios')) return { icon: 'fa-apple', class: 'device-iphone', name: 'iOS' };
+            if (ua.includes('macintosh') || ua.includes('mac os')) return { icon: 'fa-apple', class: 'device-macos', name: 'macOS' };
+            if (ua.includes('windows')) return { icon: 'fa-windows', class: 'device-windows', name: 'Windows' };
+            if (ua.includes('linux')) return { icon: 'fa-linux', class: 'device-linux', name: 'Linux' };
+            return { icon: 'fa-desktop', class: 'device-windows', name: 'Desktop' };
+        }
+        
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
-            container.innerHTML = `
-                <div class="glass-card p-6 rounded-3xl btn-hover cursor-pointer transition-all" onclick="showSystemDetails()">
+            const systems = [
+                { id: 'att-hub', name: 'Attendance Hub', status: 'online', employees: totalEmployees, present: presentToday },
+                { id: 'user-mgmt', name: 'User Management', status: 'online', employees: totalEmployees, present: presentToday },
+                { id: 'reporting', name: 'Reporting Engine', status: 'online', employees: totalEmployees, present: presentToday },
+                { id: 'notifications', name: 'Notification Service', status: 'online', employees: totalEmployees, present: presentToday }
+            ];
+            
+            container.innerHTML = systems.map(sys => `
+                <div class="glass-card p-4 rounded-3xl system-item ${selectedSystem === sys.id ? 'active' : ''}" onclick="selectSystem('${sys.id}')">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-full ${sys.status === 'online' ? 'bg-cyan-400 animate-pulse' : 'bg-red-400'}"></div>
                             <div>
-                                <div class="font-semibold">Attendance Hub</div>
-                                <div class="text-xs text-slate-400 font-mono">att-hub</div>
+                                <div class="font-semibold text-sm">${sys.name}</div>
+                                <div class="text-xs text-slate-400 font-mono">${sys.id}</div>
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-3xl font-black text-white" id="presentCount">${presentToday}</div>
-                            <div class="text-xs text-emerald-400">active now</div>
+                            <div class="text-lg font-bold text-white">${sys.present}</div>
+                            <div class="text-[10px] text-emerald-400">active</div>
                         </div>
                     </div>
-                    <div class="mt-6 text-xs text-slate-400">Total Registered Staff</div>
-                    <div class="text-5xl font-black text-white count-up">${totalEmployees}</div>
                 </div>
-            `;
+            `).join('');
         }
         
-        function showSystemDetails() {
-            showNotification('Attendance Hub System - All services operational', 'success');
+        function selectSystem(systemId) {
+            selectedSystem = selectedSystem === systemId ? null : systemId;
+            renderSystems(document.getElementById('totalActiveUsers').dataset.total || 0, 
+                         document.getElementById('totalActiveUsers').textContent);
+            renderHealthBars();
+            
+            const healthTitle = document.getElementById('healthTitle');
+            if (selectedSystem && systemHealthData[selectedSystem]) {
+                healthTitle.textContent = `System Health - ${systemHealthData[selectedSystem].name}`;
+                showNotification(`Viewing health metrics for ${systemHealthData[selectedSystem].name}`, 'info');
+            } else {
+                healthTitle.textContent = 'System Health - All Systems';
+            }
         }
         
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
-            const healthMetrics = [
-                { name: 'Firebase Realtime DB', status: 'Operational', health: 100, color: 'emerald' },
-                { name: 'Authentication Service', status: 'Operational', health: 100, color: 'emerald' },
-                { name: 'Attendance API', status: 'Operational', health: 98, color: 'cyan' },
-                { name: 'Threat Detection', status: 'Active', health: 100, color: 'emerald' }
-            ];
+            let healthMetrics;
+            
+            if (selectedSystem && systemHealthData[selectedSystem]) {
+                healthMetrics = systemHealthData[selectedSystem].metrics;
+            } else {
+                // Aggregate all systems
+                healthMetrics = [
+                    { name: 'Firebase Realtime DB', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Authentication Service', status: 'Operational', health: 100, color: 'emerald' },
+                    { name: 'Attendance API', status: 'Operational', health: 98, color: 'cyan' },
+                    { name: 'Threat Detection', status: 'Active', health: 100, color: 'emerald' },
+                    { name: 'User Management', status: 'Operational', health: 99, color: 'emerald' },
+                    { name: 'Reporting Engine', status: 'Operational', health: 97, color: 'cyan' }
+                ];
+            }
             
             container.innerHTML = healthMetrics.map((metric, idx) => `
                 <div class="flex items-center gap-4 slide-up" style="animation-delay: ${idx * 0.1}s;">
@@ -347,17 +495,23 @@
             userDoughnutChart = new Chart(doughnutCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Working', 'Lunch', 'Clocked Out'],
+                    labels: ['Systems Online', 'Active Users', 'Threats', 'Lunch Break'],
                     datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: ['#22d3ee', '#fbbf24', '#ef4444'],
+                        data: [4, 0, 0, 0],
+                        backgroundColor: ['#22d3ee', '#10b981', '#ef4444', '#fbbf24'],
                         borderColor: '#0f172a',
                         borderWidth: 5
                     }]
                 },
                 options: {
                     cutout: '78%',
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 10 }, padding: 15 }
+                        } 
+                    },
                     animation: { animateScale: true, animateRotate: true }
                 }
             });
@@ -398,6 +552,35 @@
             });
         }
         
+        function setThreatFilter(filter) {
+            currentThreatFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            filterAndRenderThreats();
+        }
+        
+        function filterAndRenderThreats() {
+            const now = new Date();
+            const filtered = allThreats.filter(threat => {
+                if (!threat.timestamp) return false;
+                const threatDate = new Date(threat.timestamp);
+                const diffMs = now - threatDate;
+                const diffHours = diffMs / (1000 * 60 * 60);
+                const diffDays = diffHours / 24;
+                
+                switch(currentThreatFilter) {
+                    case 'today': return diffHours <= 24;
+                    case 'week': return diffDays <= 7;
+                    case 'month': return diffDays <= 30;
+                    case 'all': return true;
+                    default: return diffHours <= 24;
+                }
+            });
+            threats = filtered.slice(0, 12);
+            renderThreats();
+        }
+        
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
@@ -417,20 +600,20 @@
             threats.forEach((threat, index) => {
                 const isNew = index === 0;
                 const isBlocked = blockedIPs.has(threat.attemptedEmail);
+                const device = getDeviceIcon(threat.userAgent || threat.device);
                 const div = document.createElement('div');
-                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-4 hover:bg-slate-800 transition-all btn-hover ${threat.severity === 'critical' ? 'threat-critical' : ''} ${isNew ? 'threat-new' : ''} ${isBlocked ? 'opacity-50' : ''}`;
+                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-3 hover:bg-slate-800 transition-all btn-hover ${threat.severity === 'critical' ? 'threat-critical' : ''} ${isNew ? 'threat-new' : ''} ${isBlocked ? 'opacity-50' : ''}`;
                 div.innerHTML = `
-                    <div class="w-12 text-center flex flex-col items-center justify-center">
-                        <div class="text-xs font-mono text-slate-400">${threat.time}</div>
-                        ${isBlocked ? '<i class="fa-solid fa-ban text-red-400 text-xs mt-1"></i>' : ''}
+                    <div class="w-10 text-center flex flex-col items-center justify-center">
+                        <i class="fa-brands ${device.icon} ${device.class} device-icon"></i>
+                        <div class="text-[10px] font-mono text-slate-400 mt-1">${device.name}</div>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-semibold text-white truncate ${isBlocked ? 'line-through text-slate-500' : ''}">${threat.attemptedEmail}</div>
-                        <div class="text-xs text-slate-400">Unauthorized Admin Login</div>
+                        <div class="text-xs text-slate-400">${threat.time}</div>
                     </div>
-                    <div class="text-right text-xs flex flex-col items-end justify-center">
-                        <div class="font-mono text-slate-500">${threat.device || 'Unknown'}</div>
-                        ${isBlocked ? '<span class="text-red-400 text-[10px]">BLOCKED</span>' : ''}
+                    <div class="text-right flex flex-col items-end justify-center">
+                        ${isBlocked ? '<i class="fa-solid fa-ban text-red-400"></i>' : '<i class="fa-solid fa-circle-exclamation text-red-400"></i>'}
                     </div>
                 `;
                 div.onclick = () => showThreatDetail(threat);
@@ -442,21 +625,29 @@
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             const isBlocked = blockedIPs.has(threat.attemptedEmail);
+            const device = getDeviceIcon(threat.userAgent || threat.device);
             modal.classList.remove('hidden');
             document.getElementById('modalThreatTitle').innerHTML = `
                 <i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i>
                 ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}
             `;
             document.getElementById('modalThreatContent').innerHTML = `
-                <div class="text-3xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-6 break-all">${threat.attemptedEmail}</div>
-                <div class="grid grid-cols-2 gap-6 text-sm">
+                <div class="text-2xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-4 break-all">${threat.attemptedEmail}</div>
+                <div class="flex items-center gap-3 mb-6 glass-card p-4 rounded-xl">
+                    <i class="fa-brands ${device.icon} ${device.class} text-3xl"></i>
+                    <div>
+                        <div class="text-sm text-slate-400">Device</div>
+                        <div class="font-semibold">${device.name}</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-sm">
                     <div class="glass-card p-3 rounded-xl">
                         <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Time</div>
                         <div class="font-mono text-lg text-white">${threat.time}</div>
                     </div>
                     <div class="glass-card p-3 rounded-xl">
-                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Device</div>
-                        <div class="text-lg text-white">${threat.device || 'Unknown'}</div>
+                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Date</div>
+                        <div class="text-lg text-white">${threat.date || new Date(threat.timestamp).toLocaleDateString()}</div>
                     </div>
                     <div class="glass-card p-3 rounded-xl">
                         <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Severity</div>
@@ -464,7 +655,7 @@
                     </div>
                     <div class="glass-card p-3 rounded-xl">
                         <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Status</div>
-                        <div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'BLOCKED'}</div>
+                        <div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'DETECTED'}</div>
                     </div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
@@ -472,6 +663,7 @@
                         <i class="fa-solid fa-database"></i>
                         Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}
                     </div>
+                    ${threat.userAgent ? `<div class="mt-2 text-[10px] break-all opacity-60">${threat.userAgent}</div>` : ''}
                 </div>
             `;
         }
@@ -509,87 +701,143 @@
             showNotification('All systems refreshed successfully', 'success');
         }
         
-        function exportFullReport() {
+        async function exportFullReport() {
+            showNotification('Generating PDF report...', 'info');
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
             const now = new Date();
-            const reportData = {
-                generated: now.toISOString(),
-                totalStaff: document.getElementById('totalActiveUsers').textContent,
-                systemsOnline: document.getElementById('systemsOnline').textContent,
-                unauthorizedAttempts: threats.length,
-                threats: threats.map(t => ({
-                    email: t.attemptedEmail,
-                    time: t.time,
-                    device: t.device,
-                    severity: t.severity
-                }))
-            };
+            const pageWidth = doc.internal.pageSize.getWidth();
             
-            const report = `═══════════════════════════════════════
-    FIREBASE SYSTEMS COMMAND CENTER
-    SECURITY REPORT
-═══════════════════════════════════════
-
-Generated: ${now.toLocaleString()}
-Report ID: RPT-${Date.now()}
-
-SYSTEM OVERVIEW
-─────────────────────────────────────
-Total Active Staff:     ${reportData.totalStaff}
-Systems Online:         ${reportData.systemsOnline}
-Firebase Project:       pinotp-d7ef5
-
-SECURITY SUMMARY
-─────────────────────────────────────
-Unauthorized Attempts:  ${reportData.unauthorizedAttempts}
-Blocked IPs:            ${blockedIPs.size}
-Threat Level:           ${threats.length > 5 ? 'HIGH' : threats.length > 0 ? 'MEDIUM' : 'LOW'}
-
-THREAT DETAILS
-─────────────────────────────────────
-${threats.length === 0 ? 'No threats detected.' : threats.map((t, i) => `
-[${i + 1}] ${t.attemptedEmail}
-    Time: ${t.time}
-    Device: ${t.device || 'Unknown'}
-    Severity: ${t.severity || 'High'}
-`).join('\n')}
-
-═══════════════════════════════════════
-End of Report
-═══════════════════════════════════════`;
+            // Header
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            doc.setTextColor(34, 211, 238);
+            doc.setFontSize(24);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SYSTEMS COMMAND CENTER', 15, 20);
+            doc.setTextColor(148, 163, 184);
+            doc.setFontSize(10);
+            doc.text(`Security Report • ${now.toLocaleString()}`, 15, 32);
             
-            const blob = new Blob([report], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `security-report-${now.toISOString().slice(0,10)}-${Date.now()}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // Summary Section
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text('Executive Summary', 15, 55);
+            doc.setDrawColor(34, 211, 238);
+            doc.line(15, 58, pageWidth - 15, 58);
             
-            showNotification('Report exported successfully', 'success');
+            const totalStaff = document.getElementById('totalActiveUsers').textContent;
+            const systemsOnline = document.getElementById('systemsOnline').textContent;
+            const threatCount = threats.length;
+            
+            doc.setFontSize(11);
+            doc.setTextColor(200, 200, 200);
+            const summaryData = [
+                `Total Active Staff: ${totalStaff}`,
+                `Systems Online: ${systemsOnline}`,
+                `Firebase Project: pinotp-d7ef5`,
+                `Unauthorized Attempts: ${threatCount}`,
+                `Blocked IPs: ${blockedIPs.size}`,
+                `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
+            ];
+            
+            summaryData.forEach((line, i) => {
+                doc.text(line, 20, 70 + (i * 7));
+            });
+            
+            // Capture charts
+            try {
+                const statusCanvas = await html2canvas(document.getElementById('statusDistributionCard'));
+                const statusImg = statusCanvas.toDataURL('image/png');
+                doc.addImage(statusImg, 'PNG', 15, 120, 85, 70);
+                
+                const liveCanvas = await html2canvas(document.getElementById('fluctuatingChart'));
+                const liveImg = liveCanvas.toDataURL('image/png');
+                doc.addImage(liveImg, 'PNG', 105, 120, 90, 70);
+            } catch (e) {
+                console.log('Chart capture skipped');
+            }
+            
+            // New page for threats
+            if (threats.length > 0) {
+                doc.addPage();
+                doc.setFillColor(15, 23, 42);
+                doc.rect(0, 0, pageWidth, 20, 'F');
+                doc.setTextColor(239, 68, 68);
+                doc.setFontSize(18);
+                doc.text('THREAT DETAILS', 15, 14);
+                
+                doc.setFontSize(9);
+                doc.setTextColor(200, 200, 200);
+                let y = 35;
+                
+                threats.slice(0, 20).forEach((t, i) => {
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
+                    const device = getDeviceIcon(t.userAgent || t.device);
+                    doc.setTextColor(239, 68, 68);
+                    doc.text(`${i + 1}. ${t.attemptedEmail}`, 15, y);
+                    doc.setTextColor(148, 163, 184);
+                    doc.text(`   Time: ${t.time} | Device: ${device.name} | ${blockedIPs.has(t.attemptedEmail) ? 'BLOCKED' : 'ACTIVE'}`, 15, y + 5);
+                    y += 15;
+                });
+            }
+            
+            // System Health Page
+            doc.addPage();
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageWidth, 20, 'F');
+            doc.setTextColor(16, 185, 129);
+            doc.setFontSize(18);
+            doc.text('SYSTEM HEALTH METRICS', 15, 14);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(200, 200, 200);
+            let hy = 35;
+            
+            Object.entries(systemHealthData).forEach(([key, sys]) => {
+                if (hy > 250) {
+                    doc.addPage();
+                    hy = 20;
+                }
+                doc.setTextColor(34, 211, 238);
+                doc.text(sys.name, 15, hy);
+                hy += 8;
+                
+                sys.metrics.forEach(m => {
+                    doc.setTextColor(200, 200, 200);
+                    doc.text(`  ${m.name}: ${m.health}% - ${m.status}`, 20, hy);
+                    hy += 6;
+                });
+                hy += 5;
+            });
+            
+            doc.save(`security-report-${now.toISOString().slice(0,10)}-${Date.now()}.pdf`);
+            showNotification('PDF report exported successfully', 'success');
         }
         
         function clearThreats() {
-            // Immediately clear UI
             threats = [];
+            allThreats = [];
             threatData = Array(20).fill(0);
             
-            // Update chart immediately
             if (fluctuatingChart) {
                 fluctuatingChart.data.datasets[1].data = threatData;
                 fluctuatingChart.update();
             }
             
-            // Render empty state
             renderThreats();
+            updateStatusChart();
             
-            // Clear from Firebase
             db.ref('unauthorized_attempts').remove()
                 .then(() => {
                     showNotification('All threat logs cleared', 'success');
                 })
                 .catch(err => {
                     showNotification('Failed to clear logs: ' + err.message, 'error');
-                    console.error('Clear error:', err);
                 });
         }
         
@@ -597,10 +845,20 @@ End of Report
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
         
+        function updateStatusChart(working = 0, lunch = 0, out = 0) {
+            if (userDoughnutChart) {
+                const systemsOnline = 4;
+                const threatCount = threats.length;
+                userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount, lunch];
+                userDoughnutChart.update();
+            }
+        }
+        
         function loadAllData() {
             return new Promise((resolve) => {
                 db.ref('employees').once('value', snap => {
                     const total = Object.keys(snap.val() || {}).length;
+                    document.getElementById('totalActiveUsers').dataset.total = total;
                     
                     db.ref('attendance/' + todayStr).once('value', snap2 => {
                         const data = snap2.val() || {};
@@ -615,11 +873,7 @@ End of Report
                         
                         animateNumber('totalActiveUsers', active);
                         renderSystems(total, active);
-                        
-                        if (userDoughnutChart) {
-                            userDoughnutChart.data.datasets[0].data = [working, lunch, out];
-                            userDoughnutChart.update();
-                        }
+                        updateStatusChart(working, lunch, out);
                         
                         document.getElementById('activeList').innerHTML = `
                             <div class="glass-card p-6 rounded-3xl text-center btn-hover">
@@ -637,6 +891,10 @@ End of Report
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
             if (threat) {
+                threat.key = snap.key;
+                if (!threat.timestamp) threat.timestamp = Date.now();
+                if (!threat.date) threat.date = new Date().toLocaleDateString();
+                
                 threatData.shift();
                 threatData.push((threatData[threatData.length - 1] || 0) + 1);
                 if (fluctuatingChart) {
@@ -645,31 +903,51 @@ End of Report
                 }
                 
                 showThreatAlert(threat);
+                showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
                 
-                threats.unshift({...threat, key: snap.key});
-                threats = threats.slice(0, 12);
-                renderThreats();
+                allThreats.unshift(threat);
+                filterAndRenderThreats();
+                updateStatusChart();
             }
         });
         
         // Load existing threats
         db.ref('unauthorized_attempts').on('value', snap => {
             const data = snap.val() || {};
-            threats = [];
+            allThreats = [];
             Object.keys(data).forEach(key => {
-                threats.unshift({...data[key], key});
+                const threat = data[key];
+                threat.key = key;
+                if (!threat.timestamp) threat.timestamp = Date.now();
+                if (!threat.date) threat.date = new Date().toLocaleDateString();
+                allThreats.push(threat);
             });
-            threats = threats.slice(0, 12);
-            renderThreats();
+            allThreats.sort((a, b) => b.timestamp - a.timestamp);
+            filterAndRenderThreats();
+            updateStatusChart();
         });
         
         // Attendance listeners for graph
-        db.ref('attendance/' + todayStr).on('child_added', () => {
+        db.ref('attendance/' + todayStr).on('child_added', (snap) => {
+            const data = snap.val();
             liveActivityData.shift();
             liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
             if (fluctuatingChart) {
                 fluctuatingChart.data.datasets[0].data = liveActivityData;
                 fluctuatingChart.update();
+            }
+            
+            if (data && data.employeeName) {
+                showDataNotification('Attendance Recorded', `${data.employeeName} checked in`, 'fa-user-check');
+            }
+            loadAllData();
+        });
+        
+        // Listen for employee changes
+        db.ref('employees').on('child_added', (snap) => {
+            const emp = snap.val();
+            if (emp && emp.name) {
+                showDataNotification('New Employee', `${emp.name} registered in system`, 'fa-user-plus');
             }
         });
         
@@ -704,10 +982,14 @@ End of Report
             }, 15000);
             renderHealthBars();
             
-            // Simulate some initial data for demo
             setTimeout(() => {
                 document.getElementById('perfBar').style.width = '98%';
             }, 500);
+            
+            // Welcome notification
+            setTimeout(() => {
+                showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
+            }, 1000);
         };
     </script>
 </body>
