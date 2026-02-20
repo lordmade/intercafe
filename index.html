@@ -117,10 +117,36 @@
             outline: none;
             border-color: #22d3ee;
         }
-        /* Custom date picker calendar styling */
         ::-webkit-calendar-picker-indicator {
             filter: invert(1);
             cursor: pointer;
+        }
+        /* Threat date filter styling - matching the image */
+        .threat-date-filter {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-family: 'Inter', monospace;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' /%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.25rem;
+            padding-right: 2.5rem;
+        }
+        .threat-date-filter:hover {
+            border-color: rgba(148, 163, 184, 0.4);
+            background-color: rgba(30, 41, 59, 0.9);
+        }
+        .threat-date-filter:focus {
+            outline: none;
+            border-color: #22d3ee;
         }
     </style>
 <base target="_blank">
@@ -258,9 +284,10 @@
                     <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
                 </div>
             </div>
-            <!-- Time Filters -->
+            <!-- Time Filters with Date Picker -->
             <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center">
+                    <input type="date" id="threatDateFilter" class="threat-date-filter flex-1" onchange="setThreatDateFilter(this.value)">
                     <button onclick="setThreatFilter('today')" class="filter-btn active flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="today">TODAY</button>
                     <button onclick="setThreatFilter('week')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="week">WEEK</button>
                     <button onclick="setThreatFilter('month')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="month">MONTH</button>
@@ -338,6 +365,7 @@
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let selectedDate = todayStr;
+        let threatFilterDate = todayStr;
         let threats = [];
         let allThreats = [];
         let liveActivityData = Array(20).fill(0);
@@ -453,6 +481,12 @@
             
             // Reload attendance listeners for new date
             setupAttendanceListener();
+        }
+        
+        // Set threat date filter
+        function setThreatDateFilter(newDate) {
+            threatFilterDate = newDate;
+            filterAndRenderThreats();
         }
         
         // Setup attendance listener for selected date
@@ -670,20 +704,28 @@
         }
         
         function filterAndRenderThreats() {
-            const now = new Date();
+            const filterDateObj = new Date(threatFilterDate);
             const filtered = allThreats.filter(threat => {
                 if (!threat.timestamp) return false;
                 const threatDate = new Date(threat.timestamp);
-                const diffMs = now - threatDate;
-                const diffHours = diffMs / (1000 * 60 * 60);
-                const diffDays = diffHours / 24;
                 
                 switch(currentThreatFilter) {
-                    case 'today': return diffHours <= 24;
-                    case 'week': return diffDays <= 7;
-                    case 'month': return diffDays <= 30;
-                    case 'all': return true;
-                    default: return diffHours <= 24;
+                    case 'today': 
+                        return threatDate.toDateString() === filterDateObj.toDateString();
+                    case 'week': {
+                        const weekAgo = new Date(filterDateObj);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return threatDate >= weekAgo && threatDate <= filterDateObj;
+                    }
+                    case 'month': {
+                        const monthAgo = new Date(filterDateObj);
+                        monthAgo.setDate(monthAgo.getDate() - 30);
+                        return threatDate >= monthAgo && threatDate <= filterDateObj;
+                    }
+                    case 'all': 
+                        return true;
+                    default: 
+                        return threatDate.toDateString() === filterDateObj.toDateString();
                 }
             });
             threats = filtered.slice(0, 12);
@@ -1073,9 +1115,10 @@
         document.addEventListener('click', initAudioContext, { once: true });
         
         window.onload = () => {
-            // Set default date in picker
+            // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
+            document.getElementById('threatDateFilter').value = todayStr;
             
             initCharts();
             loadAllData();
