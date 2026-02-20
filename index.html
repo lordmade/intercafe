@@ -147,9 +147,6 @@
             outline: none;
             border-color: #22d3ee;
         }
-        .heatmap-cell {
-            transition: background-color 0.2s ease;
-        }
     </style>
 <base target="_blank">
 </head>
@@ -169,6 +166,12 @@
                     <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
                     <span class="hidden md:inline font-medium">SOUND ON</span>
                 </div>
+                <!-- Volume Slider -->
+                <div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-2xl">
+                    <i class="fa-solid fa-volume-down text-cyan-400"></i>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1" 
+                           class="accent-cyan-400 w-28 cursor-pointer" oninput="setVolume(this.value)">
+                </div>
                 <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
                     <i class="fa-solid fa-rotate text-lg" id="refreshIcon"></i>
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
@@ -177,6 +180,7 @@
                     <i class="fa-solid fa-file-pdf"></i>
                     <span class="hidden sm:inline">EXPORT PDF</span>
                 </button>
+                <span id="lastRefreshed" class="text-xs font-mono text-slate-400 ml-2 hidden md:block">Just now</span>
             </div>
         </nav>
     </header>
@@ -321,18 +325,6 @@
                 </div>
             </div>
 
-            <!-- Threat Heatmap -->
-            <div class="px-4 py-4 border-b border-slate-700 bg-slate-950">
-                <div class="flex justify-between items-center mb-3">
-                    <div class="text-xs font-medium text-slate-400">THREAT HEATMAP</div>
-                    <div class="text-[10px] font-mono text-slate-500">LAST 7 DAYS • 24H</div>
-                </div>
-                <div class="flex gap-2">
-                    <div id="dayLabels" class="flex flex-col justify-between text-[10px] text-slate-500 pr-2 h-[112px]"></div>
-                    <div id="heatmapGrid" class="flex-1 grid grid-cols-24 gap-px bg-slate-800 rounded-2xl p-1" style="height: 112px;"></div>
-                </div>
-            </div>
-
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
             <div class="p-4 border-t border-slate-700 bg-slate-950">
                 <button onclick="clearThreats()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
@@ -416,8 +408,9 @@
         let selectedSystem = 'att-hub';
         let autoBlockEnabled = true;
         let attemptTracker = {};
-        let heatmapData = Array.from({length: 7}, () => Array(24).fill(0));
         let currentSearchTerm = '';
+        let volumeLevel = 1.0;
+        let lastRefreshTime = Date.now();
 
         // Audio context and sound settings
         let audioContext = null;
@@ -434,33 +427,28 @@
        
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            oscillator.type = 'sawtooth';
-            oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.3);
-            setTimeout(() => {
-                const osc2 = audioContext.createOscillator();
-                const gain2 = audioContext.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioContext.destination);
-                osc2.type = 'square';
-                osc2.frequency.setValueAtTime(200, audioContext.currentTime);
-                gain2.gain.setValueAtTime(0.2, audioContext.currentTime);
-                gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-                osc2.start(audioContext.currentTime);
-                osc2.stop(audioContext.currentTime + 0.2);
-            }, 150);
+            initAudioContext();
+            const baseGain = 0.92 * volumeLevel; // extremely loud
+            // Loud urgent repeating siren alarm (5 beeps with rising pitch)
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(680 + i * 120, audioContext.currentTime);
+                    gain.gain.value = baseGain;
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.start();
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+                    osc.stop(audioContext.currentTime + 0.38);
+                }, i * 280);
+            }
         }
        
         function playAttendanceSound() {
             if (!soundEnabled || !audioContext) return;
+            initAudioContext();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             oscillator.connect(gainNode);
@@ -468,7 +456,7 @@
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
             oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.2 * volumeLevel, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.4);
@@ -491,6 +479,10 @@
                 text.textContent = 'MUTED';
                 showNotification('Sound alerts disabled', 'info');
             }
+        }
+       
+        function setVolume(val) {
+            volumeLevel = parseFloat(val) / 100;
         }
        
         function changeDate(newDate) {
@@ -543,9 +535,13 @@
             const icon = document.getElementById('notifyIcon');
             const msg = document.getElementById('notifyMsg');
             msg.textContent = message;
-            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' : 'fa-solid fa-info-circle text-cyan-400';
+            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' :
+                            type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' :
+                            'fa-solid fa-info-circle text-cyan-400';
             toast.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
-            setTimeout(() => toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none'), 3000);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
+            }, 3000);
         }
        
         function showDataNotification(title, message, iconClass = 'fa-bell') {
@@ -554,7 +550,9 @@
             document.getElementById('dataNotifyMsg').textContent = message;
             document.getElementById('dataNotifyIcon').className = `fa-solid ${iconClass} text-cyan-400`;
             notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 4000);
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
         }
        
         function animateNumber(elementId, targetValue, duration = 500) {
@@ -585,7 +583,13 @@
        
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
-            const system = { id: 'att-hub', name: 'Attendance Hub', status: 'online', employees: totalEmployees, present: presentToday };
+            const system = {
+                id: 'att-hub',
+                name: 'Attendance Hub',
+                status: 'online',
+                employees: totalEmployees,
+                present: presentToday
+            };
             container.innerHTML = `
                 <div class="glass-card p-4 rounded-3xl system-item active">
                     <div class="flex items-center justify-between">
@@ -630,11 +634,22 @@
                 type: 'doughnut',
                 data: {
                     labels: ['System Online', 'Active Users', 'Threats', 'Lunch Break'],
-                    datasets: [{ data: [1, 0, 0, 0], backgroundColor: ['#22d3ee', '#10b981', '#ef4444', '#fbbf24'], borderColor: '#0f172a', borderWidth: 5 }]
+                    datasets: [{
+                        data: [1, 0, 0, 0],
+                        backgroundColor: ['#22d3ee', '#10b981', '#ef4444', '#fbbf24'],
+                        borderColor: '#0f172a',
+                        borderWidth: 5
+                    }]
                 },
                 options: {
                     cutout: '78%',
-                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15 } } },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 10 }, padding: 15 }
+                        }
+                    },
                     animation: { animateScale: true, animateRotate: true }
                 }
             });
@@ -693,46 +708,12 @@
             const key = threat.attemptedEmail || 'unknown';
             if (!attemptTracker[key]) attemptTracker[key] = [];
             attemptTracker[key].push(threat.timestamp || Date.now());
-            const cutoff = Date.now() - 300000; // 5 mins
+            const cutoff = Date.now() - 300000;
             attemptTracker[key] = attemptTracker[key].filter(t => t > cutoff);
             if (attemptTracker[key].length >= 3) {
                 blockedIPs.add(key);
                 showNotification(`AUTO-BLOCKED ${key} (3 attempts in 5 mins)`, 'error');
             }
-        }
-       
-        function updateHeatmap() {
-            heatmapData = Array.from({length: 7}, () => Array(24).fill(0));
-            const now = Date.now();
-            allThreats.forEach(threat => {
-                if (!threat.timestamp) return;
-                const d = new Date(threat.timestamp);
-                const dayDiff = Math.floor((now - threat.timestamp) / 86400000);
-                if (dayDiff >= 0 && dayDiff < 7) {
-                    const dayIndex = 6 - dayDiff; // 0 = today at bottom
-                    const hour = d.getHours();
-                    heatmapData[dayIndex][hour]++;
-                }
-            });
-            renderHeatmap();
-        }
-       
-        function renderHeatmap() {
-            const grid = document.getElementById('heatmapGrid');
-            grid.innerHTML = '';
-            let max = 0;
-            heatmapData.forEach(row => row.forEach(v => { if (v > max) max = v; }));
-            if (max === 0) max = 1;
-            heatmapData.forEach(row => {
-                row.forEach(count => {
-                    const intensity = Math.min(100, Math.floor((count / max) * 100));
-                    const cell = document.createElement('div');
-                    cell.className = 'heatmap-cell w-full h-full rounded-sm';
-                    cell.style.backgroundColor = `rgb(239, 68, 68)`;
-                    cell.style.opacity = intensity / 100;
-                    grid.appendChild(cell);
-                });
-            });
         }
        
         function applySearchFilter() {
@@ -883,7 +864,12 @@
             const icon = document.getElementById('refreshIcon');
             icon.classList.add('spin-anim');
             showNotification('Refreshing all systems...', 'info');
-            await Promise.all([ new Promise(resolve => setTimeout(resolve, 800)), loadAllData() ]);
+            await Promise.all([
+                new Promise(resolve => setTimeout(resolve, 800)),
+                loadAllData()
+            ]);
+            lastRefreshTime = Date.now();
+            updateRelativeTime();
             icon.classList.remove('spin-anim');
             isRefreshing = false;
             showNotification('All systems refreshed successfully', 'success');
@@ -923,7 +909,9 @@
                 `Blocked IPs: ${blockedIPs.size}`,
                 `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
             ];
-            summaryData.forEach((line, i) => doc.text(line, 20, 70 + (i * 7)));
+            summaryData.forEach((line, i) => {
+                doc.text(line, 20, 70 + (i * 7));
+            });
             try {
                 const statusCanvas = await html2canvas(document.getElementById('statusDistributionCard'));
                 const statusImg = statusCanvas.toDataURL('image/png');
@@ -943,7 +931,10 @@
                 doc.setTextColor(200, 200, 200);
                 let y = 35;
                 threats.slice(0, 20).forEach((t, i) => {
-                    if (y > 270) { doc.addPage(); y = 20; }
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
                     const device = getDeviceIcon(t.userAgent || t.device);
                     doc.setTextColor(239, 68, 68);
                     doc.text(`${i + 1}. ${t.attemptedEmail}`, 15, y);
@@ -962,7 +953,10 @@
             doc.setTextColor(200, 200, 200);
             let hy = 35;
             Object.entries(systemHealthData).forEach(([key, sys]) => {
-                if (hy > 250) { doc.addPage(); hy = 20; }
+                if (hy > 250) {
+                    doc.addPage();
+                    hy = 20;
+                }
                 doc.setTextColor(34, 211, 238);
                 doc.text(sys.name, 15, hy);
                 hy += 8;
@@ -989,8 +983,12 @@
             renderThreats();
             updateStatusChart();
             db.ref('unauthorized_attempts').remove()
-                .then(() => showNotification('All threat logs cleared', 'success'))
-                .catch(err => showNotification('Failed to clear logs: ' + err.message, 'error'));
+                .then(() => {
+                    showNotification('All threat logs cleared', 'success');
+                })
+                .catch(err => {
+                    showNotification('Failed to clear logs: ' + err.message, 'error');
+                });
         }
        
         function updateClock() {
@@ -1004,6 +1002,15 @@
                 userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount, lunch];
                 userDoughnutChart.update();
             }
+        }
+       
+        function updateRelativeTime() {
+            const el = document.getElementById('lastRefreshed');
+            const diff = Date.now() - lastRefreshTime;
+            let text = 'Just now';
+            if (diff > 60000) text = Math.floor(diff / 60000) + 'm ago';
+            else if (diff > 10000) text = Math.floor(diff / 1000) + 's ago';
+            el.textContent = text;
         }
        
         function loadAllData() {
@@ -1044,7 +1051,6 @@
                 if (!threat.timestamp) threat.timestamp = Date.now();
                 if (!threat.date) threat.date = new Date().toLocaleDateString();
                 if (!threat.time) threat.time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-               
                 threatData.shift();
                 threatData.push((threatData[threatData.length - 1] || 0) + 1);
                 if (fluctuatingChart) {
@@ -1053,10 +1059,11 @@
                 }
                 checkAndAutoBlock(threat);
                 showThreatAlert(threat);
-                if (selectedDate === todayStr) playThreatSound();
+                if (selectedDate === todayStr) {
+                    playThreatSound();
+                }
                 showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
                 allThreats.unshift(threat);
-                updateHeatmap();
                 filterAndRenderThreats();
                 updateStatusChart();
             }
@@ -1075,16 +1082,9 @@
                 allThreats.push(threat);
             });
             allThreats.sort((a, b) => b.timestamp - a.timestamp);
-            // Check auto-block for loaded threats
             allThreats.forEach(t => checkAndAutoBlock(t));
-            updateHeatmap();
             filterAndRenderThreats();
             updateStatusChart();
-        });
-       
-        db.ref('employees').on('child_added', (snap) => {
-            const emp = snap.val();
-            if (emp && emp.name) showDataNotification('New Employee', `${emp.name} registered in system`, 'fa-user-plus');
         });
        
         function showThreatAlert(threat) {
@@ -1094,10 +1094,12 @@
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
        
+        // Close modal on backdrop click
         document.getElementById('threatModal').addEventListener('click', (e) => {
             if (e.target.id === 'threatModal') closeThreatModal();
         });
        
+        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeThreatModal();
             if (e.key === 'r' && e.ctrlKey) {
@@ -1106,30 +1108,34 @@
             }
         });
        
+        // Initialize audio context on first user click anywhere
         document.addEventListener('click', initAudioContext, { once: true });
        
         window.onload = () => {
+            // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
-           
-            // Populate day labels for heatmap
-            const dayNames = ['6d ago','5d ago','4d ago','3d ago','2d ago','Yesterday','Today'];
-            const labelsHTML = dayNames.map(d => `<div class="text-right text-[9px] leading-none">${d}</div>`).join('');
-            document.getElementById('dayLabels').innerHTML = labelsHTML;
            
             initCharts();
             loadAllData();
             setupAttendanceListener();
             setInterval(updateClock, 1000);
             updateClock();
-            setInterval(() => { if (!isRefreshing) loadAllData(); }, 15000);
+            setInterval(() => {
+                if (!isRefreshing) loadAllData();
+            }, 15000);
             renderHealthBars();
+           
+            lastRefreshTime = Date.now();
+            updateRelativeTime();
+            setInterval(updateRelativeTime, 30000);
            
             setTimeout(() => {
                 document.getElementById('perfBar').style.width = '98%';
             }, 500);
            
+            // Welcome notification
             setTimeout(() => {
                 showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
             }, 1000);
