@@ -98,6 +98,30 @@
         .sound-btn { transition: all 0.2s ease; }
         .sound-btn:hover { color: #22d3ee; }
         .sound-btn.muted { color: #64748b; }
+        .date-picker {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            font-family: 'Inter', monospace;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .date-picker:hover {
+            border-color: #22d3ee;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.2);
+        }
+        .date-picker:focus {
+            outline: none;
+            border-color: #22d3ee;
+        }
+        /* Custom date picker calendar styling */
+        ::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
     </style>
 <base target="_blank">
 </head>
@@ -111,7 +135,8 @@
                     <p class="text-[10px] font-mono uppercase tracking-[3px] text-slate-400 -mt-1">REAL-TIME FIREBASE MONITOR</p>
                 </div>
             </div>
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-4">
+                <input type="date" id="datePicker" class="date-picker" onchange="changeDate(this.value)">
                 <div onclick="toggleSound()" id="soundBtn" class="sound-btn flex items-center gap-2 cursor-pointer text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800" title="Toggle Sound Alerts">
                     <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
                     <span class="hidden md:inline font-medium">SOUND ON</span>
@@ -172,7 +197,7 @@
             <div class="flex justify-between items-center mb-6 lg:mb-8">
                 <div>
                     <h2 class="text-3xl lg:text-4xl font-black tracking-tight">Attendance Hub Monitor</h2>
-                    <p class="text-slate-400 mt-1 text-sm">Firebase Project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span></p>
+                    <p class="text-slate-400 mt-1 text-sm">Firebase Project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span> • Date: <span id="currentDateDisplay" class="font-mono text-cyan-400"></span></p>
                 </div>
                 <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2 btn-hover">
                     <i class="fa-solid fa-clock text-cyan-400"></i>
@@ -312,6 +337,7 @@
         const db = firebase.database();
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
+        let selectedDate = todayStr;
         let threats = [];
         let allThreats = [];
         let liveActivityData = Array(20).fill(0);
@@ -346,7 +372,6 @@
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            // Deep warning tone
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
@@ -357,7 +382,6 @@
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
             
-            // Second tone for urgency
             setTimeout(() => {
                 const osc2 = audioContext.createOscillator();
                 const gain2 = audioContext.createGain();
@@ -382,10 +406,9 @@
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            // Pleasant chime
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
             
             gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
@@ -406,7 +429,6 @@
                 icon.className = 'fa-solid fa-volume-high text-lg';
                 text.textContent = 'SOUND ON';
                 showNotification('Sound alerts enabled', 'success');
-                // Initialize audio context on user interaction
                 initAudioContext();
             } else {
                 btn.classList.add('muted');
@@ -414,6 +436,46 @@
                 text.textContent = 'MUTED';
                 showNotification('Sound alerts disabled', 'info');
             }
+        }
+        
+        // Change date function
+        function changeDate(newDate) {
+            selectedDate = newDate;
+            document.getElementById('currentDateDisplay').textContent = newDate;
+            showNotification(`Loading data for ${newDate}...`, 'info');
+            
+            // Reset charts data for new date
+            liveActivityData = Array(20).fill(0);
+            threatData = Array(20).fill(0);
+            
+            // Reload all data for selected date
+            loadAllData();
+            
+            // Reload attendance listeners for new date
+            setupAttendanceListener();
+        }
+        
+        // Setup attendance listener for selected date
+        function setupAttendanceListener() {
+            // Remove old listener and set up new one
+            db.ref('attendance/' + selectedDate).off('child_added');
+            db.ref('attendance/' + selectedDate).on('child_added', (snap) => {
+                const data = snap.val();
+                liveActivityData.shift();
+                liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
+                if (fluctuatingChart) {
+                    fluctuatingChart.data.datasets[0].data = liveActivityData;
+                    fluctuatingChart.update();
+                }
+                
+                if (data && data.employeeName) {
+                    if (selectedDate === todayStr) {
+                        playAttendanceSound();
+                    }
+                    showDataNotification('Attendance Recorded', `${data.employeeName} checked in`, 'fa-user-check');
+                }
+                loadAllData();
+            });
         }
         
         // System health data for Attendance Hub only
@@ -784,6 +846,7 @@
                 `Total Active Staff: ${totalStaff}`,
                 `Systems Online: ${systemsOnline}`,
                 `Firebase Project: pinotp-d7ef5`,
+                `Selected Date: ${selectedDate}`,
                 `Unauthorized Attempts: ${threatCount}`,
                 `Blocked IPs: ${blockedIPs.size}`,
                 `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
@@ -862,7 +925,7 @@
                 hy += 5;
             });
             
-            doc.save(`security-report-${now.toISOString().slice(0,10)}-${Date.now()}.pdf`);
+            doc.save(`security-report-${selectedDate}-${Date.now()}.pdf`);
             showNotification('PDF report exported successfully', 'success');
         }
         
@@ -907,7 +970,7 @@
                     const total = Object.keys(snap.val() || {}).length;
                     document.getElementById('totalActiveUsers').dataset.total = total;
                     
-                    db.ref('attendance/' + todayStr).once('value', snap2 => {
+                    db.ref('attendance/' + selectedDate).once('value', snap2 => {
                         const data = snap2.val() || {};
                         let working = 0, lunch = 0, out = 0;
                         let active = 0;
@@ -950,7 +1013,9 @@
                 }
                 
                 showThreatAlert(threat);
-                playThreatSound(); // Play sound alert
+                if (selectedDate === todayStr) {
+                    playThreatSound();
+                }
                 showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
                 
                 allThreats.unshift(threat);
@@ -973,23 +1038,6 @@
             allThreats.sort((a, b) => b.timestamp - a.timestamp);
             filterAndRenderThreats();
             updateStatusChart();
-        });
-        
-        // Attendance listeners for graph
-        db.ref('attendance/' + todayStr).on('child_added', (snap) => {
-            const data = snap.val();
-            liveActivityData.shift();
-            liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
-            if (fluctuatingChart) {
-                fluctuatingChart.data.datasets[0].data = liveActivityData;
-                fluctuatingChart.update();
-            }
-            
-            if (data && data.employeeName) {
-                playAttendanceSound(); // Play sound alert
-                showDataNotification('Attendance Recorded', `${data.employeeName} checked in`, 'fa-user-check');
-            }
-            loadAllData();
         });
         
         // Listen for employee changes
@@ -1025,8 +1073,13 @@
         document.addEventListener('click', initAudioContext, { once: true });
         
         window.onload = () => {
+            // Set default date in picker
+            document.getElementById('datePicker').value = todayStr;
+            document.getElementById('currentDateDisplay').textContent = todayStr;
+            
             initCharts();
             loadAllData();
+            setupAttendanceListener();
             setInterval(updateClock, 1000);
             updateClock();
             setInterval(() => {
