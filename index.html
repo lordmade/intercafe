@@ -19,7 +19,7 @@
         .neon-text { text-shadow: 0 0 15px rgb(34 211 238); }
         .threat-critical { animation: pulse-red 2s infinite; }
         @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
         .modern-modal { animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
         @keyframes modalPop { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
@@ -286,12 +286,12 @@
             </div>
             <!-- Time Filters with Date Picker -->
             <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
-                <div class="flex gap-2 items-center">
-                    <input type="date" id="threatDateFilter" class="threat-date-filter flex-1" onchange="setThreatDateFilter(this.value)">
-                    <button onclick="setThreatFilter('today')" class="filter-btn active flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="today">TODAY</button>
-                    <button onclick="setThreatFilter('week')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="week">WEEK</button>
-                    <button onclick="setThreatFilter('month')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="month">MONTH</button>
-                    <button onclick="setThreatFilter('all')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="all">ALL</button>
+                <div class="flex gap-2 items-center overflow-x-auto pb-3 custom-scroll flex-nowrap">
+                    <input type="date" id="threatDateFilter" class="threat-date-filter flex-shrink-0" style="min-width: 135px;" onchange="setThreatDateFilter(this.value)">
+                    <button onclick="setThreatFilter('today')" class="filter-btn active flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="today">TODAY</button>
+                    <button onclick="setThreatFilter('week')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="week">WEEK</button>
+                    <button onclick="setThreatFilter('month')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="month">MONTH</button>
+                    <button onclick="setThreatFilter('all')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="all">ALL</button>
                 </div>
             </div>
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
@@ -375,11 +375,11 @@
         let blockedIPs = new Set();
         let currentThreatFilter = 'today';
         let selectedSystem = 'att-hub';
-        
+       
         // Audio context and sound settings
         let audioContext = null;
         let soundEnabled = true;
-        
+       
         // Initialize audio context on first user interaction
         function initAudioContext() {
             if (!audioContext) {
@@ -389,27 +389,27 @@
                 audioContext.resume();
             }
         }
-        
+       
         // Play threat alert sound (deep warning buzz)
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
-            
+           
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
+           
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
+           
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
-            
+           
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
+           
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
-            
+           
             setTimeout(() => {
                 const osc2 = audioContext.createOscillator();
                 const gain2 = audioContext.createGain();
@@ -423,35 +423,35 @@
                 osc2.stop(audioContext.currentTime + 0.2);
             }, 150);
         }
-        
+       
         // Play attendance notification sound (pleasant chime)
         function playAttendanceSound() {
             if (!soundEnabled || !audioContext) return;
-            
+           
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
+           
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
+           
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
             oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-            
+           
             gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            
+           
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.4);
         }
-        
+       
         // Toggle sound on/off
         function toggleSound() {
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundBtn');
             const icon = document.getElementById('soundIcon');
             const text = btn.querySelector('span');
-            
+           
             if (soundEnabled) {
                 btn.classList.remove('muted');
                 icon.className = 'fa-solid fa-volume-high text-lg';
@@ -465,30 +465,30 @@
                 showNotification('Sound alerts disabled', 'info');
             }
         }
-        
+       
         // Change date function
         function changeDate(newDate) {
             selectedDate = newDate;
             document.getElementById('currentDateDisplay').textContent = newDate;
             showNotification(`Loading data for ${newDate}...`, 'info');
-            
+           
             // Reset charts data for new date
             liveActivityData = Array(20).fill(0);
             threatData = Array(20).fill(0);
-            
+           
             // Reload all data for selected date
             loadAllData();
-            
+           
             // Reload attendance listeners for new date
             setupAttendanceListener();
         }
-        
+       
         // Set threat date filter
         function setThreatDateFilter(newDate) {
             threatFilterDate = newDate;
             filterAndRenderThreats();
         }
-        
+       
         // Setup attendance listener for selected date
         function setupAttendanceListener() {
             // Remove old listener and set up new one
@@ -501,7 +501,7 @@
                     fluctuatingChart.data.datasets[0].data = liveActivityData;
                     fluctuatingChart.update();
                 }
-                
+               
                 if (data && data.employeeName) {
                     if (selectedDate === todayStr) {
                         playAttendanceSound();
@@ -511,7 +511,7 @@
                 loadAllData();
             });
         }
-        
+       
         // System health data for Attendance Hub only
         const systemHealthData = {
             'att-hub': {
@@ -524,54 +524,54 @@
                 ]
             }
         };
-        
+       
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notifyToast');
             const icon = document.getElementById('notifyIcon');
             const msg = document.getElementById('notifyMsg');
-            
+           
             msg.textContent = message;
-            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : 
+            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' :
                             type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' :
                             'fa-solid fa-info-circle text-cyan-400';
-            
+           
             toast.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
             }, 3000);
         }
-        
+       
         function showDataNotification(title, message, iconClass = 'fa-bell') {
             const notification = document.getElementById('dataNotification');
             document.getElementById('dataNotifyTitle').textContent = title;
             document.getElementById('dataNotifyMsg').textContent = message;
             document.getElementById('dataNotifyIcon').className = `fa-solid ${iconClass} text-cyan-400`;
-            
+           
             notification.classList.add('show');
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 4000);
         }
-        
+       
         function animateNumber(elementId, targetValue, duration = 500) {
             const element = document.getElementById(elementId);
             const startValue = parseInt(element.textContent) || 0;
             const startTime = performance.now();
-            
+           
             function update(currentTime) {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
                 const easeProgress = 1 - Math.pow(1 - progress, 3);
                 const current = Math.floor(startValue + (targetValue - startValue) * easeProgress);
                 element.textContent = current;
-                
+               
                 if (progress < 1) {
                     requestAnimationFrame(update);
                 }
             }
             requestAnimationFrame(update);
         }
-        
+       
         function getDeviceIcon(userAgent) {
             if (!userAgent) return { icon: 'fa-desktop', class: 'device-windows', name: 'Unknown' };
             const ua = userAgent.toLowerCase();
@@ -582,18 +582,18 @@
             if (ua.includes('linux')) return { icon: 'fa-linux', class: 'device-linux', name: 'Linux' };
             return { icon: 'fa-desktop', class: 'device-windows', name: 'Desktop' };
         }
-        
+       
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
-            
-            const system = { 
-                id: 'att-hub', 
-                name: 'Attendance Hub', 
-                status: 'online', 
-                employees: totalEmployees, 
-                present: presentToday 
+           
+            const system = {
+                id: 'att-hub',
+                name: 'Attendance Hub',
+                status: 'online',
+                employees: totalEmployees,
+                present: presentToday
             };
-            
+           
             container.innerHTML = `
                 <div class="glass-card p-4 rounded-3xl system-item active">
                     <div class="flex items-center justify-between">
@@ -612,11 +612,11 @@
                 </div>
             `;
         }
-        
+       
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
             const healthMetrics = systemHealthData['att-hub'].metrics;
-            
+           
             container.innerHTML = healthMetrics.map((metric, idx) => `
                 <div class="flex items-center gap-4 slide-up" style="animation-delay: ${idx * 0.1}s;">
                     <div class="flex-1">
@@ -632,7 +632,7 @@
                 </div>
             `).join('');
         }
-        
+       
         function initCharts() {
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
@@ -648,17 +648,17 @@
                 },
                 options: {
                     cutout: '78%',
-                    plugins: { 
-                        legend: { 
+                    plugins: {
+                        legend: {
                             display: true,
                             position: 'bottom',
                             labels: { color: '#94a3b8', font: { size: 10 }, padding: 15 }
-                        } 
+                        }
                     },
                     animation: { animateScale: true, animateRotate: true }
                 }
             });
-            
+           
             const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
             fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
@@ -694,7 +694,7 @@
                 }
             });
         }
-        
+       
         function setThreatFilter(filter) {
             currentThreatFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -702,15 +702,15 @@
             });
             filterAndRenderThreats();
         }
-        
+       
         function filterAndRenderThreats() {
             const filterDateObj = new Date(threatFilterDate);
             const filtered = allThreats.filter(threat => {
                 if (!threat.timestamp) return false;
                 const threatDate = new Date(threat.timestamp);
-                
+               
                 switch(currentThreatFilter) {
-                    case 'today': 
+                    case 'today':
                         return threatDate.toDateString() === filterDateObj.toDateString();
                     case 'week': {
                         const weekAgo = new Date(filterDateObj);
@@ -722,20 +722,20 @@
                         monthAgo.setDate(monthAgo.getDate() - 30);
                         return threatDate >= monthAgo && threatDate <= filterDateObj;
                     }
-                    case 'all': 
+                    case 'all':
                         return true;
-                    default: 
+                    default:
                         return threatDate.toDateString() === filterDateObj.toDateString();
                 }
             });
             threats = filtered.slice(0, 12);
             renderThreats();
         }
-        
+       
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
-            
+           
             if (threats.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-8 text-slate-500">
@@ -747,7 +747,7 @@
                 document.getElementById('threatCounter').textContent = '0';
                 return;
             }
-            
+           
             threats.forEach((threat, index) => {
                 const isNew = index === 0;
                 const isBlocked = blockedIPs.has(threat.attemptedEmail);
@@ -772,7 +772,7 @@
             });
             animateNumber('threatCounter', threats.length);
         }
-        
+       
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             const isBlocked = blockedIPs.has(threat.attemptedEmail);
@@ -818,11 +818,11 @@
                 </div>
             `;
         }
-        
+       
         function closeThreatModal() {
             document.getElementById('threatModal').classList.add('hidden');
         }
-        
+       
         function blockIP() {
             const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
             if (email) {
@@ -832,34 +832,34 @@
             }
             closeThreatModal();
         }
-        
+       
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
-            
+           
             const icon = document.getElementById('refreshIcon');
             icon.classList.add('spin-anim');
-            
+           
             showNotification('Refreshing all systems...', 'info');
-            
+           
             await Promise.all([
                 new Promise(resolve => setTimeout(resolve, 800)),
                 loadAllData()
             ]);
-            
+           
             icon.classList.remove('spin-anim');
             isRefreshing = false;
             showNotification('All systems refreshed successfully', 'success');
         }
-        
+       
         async function exportFullReport() {
             showNotification('Generating PDF report...', 'info');
-            
+           
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const now = new Date();
             const pageWidth = doc.internal.pageSize.getWidth();
-            
+           
             // Header
             doc.setFillColor(15, 23, 42);
             doc.rect(0, 0, pageWidth, 40, 'F');
@@ -870,18 +870,18 @@
             doc.setTextColor(148, 163, 184);
             doc.setFontSize(10);
             doc.text(`Security Report • ${now.toLocaleString()}`, 15, 32);
-            
+           
             // Summary Section
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(16);
             doc.text('Executive Summary', 15, 55);
             doc.setDrawColor(34, 211, 238);
             doc.line(15, 58, pageWidth - 15, 58);
-            
+           
             const totalStaff = document.getElementById('totalActiveUsers').textContent;
             const systemsOnline = document.getElementById('systemsOnline').textContent;
             const threatCount = threats.length;
-            
+           
             doc.setFontSize(11);
             doc.setTextColor(200, 200, 200);
             const summaryData = [
@@ -893,24 +893,24 @@
                 `Blocked IPs: ${blockedIPs.size}`,
                 `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
             ];
-            
+           
             summaryData.forEach((line, i) => {
                 doc.text(line, 20, 70 + (i * 7));
             });
-            
+           
             // Capture charts
             try {
                 const statusCanvas = await html2canvas(document.getElementById('statusDistributionCard'));
                 const statusImg = statusCanvas.toDataURL('image/png');
                 doc.addImage(statusImg, 'PNG', 15, 120, 85, 70);
-                
+               
                 const liveCanvas = await html2canvas(document.getElementById('fluctuatingChart'));
                 const liveImg = liveCanvas.toDataURL('image/png');
                 doc.addImage(liveImg, 'PNG', 105, 120, 90, 70);
             } catch (e) {
                 console.log('Chart capture skipped');
             }
-            
+           
             // New page for threats
             if (threats.length > 0) {
                 doc.addPage();
@@ -919,11 +919,11 @@
                 doc.setTextColor(239, 68, 68);
                 doc.setFontSize(18);
                 doc.text('THREAT DETAILS', 15, 14);
-                
+               
                 doc.setFontSize(9);
                 doc.setTextColor(200, 200, 200);
                 let y = 35;
-                
+               
                 threats.slice(0, 20).forEach((t, i) => {
                     if (y > 270) {
                         doc.addPage();
@@ -933,11 +933,11 @@
                     doc.setTextColor(239, 68, 68);
                     doc.text(`${i + 1}. ${t.attemptedEmail}`, 15, y);
                     doc.setTextColor(148, 163, 184);
-                    doc.text(`   Time: ${t.time} | Device: ${device.name} | ${blockedIPs.has(t.attemptedEmail) ? 'BLOCKED' : 'ACTIVE'}`, 15, y + 5);
+                    doc.text(` Time: ${t.time} | Device: ${device.name} | ${blockedIPs.has(t.attemptedEmail) ? 'BLOCKED' : 'ACTIVE'}`, 15, y + 5);
                     y += 15;
                 });
             }
-            
+           
             // System Health Page
             doc.addPage();
             doc.setFillColor(15, 23, 42);
@@ -945,11 +945,11 @@
             doc.setTextColor(16, 185, 129);
             doc.setFontSize(18);
             doc.text('SYSTEM HEALTH METRICS', 15, 14);
-            
+           
             doc.setFontSize(10);
             doc.setTextColor(200, 200, 200);
             let hy = 35;
-            
+           
             Object.entries(systemHealthData).forEach(([key, sys]) => {
                 if (hy > 250) {
                     doc.addPage();
@@ -958,32 +958,32 @@
                 doc.setTextColor(34, 211, 238);
                 doc.text(sys.name, 15, hy);
                 hy += 8;
-                
+               
                 sys.metrics.forEach(m => {
                     doc.setTextColor(200, 200, 200);
-                    doc.text(`  ${m.name}: ${m.health}% - ${m.status}`, 20, hy);
+                    doc.text(` ${m.name}: ${m.health}% - ${m.status}`, 20, hy);
                     hy += 6;
                 });
                 hy += 5;
             });
-            
+           
             doc.save(`security-report-${selectedDate}-${Date.now()}.pdf`);
             showNotification('PDF report exported successfully', 'success');
         }
-        
+       
         function clearThreats() {
             threats = [];
             allThreats = [];
             threatData = Array(20).fill(0);
-            
+           
             if (fluctuatingChart) {
                 fluctuatingChart.data.datasets[1].data = threatData;
                 fluctuatingChart.update();
             }
-            
+           
             renderThreats();
             updateStatusChart();
-            
+           
             db.ref('unauthorized_attempts').remove()
                 .then(() => {
                     showNotification('All threat logs cleared', 'success');
@@ -992,11 +992,11 @@
                     showNotification('Failed to clear logs: ' + err.message, 'error');
                 });
         }
-        
+       
         function updateClock() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
-        
+       
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
                 const systemsOnline = 1;
@@ -1005,13 +1005,13 @@
                 userDoughnutChart.update();
             }
         }
-        
+       
         function loadAllData() {
             return new Promise((resolve) => {
                 db.ref('employees').once('value', snap => {
                     const total = Object.keys(snap.val() || {}).length;
                     document.getElementById('totalActiveUsers').dataset.total = total;
-                    
+                   
                     db.ref('attendance/' + selectedDate).once('value', snap2 => {
                         const data = snap2.val() || {};
                         let working = 0, lunch = 0, out = 0;
@@ -1022,11 +1022,11 @@
                             else if (log.TimeIn) working++;
                         });
                         active = working + lunch;
-                        
+                       
                         animateNumber('totalActiveUsers', active);
                         renderSystems(total, active);
                         updateStatusChart(working, lunch, out);
-                        
+                       
                         document.getElementById('activeList').innerHTML = `
                             <div class="glass-card p-6 rounded-3xl text-center btn-hover">
                                 <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
@@ -1038,7 +1038,7 @@
                 });
             });
         }
-        
+       
         // Real-time threat detection
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
@@ -1046,26 +1046,26 @@
                 threat.key = snap.key;
                 if (!threat.timestamp) threat.timestamp = Date.now();
                 if (!threat.date) threat.date = new Date().toLocaleDateString();
-                
+               
                 threatData.shift();
                 threatData.push((threatData[threatData.length - 1] || 0) + 1);
                 if (fluctuatingChart) {
                     fluctuatingChart.data.datasets[1].data = threatData;
                     fluctuatingChart.update();
                 }
-                
+               
                 showThreatAlert(threat);
                 if (selectedDate === todayStr) {
                     playThreatSound();
                 }
                 showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
-                
+               
                 allThreats.unshift(threat);
                 filterAndRenderThreats();
                 updateStatusChart();
             }
         });
-        
+       
         // Load existing threats
         db.ref('unauthorized_attempts').on('value', snap => {
             const data = snap.val() || {};
@@ -1081,7 +1081,7 @@
             filterAndRenderThreats();
             updateStatusChart();
         });
-        
+       
         // Listen for employee changes
         db.ref('employees').on('child_added', (snap) => {
             const emp = snap.val();
@@ -1089,19 +1089,19 @@
                 showDataNotification('New Employee', `${emp.name} registered in system`, 'fa-user-plus');
             }
         });
-        
+       
         function showThreatAlert(threat) {
             const toast = document.getElementById('threatToast');
             document.getElementById('toastEmail').textContent = threat.attemptedEmail;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
-        
+       
         // Close modal on backdrop click
         document.getElementById('threatModal').addEventListener('click', (e) => {
             if (e.target.id === 'threatModal') closeThreatModal();
         });
-        
+       
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeThreatModal();
@@ -1110,16 +1110,16 @@
                 refreshAll();
             }
         });
-        
+       
         // Initialize audio context on first user click anywhere
         document.addEventListener('click', initAudioContext, { once: true });
-        
+       
         window.onload = () => {
             // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
-            
+           
             initCharts();
             loadAllData();
             setupAttendanceListener();
@@ -1129,11 +1129,11 @@
                 if (!isRefreshing) loadAllData();
             }, 15000);
             renderHealthBars();
-            
+           
             setTimeout(() => {
                 document.getElementById('perfBar').style.width = '98%';
             }, 500);
-            
+           
             // Welcome notification
             setTimeout(() => {
                 showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
