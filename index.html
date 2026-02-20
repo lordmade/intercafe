@@ -401,6 +401,19 @@
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
+            
+            if (threats.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-500">
+                        <i class="fa-solid fa-shield-halved text-4xl mb-3 opacity-50"></i>
+                        <div class="text-sm">No unauthorized attempts</div>
+                        <div class="text-xs mt-1 opacity-70">System secure</div>
+                    </div>
+                `;
+                document.getElementById('threatCounter').textContent = '0';
+                return;
+            }
+            
             threats.forEach((threat, index) => {
                 const isNew = index === 0;
                 const isBlocked = blockedIPs.has(threat.attemptedEmail);
@@ -556,19 +569,27 @@ End of Report
         }
         
         function clearThreats() {
+            // Immediately clear UI
+            threats = [];
+            threatData = Array(20).fill(0);
+            
+            // Update chart immediately
+            if (fluctuatingChart) {
+                fluctuatingChart.data.datasets[1].data = threatData;
+                fluctuatingChart.update();
+            }
+            
+            // Render empty state
+            renderThreats();
+            
+            // Clear from Firebase
             db.ref('unauthorized_attempts').remove()
                 .then(() => {
-                    threats = [];
-                    threatData = Array(20).fill(0);
-                    if (fluctuatingChart) {
-                        fluctuatingChart.data.datasets[1].data = threatData;
-                        fluctuatingChart.update();
-                    }
-                    renderThreats();
                     showNotification('All threat logs cleared', 'success');
                 })
                 .catch(err => {
-                    showNotification('Failed to clear logs', 'error');
+                    showNotification('Failed to clear logs: ' + err.message, 'error');
+                    console.error('Clear error:', err);
                 });
         }
         
@@ -633,8 +654,8 @@ End of Report
         
         // Load existing threats
         db.ref('unauthorized_attempts').on('value', snap => {
-            threats = [];
             const data = snap.val() || {};
+            threats = [];
             Object.keys(data).forEach(key => {
                 threats.unshift({...data[key], key});
             });
