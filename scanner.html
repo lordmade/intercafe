@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <title>Employee Attendance Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+            overscroll-behavior-y: contain;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .bg-gradient {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 0% 0%, #1e293b 0%, transparent 50%),
+                        radial-gradient(circle at 100% 100%, #1e3a8a 0%, transparent 50%),
+                        radial-gradient(circle at 100% 0%, #0f172a 0%, transparent 50%),
+                        radial-gradient(circle at 0% 100%, #312e81 0%, transparent 50%);
+            background-color: #020617;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 2rem;
+        }
+        #login-view {
+            transition: all 0.5s ease-in-out;
+            transform: translateY(100%);
+            opacity: 0;
+            z-index: 100;
+            position: fixed;
+            inset: 0;
+            display: none;
+            overflow-y: auto;
+        }
+        #login-view.active {
+            display: flex;
+            transform: translateY(0);
+            opacity: 1;
+        }
+        #app-content {
+            transition: filter 0.5s ease;
+            width: 100%;
+            max-width: 28rem;
+        }
+        .blur-locked {
+            filter: blur(15px);
+            pointer-events: none;
+        }
+        #reader {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background: #000;
+        }
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+            display: block;
+        }
+        .location-lock {
+            background: rgba(2, 6, 23, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 50;
+        }
+        .debug-info {
+            font-size: 10px;
+            color: #64748b;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-top: 12px;
+            text-align: left;
+            word-break: break-all;
+        }
+        button {
+            min-height: 48px;
+            -webkit-appearance: none;
+        }
+        #toast {
+            bottom: max(24px, env(safe-area-inset-bottom));
+        }
+        .log-pill {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 relative">
+    <div class="bg-gradient"></div>
+  
+    <div id="app-content" class="flex-1 flex flex-col z-10 w-full max-w-md">
+        <div class="pt-4 pb-6 flex justify-between items-center px-2">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600/20 p-2 rounded-lg border border-blue-500/30">
+                    <i class="fa-solid fa-fingerprint text-blue-400 text-xl"></i>
+                </div>
+                <span class="font-extrabold text-white tracking-widest text-sm uppercase">Attendance<span class="text-blue-500">Hub</span></span>
+            </div>
+            <div class="text-[10px] font-bold font-mono text-blue-100 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-full" id="clock">00:00:00</div>
+        </div>
+        <div id="view-scan" class="glass-card p-6 text-center space-y-4 relative overflow-hidden flex-1 flex flex-col justify-start">
+            
+            <div id="location-overlay" class="absolute inset-0 location-lock flex items-center justify-center p-4">
+                <div class="glass-card p-8 text-center space-y-6 w-full max-w-[320px] border-blue-500/30 border-2">
+                    <div class="flex justify-center">
+                        <div class="bg-blue-600/20 p-5 rounded-3xl border border-blue-500/30">
+                            <i class="fa-solid fa-location-crosshairs text-blue-400 text-5xl animate-pulse"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-black text-white tracking-tight">Location Locked</h3>
+                        <p class="text-white/60 mt-2 text-sm leading-relaxed">Verification is required to ensure you are at the designated site.</p>
+                    </div>
+                    <div class="space-y-4">
+                        <button onclick="detectAndVerifyLocation()" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                            Verify GPS
+                        </button>
+                        <button onclick="signOutUser()" class="w-full text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] hover:text-white transition-colors">
+                            Sign Out Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="success-modal" class="absolute inset-0 z-[110] flex items-center justify-center bg-emerald-950/40 backdrop-blur-xl hidden p-4">
+                <div class="glass-card p-8 text-center space-y-6 w-full max-w-[300px] border-emerald-500/30 border-2 bg-emerald-500/10">
+                    <div class="flex justify-center">
+                        <div class="bg-emerald-500/20 p-5 rounded-full border border-emerald-500/30">
+                            <i class="fa-solid fa-check text-emerald-400 text-5xl"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-3xl font-black text-white uppercase tracking-tighter" id="modal-action-text">Success</h3>
+                        <p class="text-emerald-200/60 text-xs font-bold uppercase tracking-widest mt-2">Log Recorded</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="py-2">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-extrabold text-white">Identity Scanner</h2>
+                    <button onclick="signOutUser()" class="bg-white/5 border border-white/10 text-white px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-tighter">
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        
+            <div class="flex justify-center">
+                <div id="reader-container" class="p-1 bg-white/5 rounded-[2rem] w-full aspect-square max-w-[260px] overflow-hidden relative border border-white/10 min-h-[260px]">
+                    <div id="reader"></div>
+                </div>
+            </div>
+
+            <div class="space-y-2 mt-4">
+                <p class="text-[9px] uppercase tracking-widest text-blue-400/50 font-black text-left ml-1">Today's Logs</p>
+                <div id="daily-logs" class="grid grid-cols-2 gap-2">
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">In</span><span id="log-in" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Out</span><span id="log-lout" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Back</span><span id="log-lback" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">Out</span><span id="log-out" class="text-xs text-white font-mono">--:--</span></div>
+                </div>
+            </div>
+
+            <div id="debug-info" class="debug-info hidden">
+                ID: <span id="logged-id" class="font-mono text-emerald-400"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-view" class="flex-col justify-center items-center p-4">
+        <div class="glass-card p-10 text-center space-y-6 w-full max-w-md shadow-2xl border-blue-500/30 border-2 my-auto">
+            <div class="flex justify-center">
+                <div class="bg-blue-600/20 p-5 rounded-3xl border border-blue-500/30">
+                    <i class="fa-brands fa-google text-blue-400 text-6xl"></i>
+                </div>
+            </div>
+            <div>
+                <h1 class="text-3xl font-black text-white tracking-tight">Sign In Required</h1>
+                <p class="text-white/60 mt-2">Use your Google account registered by Admin</p>
+            </div>
+            <button onclick="signInWithGoogle()"
+                    class="w-full py-5 bg-white hover:bg-gray-100 active:scale-95 transition-all text-slate-900 rounded-2xl font-semibold flex items-center justify-center gap-4 text-lg shadow-xl">
+                <i class="fa-brands fa-google text-2xl"></i>
+                Continue with Google
+            </button>
+            <p class="text-xs text-white/40 pt-6">
+                Only accounts pre-approved by Admin can access the scanner
+            </p>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 left-4 right-4 bg-white text-slate-900 px-6 py-4 rounded-xl shadow-2xl transition-all duration-500 opacity-0 translate-y-10 pointer-events-none z-[200] font-bold text-[10px] uppercase text-center flex justify-center items-center">
+        <span id="toastMsg" class="max-w-full break-words">Notification</span>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxBT0oESoL62oz_x_Z8cMtdENWZPx4tMI",
+            authDomain: "pinotp-d7ef5.firebaseapp.com",
+            databaseURL: "https://pinotp-d7ef5-default-rtdb.firebaseio.com",
+            projectId: "pinotp-d7ef5",
+            storageBucket: "pinotp-d7ef5.firebasestorage.app",
+            messagingSenderId: "708458917827",
+            appId: "1:708458917827:web:375de278577df0adcf9776"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        
+        let currentUserData = null;
+        let html5QrCode = null;
+        
+        function showPortal() {
+            document.getElementById('login-view').classList.add('active');
+            document.getElementById('app-content').classList.add('blur-locked');
+        }
+        
+        function closePortal() {
+            document.getElementById('login-view').classList.remove('active');
+            document.getElementById('app-content').classList.remove('blur-locked');
+        }
+
+        async function signOutUser() {
+            try {
+                if (html5QrCode) await html5QrCode.stop().catch(() => {});
+                await auth.signOut();
+                currentUserData = null;
+                document.getElementById('location-overlay').classList.remove('hidden');
+                document.getElementById('debug-info').classList.add('hidden');
+                showPortal();
+            } catch (error) {
+                showToast("Sign out failed");
+            }
+        }
+        
+        async function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try { await auth.signInWithPopup(provider); } catch (error) { showToast("Login failed"); }
+        }
+        
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const snap = await db.ref('employees').orderByChild('email').equalTo(user.email.toLowerCase()).once('value');
+                if (snap.exists()) {
+                    const data = snap.val();
+                    const key = Object.keys(data)[0];
+                    currentUserData = { ...data[key], id: key };
+                    closePortal();
+                    document.getElementById('logged-id').textContent = currentUserData.id;
+                    document.getElementById('debug-info').classList.remove('hidden');
+                    listenToAttendance();
+                } else {
+                    showToast("Not registered");
+                    await auth.signOut();
+                    showPortal();
+                }
+            } else { showPortal(); }
+        });
+
+        function listenToAttendance() {
+            if (!currentUserData) return;
+            const today = new Date().toISOString().split('T')[0];
+            db.ref(`attendance/${today}/${currentUserData.id}`).on('value', (snap) => {
+                const data = snap.val() || {};
+                document.getElementById('log-in').innerText = data.TimeIn || '--:--';
+                document.getElementById('log-lout').innerText = data.LunchOut || '--:--';
+                document.getElementById('log-lback').innerText = data.LunchBack || '--:--';
+                document.getElementById('log-out').innerText = data.TimeOut || '--:--';
+            });
+        }
+        
+        async function detectAndVerifyLocation() {
+            showToast("Detecting...");
+            if (!navigator.geolocation) return showToast("GPS Not Supported");
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const userLat = pos.coords.latitude;
+                const userLon = pos.coords.longitude;
+                const snap = await db.ref('settings/officeLocation').once('value');
+                if (!snap.exists()) return showToast("Office location not set");
+                const adminConfig = snap.val();
+                const distance = calculateDistance(userLat, userLon, adminConfig.lat, adminConfig.lng);
+                if (distance <= (adminConfig.radius || 150)) {
+                    showToast("Location Verified ✓");
+                    document.getElementById('location-overlay').classList.add('hidden');
+                    startScanner();
+                } else {
+                    showToast(`Outside Range (${Math.round(distance)}m)`);
+                }
+            }, (err) => { showToast("Grant GPS permission"); }, { enableHighAccuracy: true });
+        }
+        
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+        
+        async function startScanner() {
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            try { await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 220, aspectRatio: 1.0 }, onScanSuccess); } catch (e) {}
+        }
+        
+        function onScanSuccess(decodedText) {
+            const scannedId = decodedText.trim();
+            if (!currentUserData || scannedId !== currentUserData.id) {
+                if (!window.errorToastThrottled) {
+                    showToast(`ID Mismatch`);
+                    window.errorToastThrottled = true;
+                    setTimeout(() => window.errorToastThrottled = false, 3000);
+                }
+                return;
+            }
+
+            const now = Date.now();
+            const lastScanKey = 'lastScanTime_' + currentUserData.id;
+            const lastScan = localStorage.getItem(lastScanKey);
+            const cooldownTime = 15 * 60 * 1000;
+
+            if (lastScan && (now - parseInt(lastScan)) < cooldownTime) {
+                if (!window.cooldownToastThrottled) {
+                    const remainingMinutes = Math.ceil((cooldownTime - (now - parseInt(lastScan))) / 60000);
+                    showToast(`Wait ${remainingMinutes}m`);
+                    window.cooldownToastThrottled = true;
+                    setTimeout(() => window.cooldownToastThrottled = false, 5000);
+                }
+                return;
+            }
+
+            if (window.isProcessingScan) return;
+            window.isProcessingScan = true;
+
+            const today = new Date().toISOString().split('T')[0];
+            const nowTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            
+            db.ref(`attendance/${today}/${currentUserData.id}`).once('value', (attSnap) => {
+                let update = { name: currentUserData.name || "Employee", timestamp: firebase.database.ServerValue.TIMESTAMP };
+                const att = attSnap.val();
+                let actionLabel = "Logged";
+                
+                if (!att) { actionLabel = "Time In"; update.TimeIn = nowTime; } 
+                else if (!att.LunchOut) { actionLabel = "Lunch Out"; update.LunchOut = nowTime; } 
+                else if (!att.LunchBack) { actionLabel = "Lunch Back"; update.LunchBack = nowTime; } 
+                else if (!att.TimeOut) { actionLabel = "Time Out"; update.TimeOut = nowTime; } 
+                else { window.isProcessingScan = false; return showToast("Shift complete"); }
+                
+                db.ref(`attendance/${today}/${currentUserData.id}`).update(update).then(() => {
+                    localStorage.setItem(lastScanKey, Date.now());
+                    document.getElementById('modal-action-text').innerText = actionLabel;
+                    document.getElementById('success-modal').classList.remove('hidden');
+                    setTimeout(() => { document.getElementById('success-modal').classList.add('hidden'); window.isProcessingScan = false; }, 2800);
+                }).catch(() => { window.isProcessingScan = false; });
+            });
+        }
+        
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerHTML = msg;
+            t.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+            setTimeout(() => t.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none'), 4000);
+        }
+        
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        }, 1000);
+    </script>
+</body>
+</html>
