@@ -556,26 +556,20 @@ End of Report
         }
         
         function clearThreats() {
-            if (threats.length === 0) {
-                showNotification('No threats to clear', 'info');
-                return;
-            }
-            if (confirm(`Clear all ${threats.length} unauthorized login logs from Firebase?`)) {
-                db.ref('unauthorized_attempts').remove()
-                    .then(() => {
-                        threats = [];
-                        threatData = Array(20).fill(0);
-                        if (fluctuatingChart) {
-                            fluctuatingChart.data.datasets[1].data = threatData;
-                            fluctuatingChart.update();
-                        }
-                        renderThreats();
-                        showNotification('All threat logs cleared', 'success');
-                    })
-                    .catch(err => {
-                        showNotification('Failed to clear logs', 'error');
-                    });
-            }
+            db.ref('unauthorized_attempts').remove()
+                .then(() => {
+                    threats = [];
+                    threatData = Array(20).fill(0);
+                    if (fluctuatingChart) {
+                        fluctuatingChart.data.datasets[1].data = threatData;
+                        fluctuatingChart.update();
+                    }
+                    renderThreats();
+                    showNotification('All threat logs cleared', 'success');
+                })
+                .catch(err => {
+                    showNotification('Failed to clear logs', 'error');
+                });
         }
         
         function updateClock() {
@@ -610,20 +604,6 @@ End of Report
                             <div class="glass-card p-6 rounded-3xl text-center btn-hover">
                                 <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
                                 <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
-                                <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
-                                    <div class="bg-slate-800 rounded-lg p-2">
-                                        <div class="text-cyan-400 font-bold">${working}</div>
-                                        <div class="text-slate-500">Working</div>
-                                    </div>
-                                    <div class="bg-slate-800 rounded-lg p-2">
-                                        <div class="text-amber-400 font-bold">${lunch}</div>
-                                        <div class="text-slate-500">Lunch</div>
-                                    </div>
-                                    <div class="bg-slate-800 rounded-lg p-2">
-                                        <div class="text-red-400 font-bold">${out}</div>
-                                        <div class="text-slate-500">Out</div>
-                                    </div>
-                                </div>
                             </div>
                         `;
                         resolve();
