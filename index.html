@@ -246,7 +246,6 @@
                             <span class="w-3 h-3 rounded-full bg-cyan-400" title="Systems Online"></span>
                             <span class="w-3 h-3 rounded-full bg-emerald-400" title="Active Users"></span>
                             <span class="w-3 h-3 rounded-full bg-red-400" title="Threats"></span>
-                            <span class="w-3 h-3 rounded-full bg-amber-400" title="Lunch"></span>
                         </div>
                     </div>
                     <div class="flex-1 flex items-center justify-center">
@@ -428,21 +427,19 @@
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
-            const baseGain = 0.92 * volumeLevel; // extremely loud
-            // Loud urgent repeating siren alarm (5 beeps with rising pitch)
-            for (let i = 0; i < 5; i++) {
+            const gain = audioContext.createGain();
+            gain.gain.value = 0.95 * volumeLevel;
+            gain.connect(audioContext.destination);
+            // Classic harsh beeping alarm tone (rapid high-pitched square beeps)
+            for (let i = 0; i < 8; i++) {
                 setTimeout(() => {
                     const osc = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(680 + i * 120, audioContext.currentTime);
-                    gain.gain.value = baseGain;
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(1850, audioContext.currentTime);
                     osc.connect(gain);
-                    gain.connect(audioContext.destination);
                     osc.start();
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
-                    osc.stop(audioContext.currentTime + 0.38);
-                }, i * 280);
+                    osc.stop(audioContext.currentTime + 0.09);
+                }, i * 130);
             }
         }
        
@@ -633,10 +630,10 @@
             userDoughnutChart = new Chart(doughnutCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['System Online', 'Active Users', 'Threats', 'Lunch Break'],
+                    labels: ['System Online', 'Active Users', 'Threats'],
                     datasets: [{
-                        data: [1, 0, 0, 0],
-                        backgroundColor: ['#22d3ee', '#10b981', '#ef4444', '#fbbf24'],
+                        data: [1, 0, 0],
+                        backgroundColor: ['#22d3ee', '#10b981', '#ef4444'],
                         borderColor: '#0f172a',
                         borderWidth: 5
                     }]
@@ -999,7 +996,7 @@
             if (userDoughnutChart) {
                 const systemsOnline = 1;
                 const threatCount = threats.length;
-                userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount, lunch];
+                userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount];
                 userDoughnutChart.update();
             }
         }
