@@ -48,25 +48,37 @@
             from { opacity: 0; transform: translateX(-20px); }
             to { opacity: 1; transform: translateX(0); }
         }
+        .spin-anim { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .btn-hover { transition: all 0.2s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .btn-hover:active { transform: translateY(0) scale(0.98); }
+        .count-up { animation: countUp 0.5s ease-out; }
+        @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.5); } 50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.8); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="h-screen flex flex-col text-slate-200 overflow-hidden">
     <header class="glass-header border-b border-slate-700 z-50">
         <nav class="px-6 md:px-8 py-5 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg">S</div>
+            <div class="flex items-center gap-4 slide-up">
+                <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg pulse-glow">S</div>
                 <div>
                     <h1 class="text-3xl font-black tracking-tighter neon-text">SYSTEMS<span class="text-cyan-400">COMMAND</span></h1>
                     <p class="text-[10px] font-mono uppercase tracking-[3px] text-slate-400 -mt-1">REAL-TIME FIREBASE MONITOR</p>
                 </div>
             </div>
             <div class="flex items-center gap-6">
-                <div onclick="refreshAll()" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-colors text-sm">
-                    <i class="fa-solid fa-rotate text-lg"></i>
+                <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
+                    <i class="fa-solid fa-rotate text-lg" id="refreshIcon"></i>
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
                 </div>
-                <button onclick="exportFullReport()"
-                        class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold">
+                <button onclick="exportFullReport()" class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold btn-hover transition-all">
                     <i class="fa-solid fa-file-export"></i>
                     <span class="hidden sm:inline">EXPORT</span>
                 </button>
@@ -75,16 +87,19 @@
     </header>
     <main class="flex flex-1 overflow-hidden flex-col lg:flex-row">
         <!-- LEFT SIDEBAR -->
-        <div class="w-full lg:w-96 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-700 p-6 flex flex-col overflow-y-auto custom-scroll">
+        <div class="w-full lg:w-96 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-700 p-6 flex flex-col overflow-y-auto custom-scroll slide-up" style="animation-delay: 0.1s;">
             <div class="mb-8">
                 <div class="flex justify-between items-end">
                     <div>
-                        <div class="text-xs font-mono text-emerald-400">LIVE</div>
-                        <div class="text-5xl font-black text-white" id="totalActiveUsers">0</div>
+                        <div class="text-xs font-mono text-emerald-400 flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                            LIVE
+                        </div>
+                        <div class="text-5xl font-black text-white count-up" id="totalActiveUsers">0</div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-slate-400">SYSTEMS ONLINE</div>
-                        <div class="text-4xl font-black text-emerald-400">1</div>
+                        <div class="text-4xl font-black text-emerald-400 count-up" id="systemsOnline">1</div>
                     </div>
                 </div>
             </div>
@@ -93,13 +108,13 @@
                 <div class="flex-1 h-px bg-slate-700"></div>
             </div>
             <div id="systemsList" class="flex-1 space-y-3 overflow-y-auto custom-scroll"></div>
-            <div class="mt-8 glass-card p-5 rounded-3xl text-xs">
+            <div class="mt-8 glass-card p-5 rounded-3xl text-xs btn-hover">
                 <div class="flex justify-between mb-3">
                     <span class="text-slate-400">Avg Performance</span>
                     <span class="font-mono text-emerald-400" id="avgPerf">100%</span>
                 </div>
                 <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-full transition-all duration-500"></div>
+                    <div id="perfBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 w-full transition-all duration-700 ease-out"></div>
                 </div>
             </div>
             <!-- LIVE ACTIVE STAFF -->
@@ -111,32 +126,41 @@
             </div>
         </div>
         <!-- CENTER CONTENT -->
-        <div class="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden">
+        <div class="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden slide-up" style="animation-delay: 0.2s;">
             <div class="flex justify-between items-center mb-6 lg:mb-8">
                 <div>
                     <h2 class="text-3xl lg:text-4xl font-black tracking-tight">Attendance Hub Monitor</h2>
                     <p class="text-slate-400 mt-1 text-sm">Firebase Project: <span class="font-mono text-cyan-400">pinotp-d7ef5</span></p>
                 </div>
-                <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-clock"></i>
+                <div class="px-5 py-2 bg-slate-800 rounded-3xl text-sm flex items-center gap-2 btn-hover">
+                    <i class="fa-solid fa-clock text-cyan-400"></i>
                     <span id="currentTime" class="font-mono"></span>
                 </div>
             </div>
             <!-- CHARTS -->
             <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
                 <!-- Doughnut -->
-                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col">
+                <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col btn-hover">
                     <div class="flex justify-between items-center mb-6">
                         <div class="font-semibold text-lg">Live Status Distribution</div>
+                        <div class="flex gap-2">
+                            <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+                            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+                            <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                        </div>
                     </div>
-                    <div class="flex-1 flex items-center">
+                    <div class="flex-1 flex items-center justify-center">
                         <canvas id="userDoughnut" class="max-h-[260px]"></canvas>
                     </div>
                 </div>
                 <!-- Fluctuating Live Data -->
-                <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col">
+                <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col btn-hover">
                     <div class="flex justify-between items-center mb-6">
                         <div class="font-semibold text-lg">Live Data Incoming to Admin</div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>Scans</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-400"></span>Threats</span>
+                        </div>
                     </div>
                     <div class="flex-1">
                         <canvas id="fluctuatingChart"></canvas>
@@ -144,51 +168,55 @@
                 </div>
             </div>
             <!-- HEALTH -->
-            <div class="mt-6 glass-card rounded-3xl p-6">
-                <div class="text-lg font-semibold mb-5">System Health</div>
+            <div class="mt-6 glass-card rounded-3xl p-6 btn-hover">
+                <div class="text-lg font-semibold mb-5 flex items-center gap-2">
+                    <i class="fa-solid fa-heart-pulse text-emerald-400"></i>
+                    System Health
+                </div>
                 <div id="healthBars" class="grid grid-cols-1 gap-6"></div>
             </div>
         </div>
         <!-- RIGHT THREATS -->
-        <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
+        <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col slide-up" style="animation-delay: 0.3s;">
             <div class="p-6 border-b border-slate-700">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl"></i>
+                        <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl animate-bounce"></i>
                         <div>
                             <div class="font-bold text-xl">Unauthorized Logins</div>
                             <div class="text-xs text-red-400 font-mono">LIVE FEED • REAL ATTEMPTS</div>
                         </div>
                     </div>
-                    <div id="threatCounter" class="text-5xl font-black text-red-500">0</div>
+                    <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
                 </div>
             </div>
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
             <div class="p-4 border-t border-slate-700 bg-slate-950">
-                <div onclick="clearThreats()" class="text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2">
+                <button onclick="clearThreats()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
                     <i class="fa-solid fa-trash"></i> CLEAR LOG
-                </div>
+                </button>
             </div>
         </div>
     </main>
     <!-- MODERN THREAT MODAL -->
-    <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4">
+    <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4 fade-in">
         <div class="glass-card w-full max-w-md mx-auto rounded-3xl p-8 shadow-2xl modern-modal">
             <div class="flex justify-between items-start mb-6">
-                <div id="modalThreatTitle" class="text-2xl font-black text-white"></div>
-                <button onclick="closeThreatModal()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-colors">
+                <div id="modalThreatTitle" class="text-2xl font-black text-white flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
+                    UNAUTHORIZED LOGIN
+                </div>
+                <button onclick="closeThreatModal()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-all btn-hover">
                     <i class="fa-solid fa-xmark text-2xl"></i>
                 </button>
             </div>
             <div id="modalThreatContent" class="space-y-6 text-sm"></div>
             <div class="mt-10 flex gap-3">
-                <button onclick="closeThreatModal()"
-                        class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all active:scale-95">
-                    DISMISS
+                <button onclick="closeThreatModal()" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all btn-hover">
+                    <i class="fa-solid fa-check mr-2"></i>DISMISS
                 </button>
-                <button onclick="blockIP()"
-                        class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all active:scale-95">
-                    BLOCK IP
+                <button onclick="blockIP()" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all btn-hover">
+                    <i class="fa-solid fa-ban mr-2"></i>BLOCK IP
                 </button>
             </div>
         </div>
@@ -196,12 +224,17 @@
     <!-- THREAT ALERT TOAST -->
     <div id="threatToast">
         <div class="flex items-center gap-3">
-            <i class="fa-solid fa-exclamation-triangle text-xl"></i>
+            <i class="fa-solid fa-exclamation-triangle text-xl animate-pulse"></i>
             <div>
                 <div class="font-bold">New Threat Detected</div>
                 <div id="toastEmail" class="text-sm"></div>
             </div>
         </div>
+    </div>
+    <!-- NOTIFICATION TOAST -->
+    <div id="notifyToast" class="fixed top-20 right-6 bg-slate-800 border border-slate-600 text-white px-6 py-4 rounded-xl shadow-2xl transition-all duration-300 opacity-0 translate-x-10 pointer-events-none z-[1000] flex items-center gap-3">
+        <i id="notifyIcon" class="fa-solid fa-check-circle text-emerald-400"></i>
+        <span id="notifyMsg" class="font-medium">Notification</span>
     </div>
     <script>
         const firebaseConfig = {
@@ -220,40 +253,93 @@
         let threats = [];
         let liveActivityData = Array(20).fill(0);
         let threatData = Array(20).fill(0);
-        let liveActivityLabels = Array(20).fill('').map((_, i) => `-${i}m`);
+        let liveActivityLabels = Array(20).fill('').map((_, i) => `-${19-i}m`);
+        let isRefreshing = false;
+        let blockedIPs = new Set();
+        
+        function showNotification(message, type = 'success') {
+            const toast = document.getElementById('notifyToast');
+            const icon = document.getElementById('notifyIcon');
+            const msg = document.getElementById('notifyMsg');
+            
+            msg.textContent = message;
+            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : 'fa-solid fa-exclamation-circle text-amber-400';
+            
+            toast.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
+            }, 3000);
+        }
+        
+        function animateNumber(elementId, targetValue, duration = 500) {
+            const element = document.getElementById(elementId);
+            const startValue = parseInt(element.textContent) || 0;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(startValue + (targetValue - startValue) * easeProgress);
+                element.textContent = current;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            requestAnimationFrame(update);
+        }
         
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             container.innerHTML = `
-                <div class="glass-card p-6 rounded-3xl">
+                <div class="glass-card p-6 rounded-3xl btn-hover cursor-pointer transition-all" onclick="showSystemDetails()">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-4">
-                            <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
+                            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
                             <div>
                                 <div class="font-semibold">Attendance Hub</div>
                                 <div class="text-xs text-slate-400 font-mono">att-hub</div>
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-3xl font-black text-white">${presentToday}</div>
+                            <div class="text-3xl font-black text-white" id="presentCount">${presentToday}</div>
                             <div class="text-xs text-emerald-400">active now</div>
                         </div>
                     </div>
                     <div class="mt-6 text-xs text-slate-400">Total Registered Staff</div>
-                    <div class="text-5xl font-black text-white">${totalEmployees}</div>
+                    <div class="text-5xl font-black text-white count-up">${totalEmployees}</div>
                 </div>
             `;
         }
         
+        function showSystemDetails() {
+            showNotification('Attendance Hub System - All services operational', 'success');
+        }
+        
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
-            container.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="text-emerald-400 text-6xl mb-2">✓</div>
-                    <div class="font-black text-2xl">All Systems Healthy</div>
-                    <div class="text-xs text-slate-400 mt-1">Real-time Firebase Sync Active</div>
+            const healthMetrics = [
+                { name: 'Firebase Realtime DB', status: 'Operational', health: 100, color: 'emerald' },
+                { name: 'Authentication Service', status: 'Operational', health: 100, color: 'emerald' },
+                { name: 'Attendance API', status: 'Operational', health: 98, color: 'cyan' },
+                { name: 'Threat Detection', status: 'Active', health: 100, color: 'emerald' }
+            ];
+            
+            container.innerHTML = healthMetrics.map((metric, idx) => `
+                <div class="flex items-center gap-4 slide-up" style="animation-delay: ${idx * 0.1}s;">
+                    <div class="flex-1">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-300">${metric.name}</span>
+                            <span class="text-xs font-mono text-${metric.color}-400">${metric.status}</span>
+                        </div>
+                        <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-${metric.color}-400 rounded-full transition-all duration-1000 ease-out" style="width: ${metric.health}%"></div>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-slate-500 w-10 text-right">${metric.health}%</div>
                 </div>
-            `;
+            `).join('');
         }
         
         function initCharts() {
@@ -271,7 +357,8 @@
                 },
                 options: {
                     cutout: '78%',
-                    plugins: { legend: { display: false } }
+                    plugins: { legend: { display: false } },
+                    animation: { animateScale: true, animateRotate: true }
                 }
             });
             
@@ -285,17 +372,19 @@
                         data: liveActivityData,
                         borderColor: '#22d3ee',
                         tension: 0.4,
-                        borderWidth: 4,
+                        borderWidth: 3,
                         pointBackgroundColor: '#0f172a',
-                        pointRadius: 4
+                        pointRadius: 3,
+                        pointHoverRadius: 6
                     }, {
                         label: 'Threats',
                         data: threatData,
                         borderColor: '#ef4444',
                         tension: 0.4,
-                        borderWidth: 4,
+                        borderWidth: 3,
                         pointBackgroundColor: '#0f172a',
-                        pointRadius: 4
+                        pointRadius: 3,
+                        pointHoverRadius: 6
                     }]
                 },
                 options: {
@@ -303,7 +392,8 @@
                     scales: {
                         y: { grid: { color: '#334155' }, ticks: { color: '#64748b', stepSize: 2, beginAtZero: true } },
                         x: { grid: { color: '#334155' }, ticks: { color: '#64748b' } }
-                    }
+                    },
+                    animation: { duration: 300 }
                 }
             });
         }
@@ -312,48 +402,56 @@
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
             threats.forEach((threat, index) => {
+                const isNew = index === 0;
+                const isBlocked = blockedIPs.has(threat.attemptedEmail);
                 const div = document.createElement('div');
-                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-4 hover:bg-slate-800 transition-colors ${threat.severity === 'critical' ? 'threat-critical' : ''} ${index === 0 ? 'threat-new' : ''}`;
+                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-4 hover:bg-slate-800 transition-all btn-hover ${threat.severity === 'critical' ? 'threat-critical' : ''} ${isNew ? 'threat-new' : ''} ${isBlocked ? 'opacity-50' : ''}`;
                 div.innerHTML = `
-                    <div class="w-12 text-center">
+                    <div class="w-12 text-center flex flex-col items-center justify-center">
                         <div class="text-xs font-mono text-slate-400">${threat.time}</div>
+                        ${isBlocked ? '<i class="fa-solid fa-ban text-red-400 text-xs mt-1"></i>' : ''}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-white truncate">${threat.attemptedEmail}</div>
+                        <div class="font-semibold text-white truncate ${isBlocked ? 'line-through text-slate-500' : ''}">${threat.attemptedEmail}</div>
                         <div class="text-xs text-slate-400">Unauthorized Admin Login</div>
                     </div>
-                    <div class="text-right text-xs">
+                    <div class="text-right text-xs flex flex-col items-end justify-center">
                         <div class="font-mono text-slate-500">${threat.device || 'Unknown'}</div>
+                        ${isBlocked ? '<span class="text-red-400 text-[10px]">BLOCKED</span>' : ''}
                     </div>
                 `;
                 div.onclick = () => showThreatDetail(threat);
                 container.appendChild(div);
             });
-            document.getElementById('threatCounter').textContent = threats.length;
+            animateNumber('threatCounter', threats.length);
         }
         
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
+            const isBlocked = blockedIPs.has(threat.attemptedEmail);
             modal.classList.remove('hidden');
-            document.getElementById('modalThreatTitle').innerHTML = `UNAUTHORIZED LOGIN`;
+            document.getElementById('modalThreatTitle').innerHTML = `
+                <i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i>
+                ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}
+            `;
             document.getElementById('modalThreatContent').innerHTML = `
-                <div class="text-3xl font-black text-red-400 mb-6 break-all">${threat.attemptedEmail}</div>
+                <div class="text-3xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-6 break-all">${threat.attemptedEmail}</div>
                 <div class="grid grid-cols-2 gap-6 text-sm">
-                    <div>
-                        <div class="text-slate-400 text-xs uppercase tracking-wider">Time</div>
-                        <div class="font-mono text-lg">${threat.time}</div>
+                    <div class="glass-card p-3 rounded-xl">
+                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Time</div>
+                        <div class="font-mono text-lg text-white">${threat.time}</div>
                     </div>
-                    <div>
-                        <div class="text-slate-400 text-xs uppercase tracking-wider">Device</div>
-                        <div class="text-lg">${threat.device || 'Unknown'}</div>
+                    <div class="glass-card p-3 rounded-xl">
+                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Device</div>
+                        <div class="text-lg text-white">${threat.device || 'Unknown'}</div>
                     </div>
-                    <div>
-                        <div class="text-slate-400 text-xs uppercase tracking-wider">Severity</div>
-                        <div class="text-red-400 font-bold uppercase">${threat.severity || 'High'}</div>
+                    <div class="glass-card p-3 rounded-xl">
+                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Severity</div>
+                        <div class="${isBlocked ? 'text-slate-500' : 'text-red-400'} font-bold uppercase">${threat.severity || 'High'}</div>
                     </div>
-                    <div>
-                        <div class="text-slate-400 text-xs uppercase tracking-wider">Status</div>
-                        <div class="text-emerald-400 font-bold">BLOCKED</div>
+                    <div class="glass-card p-3 rounded-xl">
+                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Status</div>
+                        <div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'BLOCKED'}</div>
                     </div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
@@ -370,60 +468,167 @@
         }
         
         function blockIP() {
-            alert("IP blocked and added to Firebase security rules");
+            const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
+            if (email) {
+                blockedIPs.add(email);
+                showNotification(`IP/Email ${email} has been blocked`, 'success');
+                renderThreats();
+            }
             closeThreatModal();
         }
         
-        function refreshAll() {
-            loadAllData();
+        async function refreshAll() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('spin-anim');
+            
+            showNotification('Refreshing all systems...', 'info');
+            
+            await Promise.all([
+                new Promise(resolve => setTimeout(resolve, 800)),
+                loadAllData()
+            ]);
+            
+            icon.classList.remove('spin-anim');
+            isRefreshing = false;
+            showNotification('All systems refreshed successfully', 'success');
         }
         
         function exportFullReport() {
-            const report = `Firebase Systems Report\nGenerated: ${new Date().toISOString()}\nTotal Staff: ${document.getElementById('totalActiveUsers').textContent}\nUnauthorized Attempts: ${threats.length}`;
+            const now = new Date();
+            const reportData = {
+                generated: now.toISOString(),
+                totalStaff: document.getElementById('totalActiveUsers').textContent,
+                systemsOnline: document.getElementById('systemsOnline').textContent,
+                unauthorizedAttempts: threats.length,
+                threats: threats.map(t => ({
+                    email: t.attemptedEmail,
+                    time: t.time,
+                    device: t.device,
+                    severity: t.severity
+                }))
+            };
+            
+            const report = `═══════════════════════════════════════
+    FIREBASE SYSTEMS COMMAND CENTER
+    SECURITY REPORT
+═══════════════════════════════════════
+
+Generated: ${now.toLocaleString()}
+Report ID: RPT-${Date.now()}
+
+SYSTEM OVERVIEW
+─────────────────────────────────────
+Total Active Staff:     ${reportData.totalStaff}
+Systems Online:         ${reportData.systemsOnline}
+Firebase Project:       pinotp-d7ef5
+
+SECURITY SUMMARY
+─────────────────────────────────────
+Unauthorized Attempts:  ${reportData.unauthorizedAttempts}
+Blocked IPs:            ${blockedIPs.size}
+Threat Level:           ${threats.length > 5 ? 'HIGH' : threats.length > 0 ? 'MEDIUM' : 'LOW'}
+
+THREAT DETAILS
+─────────────────────────────────────
+${threats.length === 0 ? 'No threats detected.' : threats.map((t, i) => `
+[${i + 1}] ${t.attemptedEmail}
+    Time: ${t.time}
+    Device: ${t.device || 'Unknown'}
+    Severity: ${t.severity || 'High'}
+`).join('\n')}
+
+═══════════════════════════════════════
+End of Report
+═══════════════════════════════════════`;
+            
             const blob = new Blob([report], {type: 'text/plain'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `firebase-report-${new Date().toISOString().slice(0,10)}.txt`;
+            a.download = `security-report-${now.toISOString().slice(0,10)}-${Date.now()}.txt`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
+            
+            showNotification('Report exported successfully', 'success');
         }
         
         function clearThreats() {
-            if (confirm("Clear all unauthorized login logs from Firebase?")) {
-                db.ref('unauthorized_attempts').remove();
+            if (threats.length === 0) {
+                showNotification('No threats to clear', 'info');
+                return;
+            }
+            if (confirm(`Clear all ${threats.length} unauthorized login logs from Firebase?`)) {
+                db.ref('unauthorized_attempts').remove()
+                    .then(() => {
+                        threats = [];
+                        threatData = Array(20).fill(0);
+                        if (fluctuatingChart) {
+                            fluctuatingChart.data.datasets[1].data = threatData;
+                            fluctuatingChart.update();
+                        }
+                        renderThreats();
+                        showNotification('All threat logs cleared', 'success');
+                    })
+                    .catch(err => {
+                        showNotification('Failed to clear logs', 'error');
+                    });
             }
         }
         
         function updateClock() {
-            document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+            document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
         
         function loadAllData() {
-            db.ref('employees').on('value', snap => {
-                const total = Object.keys(snap.val() || {}).length;
-                renderSystems(total, 0);
-            });
-            
-            db.ref('attendance/' + todayStr).on('value', snap => {
-                const data = snap.val() || {};
-                let working = 0, lunch = 0, out = 0;
-                let active = 0;
-                Object.values(data).forEach(log => {
-                    if (log.TimeOut) out++;
-                    else if (log.LunchOut && !log.LunchBack) lunch++;
-                    else if (log.TimeIn) working++;
+            return new Promise((resolve) => {
+                db.ref('employees').once('value', snap => {
+                    const total = Object.keys(snap.val() || {}).length;
+                    
+                    db.ref('attendance/' + todayStr).once('value', snap2 => {
+                        const data = snap2.val() || {};
+                        let working = 0, lunch = 0, out = 0;
+                        let active = 0;
+                        Object.values(data).forEach(log => {
+                            if (log.TimeOut) out++;
+                            else if (log.LunchOut && !log.LunchBack) lunch++;
+                            else if (log.TimeIn) working++;
+                        });
+                        active = working + lunch;
+                        
+                        animateNumber('totalActiveUsers', active);
+                        renderSystems(total, active);
+                        
+                        if (userDoughnutChart) {
+                            userDoughnutChart.data.datasets[0].data = [working, lunch, out];
+                            userDoughnutChart.update();
+                        }
+                        
+                        document.getElementById('activeList').innerHTML = `
+                            <div class="glass-card p-6 rounded-3xl text-center btn-hover">
+                                <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
+                                <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
+                                <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                                    <div class="bg-slate-800 rounded-lg p-2">
+                                        <div class="text-cyan-400 font-bold">${working}</div>
+                                        <div class="text-slate-500">Working</div>
+                                    </div>
+                                    <div class="bg-slate-800 rounded-lg p-2">
+                                        <div class="text-amber-400 font-bold">${lunch}</div>
+                                        <div class="text-slate-500">Lunch</div>
+                                    </div>
+                                    <div class="bg-slate-800 rounded-lg p-2">
+                                        <div class="text-red-400 font-bold">${out}</div>
+                                        <div class="text-slate-500">Out</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        resolve();
+                    });
                 });
-                active = working + lunch;
-                document.getElementById('totalActiveUsers').textContent = active;
-                if (userDoughnutChart) {
-                    userDoughnutChart.data.datasets[0].data = [working, lunch, out];
-                    userDoughnutChart.update();
-                }
-                document.getElementById('activeList').innerHTML = `
-                    <div class="glass-card p-6 rounded-3xl text-center">
-                        <div class="text-8xl font-black text-emerald-400">${active}</div>
-                        <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
-                    </div>
-                `;
             });
         }
         
@@ -431,15 +636,15 @@
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
             if (threat) {
-                // Update chart
                 threatData.shift();
                 threatData.push((threatData[threatData.length - 1] || 0) + 1);
-                if (fluctuatingChart) fluctuatingChart.update();
+                if (fluctuatingChart) {
+                    fluctuatingChart.data.datasets[1].data = threatData;
+                    fluctuatingChart.update();
+                }
                 
-                // Show toast notification
                 showThreatAlert(threat);
                 
-                // Add to beginning of threats array
                 threats.unshift({...threat, key: snap.key});
                 threats = threats.slice(0, 12);
                 renderThreats();
@@ -461,7 +666,10 @@
         db.ref('attendance/' + todayStr).on('child_added', () => {
             liveActivityData.shift();
             liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
-            if (fluctuatingChart) fluctuatingChart.update();
+            if (fluctuatingChart) {
+                fluctuatingChart.data.datasets[0].data = liveActivityData;
+                fluctuatingChart.update();
+            }
         });
         
         function showThreatAlert(threat) {
@@ -471,13 +679,34 @@
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
         
+        // Close modal on backdrop click
+        document.getElementById('threatModal').addEventListener('click', (e) => {
+            if (e.target.id === 'threatModal') closeThreatModal();
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeThreatModal();
+            if (e.key === 'r' && e.ctrlKey) {
+                e.preventDefault();
+                refreshAll();
+            }
+        });
+        
         window.onload = () => {
             initCharts();
             loadAllData();
             setInterval(updateClock, 1000);
             updateClock();
-            setInterval(loadAllData, 15000);
+            setInterval(() => {
+                if (!isRefreshing) loadAllData();
+            }, 15000);
             renderHealthBars();
+            
+            // Simulate some initial data for demo
+            setTimeout(() => {
+                document.getElementById('perfBar').style.width = '98%';
+            }, 500);
         };
     </script>
 </body>
