@@ -139,6 +139,7 @@
             background-position: right 0.75rem center;
             background-size: 1.25rem;
             padding-right: 2.5rem;
+            width: 100%;
         }
         .threat-date-filter:hover {
             border-color: rgba(148, 163, 184, 0.4);
@@ -284,15 +285,9 @@
                     <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
                 </div>
             </div>
-            <!-- Time Filters with Date Picker -->
+            <!-- Date Filter for Threats -->
             <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
-                <div class="flex gap-2 items-center">
-                    <input type="date" id="threatDateFilter" class="threat-date-filter flex-1" onchange="setThreatDateFilter(this.value)">
-                    <button onclick="setThreatFilter('today')" class="filter-btn active flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="today">TODAY</button>
-                    <button onclick="setThreatFilter('week')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="week">WEEK</button>
-                    <button onclick="setThreatFilter('month')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="month">MONTH</button>
-                    <button onclick="setThreatFilter('all')" class="filter-btn flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300" data-filter="all">ALL</button>
-                </div>
+                <input type="date" id="threatDateFilter" class="threat-date-filter" onchange="setThreatDateFilter(this.value)">
             </div>
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
             <div class="p-4 border-t border-slate-700 bg-slate-950">
@@ -373,7 +368,6 @@
         let liveActivityLabels = Array(20).fill('').map((_, i) => `-${19-i}m`);
         let isRefreshing = false;
         let blockedIPs = new Set();
-        let currentThreatFilter = 'today';
         let selectedSystem = 'att-hub';
         
         // Audio context and sound settings
@@ -486,7 +480,29 @@
         // Set threat date filter
         function setThreatDateFilter(newDate) {
             threatFilterDate = newDate;
-            filterAndRenderThreats();
+            loadThreatsForDate(newDate);
+        }
+        
+        // Load threats for specific date from Firebase
+        function loadThreatsForDate(dateStr) {
+            const dateObj = new Date(dateStr);
+            const dateKey = dateStr.replace(/-/g, '');
+            
+            // Query threats for the specific date from Firebase
+            db.ref('unauthorized_attempts').orderByChild('date').equalTo(dateStr).once('value', snap => {
+                const data = snap.val() || {};
+                threats = [];
+                Object.keys(data).forEach(key => {
+                    const threat = data[key];
+                    threat.key = key;
+                    if (!threat.timestamp) threat.timestamp = Date.now();
+                    if (!threat.date) threat.date = dateStr;
+                    threats.push(threat);
+                });
+                threats.sort((a, b) => b.timestamp - a.timestamp);
+                renderThreats();
+                updateStatusChart();
+            });
         }
         
         // Setup attendance listener for selected date
@@ -695,43 +711,6 @@
             });
         }
         
-        function setThreatFilter(filter) {
-            currentThreatFilter = filter;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.filter === filter);
-            });
-            filterAndRenderThreats();
-        }
-        
-        function filterAndRenderThreats() {
-            const filterDateObj = new Date(threatFilterDate);
-            const filtered = allThreats.filter(threat => {
-                if (!threat.timestamp) return false;
-                const threatDate = new Date(threat.timestamp);
-                
-                switch(currentThreatFilter) {
-                    case 'today': 
-                        return threatDate.toDateString() === filterDateObj.toDateString();
-                    case 'week': {
-                        const weekAgo = new Date(filterDateObj);
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        return threatDate >= weekAgo && threatDate <= filterDateObj;
-                    }
-                    case 'month': {
-                        const monthAgo = new Date(filterDateObj);
-                        monthAgo.setDate(monthAgo.getDate() - 30);
-                        return threatDate >= monthAgo && threatDate <= filterDateObj;
-                    }
-                    case 'all': 
-                        return true;
-                    default: 
-                        return threatDate.toDateString() === filterDateObj.toDateString();
-                }
-            });
-            threats = filtered.slice(0, 12);
-            renderThreats();
-        }
-        
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
@@ -749,7 +728,7 @@
             }
             
             threats.forEach((threat, index) => {
-                const isNew = index === 0;
+                const isNew = index === 0 && threatFilterDate === todayStr;
                 const isBlocked = blockedIPs.has(threat.attemptedEmail);
                 const device = getDeviceIcon(threat.userAgent || threat.device);
                 const div = document.createElement('div');
@@ -889,6 +868,7 @@
                 `Systems Online: ${systemsOnline}`,
                 `Firebase Project: pinotp-d7ef5`,
                 `Selected Date: ${selectedDate}`,
+                `Threat Date Filter: ${threatFilterDate}`,
                 `Unauthorized Attempts: ${threatCount}`,
                 `Blocked IPs: ${blockedIPs.size}`,
                 `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
@@ -973,24 +953,30 @@
         
         function clearThreats() {
             threats = [];
-            allThreats = [];
-            threatData = Array(20).fill(0);
             
             if (fluctuatingChart) {
-                fluctuatingChart.data.datasets[1].data = threatData;
+                fluctuatingChart.data.datasets[1].data = Array(20).fill(0);
                 fluctuatingChart.update();
             }
             
             renderThreats();
             updateStatusChart();
             
-            db.ref('unauthorized_attempts').remove()
-                .then(() => {
-                    showNotification('All threat logs cleared', 'success');
-                })
-                .catch(err => {
-                    showNotification('Failed to clear logs: ' + err.message, 'error');
+            // Only clear threats for the selected filter date
+            db.ref('unauthorized_attempts').orderByChild('date').equalTo(threatFilterDate).once('value', snap => {
+                const data = snap.val() || {};
+                const updates = {};
+                Object.keys(data).forEach(key => {
+                    updates[key] = null;
                 });
+                db.ref('unauthorized_attempts').update(updates)
+                    .then(() => {
+                        showNotification(`Threat logs cleared for ${threatFilterDate}`, 'success');
+                    })
+                    .catch(err => {
+                        showNotification('Failed to clear logs: ' + err.message, 'error');
+                    });
+            });
         }
         
         function updateClock() {
@@ -1039,54 +1025,30 @@
             });
         }
         
-        // Real-time threat detection
+        // Real-time threat detection - only for today
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
             if (threat) {
                 threat.key = snap.key;
                 if (!threat.timestamp) threat.timestamp = Date.now();
-                if (!threat.date) threat.date = new Date().toLocaleDateString();
+                if (!threat.date) threat.date = new Date().toISOString().split('T')[0];
                 
-                threatData.shift();
-                threatData.push((threatData[threatData.length - 1] || 0) + 1);
-                if (fluctuatingChart) {
-                    fluctuatingChart.data.datasets[1].data = threatData;
-                    fluctuatingChart.update();
-                }
-                
-                showThreatAlert(threat);
-                if (selectedDate === todayStr) {
+                // Only show real-time updates if viewing today's threats
+                if (threatFilterDate === todayStr && threat.date === todayStr) {
+                    threatData.shift();
+                    threatData.push((threatData[threatData.length - 1] || 0) + 1);
+                    if (fluctuatingChart) {
+                        fluctuatingChart.data.datasets[1].data = threatData;
+                        fluctuatingChart.update();
+                    }
+                    
+                    showThreatAlert(threat);
                     playThreatSound();
+                    showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
+                    
+                    // Reload threats for today
+                    loadThreatsForDate(todayStr);
                 }
-                showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
-                
-                allThreats.unshift(threat);
-                filterAndRenderThreats();
-                updateStatusChart();
-            }
-        });
-        
-        // Load existing threats
-        db.ref('unauthorized_attempts').on('value', snap => {
-            const data = snap.val() || {};
-            allThreats = [];
-            Object.keys(data).forEach(key => {
-                const threat = data[key];
-                threat.key = key;
-                if (!threat.timestamp) threat.timestamp = Date.now();
-                if (!threat.date) threat.date = new Date().toLocaleDateString();
-                allThreats.push(threat);
-            });
-            allThreats.sort((a, b) => b.timestamp - a.timestamp);
-            filterAndRenderThreats();
-            updateStatusChart();
-        });
-        
-        // Listen for employee changes
-        db.ref('employees').on('child_added', (snap) => {
-            const emp = snap.val();
-            if (emp && emp.name) {
-                showDataNotification('New Employee', `${emp.name} registered in system`, 'fa-user-plus');
             }
         });
         
@@ -1123,6 +1085,7 @@
             initCharts();
             loadAllData();
             setupAttendanceListener();
+            loadThreatsForDate(todayStr); // Load today's threats initially
             setInterval(updateClock, 1000);
             updateClock();
             setInterval(() => {
