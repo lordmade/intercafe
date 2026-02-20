@@ -182,7 +182,7 @@
                     <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">In</span><span id="log-in" class="text-xs text-white font-mono">--:--</span></div>
                     <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Out</span><span id="log-lout" class="text-xs text-white font-mono">--:--</span></div>
                     <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">L-Back</span><span id="log-lback" class="text-xs text-white font-mono">--:--</span></div>
-                    <div class="log-pill"><span class="text-[9px] text-white/40 uppercase">Out</span><span id="log-out" class="text-xs text-white font-mono">--:--</span></div>
+                    <div class="log-pill"><span class="text-[9px] textwhite/40 uppercase">Out</span><span id="log-out" class="text-xs text-white font-mono">--:--</span></div>
                 </div>
             </div>
 
@@ -267,6 +267,25 @@
             try { await auth.signInWithPopup(provider); } catch (error) { showToast("Login failed"); }
         }
         
+        // Function to log unauthorized attempts
+        async function logUnauthorizedAttempt(user) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const deviceInfo = navigator.userAgent.match(/(iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini|Windows Phone|Desktop)/i)?.[0] || 'Unknown Device';
+            
+            const attemptData = {
+                attemptedEmail: user.email,
+                time: timeString,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                device: deviceInfo,
+                severity: 'critical',
+                ip: 'pending' // In production, you'd get this from a backend service
+            };
+            
+            // Push to unauthorized_attempts node
+            await db.ref('unauthorized_attempts').push(attemptData);
+        }
+        
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 const snap = await db.ref('employees').orderByChild('email').equalTo(user.email.toLowerCase()).once('value');
@@ -279,7 +298,9 @@
                     document.getElementById('debug-info').classList.remove('hidden');
                     listenToAttendance();
                 } else {
-                    showToast("Not registered");
+                    // Log unauthorized attempt before signing out
+                    await logUnauthorizedAttempt(user);
+                    showToast("Not registered - Alert sent to admin");
                     await auth.signOut();
                     showPortal();
                 }
