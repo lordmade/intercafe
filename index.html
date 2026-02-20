@@ -95,6 +95,9 @@
         .device-macos { color: #a2aaad; }
         .device-windows { color: #00a4ef; }
         .device-linux { color: #fcc624; }
+        .sound-btn { transition: all 0.2s ease; }
+        .sound-btn:hover { color: #22d3ee; }
+        .sound-btn.muted { color: #64748b; }
     </style>
 <base target="_blank">
 </head>
@@ -109,6 +112,10 @@
                 </div>
             </div>
             <div class="flex items-center gap-6">
+                <div onclick="toggleSound()" id="soundBtn" class="sound-btn flex items-center gap-2 cursor-pointer text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800" title="Toggle Sound Alerts">
+                    <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
+                    <span class="hidden md:inline font-medium">SOUND ON</span>
+                </div>
                 <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
                     <i class="fa-solid fa-rotate text-lg" id="refreshIcon"></i>
                     <span class="hidden md:inline font-medium">REFRESH ALL</span>
@@ -313,7 +320,101 @@
         let isRefreshing = false;
         let blockedIPs = new Set();
         let currentThreatFilter = 'today';
-        let selectedSystem = 'att-hub'; // Default to the only system
+        let selectedSystem = 'att-hub';
+        
+        // Audio context and sound settings
+        let audioContext = null;
+        let soundEnabled = true;
+        
+        // Initialize audio context on first user interaction
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+        
+        // Play threat alert sound (deep warning buzz)
+        function playThreatSound() {
+            if (!soundEnabled || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Deep warning tone
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+            
+            // Second tone for urgency
+            setTimeout(() => {
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(200, audioContext.currentTime);
+                gain2.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                osc2.start(audioContext.currentTime);
+                osc2.stop(audioContext.currentTime + 0.2);
+            }, 150);
+        }
+        
+        // Play attendance notification sound (pleasant chime)
+        function playAttendanceSound() {
+            if (!soundEnabled || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Pleasant chime
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+            
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4);
+        }
+        
+        // Toggle sound on/off
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundBtn');
+            const icon = document.getElementById('soundIcon');
+            const text = btn.querySelector('span');
+            
+            if (soundEnabled) {
+                btn.classList.remove('muted');
+                icon.className = 'fa-solid fa-volume-high text-lg';
+                text.textContent = 'SOUND ON';
+                showNotification('Sound alerts enabled', 'success');
+                // Initialize audio context on user interaction
+                initAudioContext();
+            } else {
+                btn.classList.add('muted');
+                icon.className = 'fa-solid fa-volume-xmark text-lg';
+                text.textContent = 'MUTED';
+                showNotification('Sound alerts disabled', 'info');
+            }
+        }
         
         // System health data for Attendance Hub only
         const systemHealthData = {
@@ -389,7 +490,6 @@
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             
-            // Only show the Attendance Hub connected to Firebase
             const system = { 
                 id: 'att-hub', 
                 name: 'Attendance Hub', 
@@ -794,7 +894,7 @@
         
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
-                const systemsOnline = 1; // Only Attendance Hub
+                const systemsOnline = 1;
                 const threatCount = threats.length;
                 userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount, lunch];
                 userDoughnutChart.update();
@@ -850,6 +950,7 @@
                 }
                 
                 showThreatAlert(threat);
+                playThreatSound(); // Play sound alert
                 showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
                 
                 allThreats.unshift(threat);
@@ -885,6 +986,7 @@
             }
             
             if (data && data.employeeName) {
+                playAttendanceSound(); // Play sound alert
                 showDataNotification('Attendance Recorded', `${data.employeeName} checked in`, 'fa-user-check');
             }
             loadAllData();
@@ -918,6 +1020,9 @@
                 refreshAll();
             }
         });
+        
+        // Initialize audio context on first user click anywhere
+        document.addEventListener('click', initAudioContext, { once: true });
         
         window.onload = () => {
             initCharts();
