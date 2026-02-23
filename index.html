@@ -156,6 +156,18 @@
         @keyframes pulse-green { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
         @keyframes pulse-yellow { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
         @keyframes pulse-orange { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* Loading Animations */
+        .loading-spinner { animation: spin 1s linear infinite; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #22d3ee; border-radius: 50%; margin: auto; }
+        .shimmer {
+            background: linear-gradient(to right, #1e293b 4%, #334155 25%, #1e293b 36%);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
     </style>
 <base target="_blank">
 </head>
@@ -846,11 +858,35 @@
             isRefreshing = true;
             const icon = document.getElementById('refreshIcon'); icon.classList.add('spin-anim');
             showNotification('Refreshing all systems...', 'info');
+            startShimmer();
             await Promise.all([new Promise(r=>setTimeout(r,800)), loadAllData()]);
+            stopShimmer();
             lastRefreshTime = Date.now(); updateRelativeTime();
             icon.classList.remove('spin-anim'); isRefreshing = false;
             showNotification('All systems refreshed successfully', 'success');
             addActivityLog('Refreshed', 'All systems');
+        }
+
+        function startShimmer() {
+            document.getElementById('systemsList').classList.add('shimmer');
+            document.getElementById('activeList').classList.add('shimmer');
+            document.getElementById('statusDistributionCard').classList.add('shimmer');
+            document.getElementById('fluctuatingChart').parentElement.classList.add('shimmer');
+            document.getElementById('healthBars').classList.add('shimmer');
+            document.getElementById('threatsFeed').classList.add('shimmer');
+            document.getElementById('systemsList').innerHTML = '<div class="loading-spinner"></div>';
+            document.getElementById('activeList').innerHTML = '<div class="loading-spinner"></div>';
+            document.getElementById('healthBars').innerHTML = '<div class="loading-spinner"></div>';
+            document.getElementById('threatsFeed').innerHTML = '<div class="loading-spinner"></div>';
+        }
+
+        function stopShimmer() {
+            document.getElementById('systemsList').classList.remove('shimmer');
+            document.getElementById('activeList').classList.remove('shimmer');
+            document.getElementById('statusDistributionCard').classList.remove('shimmer');
+            document.getElementById('fluctuatingChart').parentElement.classList.remove('shimmer');
+            document.getElementById('healthBars').classList.remove('shimmer');
+            document.getElementById('threatsFeed').classList.remove('shimmer');
         }
 
         async function exportFullReport() {
@@ -956,7 +992,7 @@
 
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
-                userDoughnutChart.data.datasets[0].data = [1, working + lunch, threats.length];
+                userDoughnutChart.data.datasets[0].data = [1, totalRegistered, threats.length];
                 userDoughnutChart.update();
             }
         }
