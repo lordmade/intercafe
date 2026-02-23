@@ -147,7 +147,6 @@
             outline: none;
             border-color: #22d3ee;
         }
-        .cluster-content { transition: all 0.3s ease; }
     </style>
 <base target="_blank">
 </head>
@@ -167,13 +166,11 @@
                     <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
                     <span class="hidden md:inline font-medium">SOUND ON</span>
                 </div>
+                <!-- Volume Slider -->
                 <div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-2xl">
                     <i class="fa-solid fa-volume-down text-cyan-400"></i>
                     <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1" 
                            class="accent-cyan-400 w-28 cursor-pointer" oninput="setVolume(this.value)">
-                </div>
-                <div onclick="startVoiceCommand()" class="flex items-center gap-2 cursor-pointer text-cyan-400 hover:text-white p-2 rounded-xl btn-hover" title="Voice Commands">
-                    <i class="fa-solid fa-microphone text-lg"></i>
                 </div>
                 <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
                     <i class="fa-solid fa-rotate text-lg" id="refreshIcon"></i>
@@ -348,16 +345,14 @@
                 </button>
             </div>
             <div id="modalThreatContent" class="space-y-6 text-sm"></div>
-        </div>
-    </div>
-    <!-- GEO MAP MODAL -->
-    <div id="geoModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[1000] p-4">
-        <div class="glass-card w-full max-w-sm rounded-3xl p-8">
-            <div class="flex justify-between items-center mb-6">
-                <div id="geoHeader" class="text-3xl"></div>
-                <button onclick="closeGeoModal()" class="text-slate-400 hover:text-white text-2xl">✕</button>
+            <div class="mt-10 flex gap-3">
+                <button onclick="closeThreatModal()" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all btn-hover">
+                    <i class="fa-solid fa-check mr-2"></i>DISMISS
+                </button>
+                <button onclick="blockIP()" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all btn-hover">
+                    <i class="fa-solid fa-ban mr-2"></i>BLOCK IP
+                </button>
             </div>
-            <div id="geoBody" class="text-center"></div>
         </div>
     </div>
     <!-- THREAT ALERT TOAST -->
@@ -435,6 +430,7 @@
             const gain = audioContext.createGain();
             gain.gain.value = 0.95 * volumeLevel;
             gain.connect(audioContext.destination);
+            // Classic harsh beeping alarm tone (rapid high-pitched square beeps)
             for (let i = 0; i < 8; i++) {
                 setTimeout(() => {
                     const osc = audioContext.createOscillator();
@@ -484,72 +480,6 @@
        
         function setVolume(val) {
             volumeLevel = parseFloat(val) / 100;
-        }
-       
-        function startVoiceCommand() {
-            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                showNotification('Voice commands not supported in this browser', 'error');
-                return;
-            }
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.interimResults = false;
-            recognition.onstart = () => showNotification('🎤 Listening... Speak now', 'info');
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript.toLowerCase().trim();
-                showNotification('✅ Heard: ' + transcript, 'success');
-                if (transcript.includes('show all threats') || transcript.includes('threats')) {
-                    setThreatFilter('all');
-                    document.getElementById('threatsFeed').scrollIntoView({ behavior: 'smooth' });
-                } else if (transcript.includes('export pdf') || transcript.includes('export')) {
-                    exportFullReport();
-                } else if (transcript.includes('mute') || transcript.includes('silent')) {
-                    soundEnabled = false;
-                    const btn = document.getElementById('soundBtn');
-                    btn.classList.add('muted');
-                    document.getElementById('soundIcon').className = 'fa-solid fa-volume-xmark text-lg';
-                    btn.querySelector('span').textContent = 'MUTED';
-                } else if (transcript.includes('refresh') || transcript.includes('reload')) {
-                    refreshAll();
-                }
-            };
-            recognition.onerror = () => showNotification('Voice recognition error', 'error');
-            recognition.start();
-        }
-       
-        function getGeo(threat) {
-            const email = (threat.attemptedEmail || '').toLowerCase();
-            const hash = [...email].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 5;
-            const locations = [
-                {flag: '🇿🇦', city: 'Johannesburg, South Africa', lat: '-26.20', lng: '28.05'},
-                {flag: '🇺🇸', city: 'New York, USA', lat: '40.71', lng: '-74.01'},
-                {flag: '🇬🇧', city: 'London, United Kingdom', lat: '51.51', lng: '-0.13'},
-                {flag: '🇮🇳', city: 'Mumbai, India', lat: '19.08', lng: '72.88'},
-                {flag: '🇧🇷', city: 'São Paulo, Brazil', lat: '-23.55', lng: '-46.63'}
-            ];
-            return locations[hash];
-        }
-       
-        function showGeoModal(threat) {
-            const geo = getGeo(threat);
-            document.getElementById('geoHeader').innerHTML = `${geo.flag} ${geo.city}`;
-            document.getElementById('geoBody').innerHTML = `
-                <div class="w-full h-64 bg-slate-900 rounded-3xl relative overflow-hidden flex items-center justify-center border border-slate-700">
-                    <div class="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:18px_18px]"></div>
-                    <div class="text-8xl opacity-10">🌍</div>
-                    <div class="absolute text-5xl text-red-500 drop-shadow-2xl animate-ping">📍</div>
-                    <div class="absolute bottom-6 left-6 text-xs font-mono bg-slate-950/70 px-3 py-1 rounded-xl">
-                        ${geo.lat}°S • ${geo.lng}°E
-                    </div>
-                </div>
-                <div class="mt-4 text-center text-slate-400 text-sm">Mini world map • Live geolocation</div>
-            `;
-            document.getElementById('geoModal').classList.remove('hidden');
-        }
-       
-        function closeGeoModal() {
-            document.getElementById('geoModal').classList.add('hidden');
         }
        
         function changeDate(newDate) {
@@ -790,7 +720,7 @@
        
         function filterAndRenderThreats() {
             const filterDateObj = new Date(threatFilterDate);
-            let filtered = allThreats.filter(threat => {
+            const filtered = allThreats.filter(threat => {
                 if (!threat.timestamp) return false;
                 const threatDate = new Date(threat.timestamp);
                 let dateMatch = false;
@@ -820,13 +750,8 @@
                 const deviceStr = ((threat.userAgent || threat.device || '') + '').toLowerCase();
                 return email.includes(currentSearchTerm) || deviceStr.includes(currentSearchTerm);
             });
-            threats = filtered.slice(0, 30);
+            threats = filtered.slice(0, 12);
             renderThreats();
-        }
-       
-        function toggleCluster(el) {
-            const content = el.nextElementSibling;
-            content.classList.toggle('hidden');
         }
        
         function renderThreats() {
@@ -843,56 +768,29 @@
                 document.getElementById('threatCounter').textContent = '0';
                 return;
             }
-            // Group into clusters by email
-            const grouped = {};
-            threats.forEach(threat => {
-                const key = threat.attemptedEmail || 'unknown';
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(threat);
-            });
-            const clusters = Object.keys(grouped).map(key => {
-                const items = grouped[key];
-                return {
-                    email: key,
-                    count: items.length,
-                    items: items,
-                    geo: getGeo(items[0]),
-                    device: getDeviceIcon(items[0].userAgent || items[0].device),
-                    severity: items.length >= 4 ? 'critical' : items.length >= 2 ? 'high' : 'medium',
-                    isBlocked: blockedIPs.has(key)
-                };
-            }).sort((a, b) => b.count - a.count);
-            clusters.forEach(cluster => {
-                const severityColor = cluster.severity === 'critical' ? 'bg-red-600' : cluster.severity === 'high' ? 'bg-amber-600' : 'bg-emerald-600';
-                let html = `
-                    <div class="glass-card rounded-3xl overflow-hidden ${cluster.isBlocked ? 'opacity-60' : ''}">
-                        <div onclick="toggleCluster(this)" class="p-4 flex gap-3 cursor-pointer hover:bg-slate-800 transition-all">
-                            <div class="w-10 flex-shrink-0 flex flex-col items-center text-center">
-                                <i class="fa-brands ${cluster.device.icon} ${cluster.device.class} device-icon"></i>
-                                <span onclick="event.stopImmediatePropagation(); showGeoModal(cluster.items[0]);" class="text-2xl cursor-pointer mt-1">${cluster.geo.flag}</span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <div class="font-semibold text-white truncate">${cluster.email}</div>
-                                    <span class="text-xs px-2.5 py-0.5 bg-slate-700 rounded-full font-mono">${cluster.count} attempts</span>
-                                </div>
-                                <div class="text-xs text-slate-400">${cluster.items[0].time} • Cluster</div>
-                            </div>
-                            <div class="text-right">
-                                <span class="inline-block px-3 py-1 text-xs font-bold rounded-2xl ${severityColor}">${cluster.severity.toUpperCase()}</span>
-                            </div>
-                        </div>
-                        <div class="cluster-content hidden p-4 border-t border-slate-700 bg-slate-950/50 space-y-3 text-sm">
-                            ${cluster.items.map((item, idx) => `
-                                <div class="pl-14 flex justify-between text-xs">
-                                    <span class="text-slate-400">${item.time}</span>
-                                    <span class="text-slate-500">${item.date || ''}</span>
-                                </div>
-                            `).join('')}
-                        </div>
+            threats.forEach((threat, index) => {
+                const isNew = index === 0;
+                const email = threat.attemptedEmail || '';
+                const isBlocked = blockedIPs.has(email);
+                const device = getDeviceIcon(threat.userAgent || threat.device);
+                const div = document.createElement('div');
+                div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-3 hover:bg-slate-800 transition-all btn-hover ${threat.severity === 'critical' ? 'threat-critical' : ''} ${isNew ? 'threat-new' : ''} ${isBlocked ? 'opacity-50' : ''}`;
+                div.innerHTML = `
+                    <div class="w-10 text-center flex flex-col items-center justify-center">
+                        <i class="fa-brands ${device.icon} ${device.class} device-icon"></i>
+                        <div class="text-[10px] font-mono text-slate-400 mt-1">${device.name}</div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-white truncate ${isBlocked ? 'line-through text-slate-500' : ''}">${email}</div>
+                        <div class="text-xs text-slate-400">${threat.time}</div>
+                    </div>
+                    <div class="text-right flex flex-col items-end justify-center gap-1">
+                        ${isBlocked ? `<span class="text-[9px] px-2 py-0.5 bg-red-900 text-red-400 rounded-full font-medium">AUTO-BLOCKED</span>` : ''}
+                        <i class="fa-solid ${isBlocked ? 'fa-ban' : 'fa-circle-exclamation'} text-red-400"></i>
                     </div>
                 `;
-                container.innerHTML += html;
+                div.onclick = () => showThreatDetail(threat);
+                container.appendChild(div);
             });
             animateNumber('threatCounter', threats.length);
         }
@@ -906,13 +804,6 @@
                 <i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i>
                 ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}
             `;
-            const actionButton = isBlocked ? 
-                `<button onclick="unblockIP()" class="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold transition-all btn-hover">
-                    <i class="fa-solid fa-lock-open mr-2"></i>UNBLOCK
-                </button>` : 
-                `<button onclick="blockIP()" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all btn-hover">
-                    <i class="fa-solid fa-ban mr-2"></i>BLOCK IP
-                </button>`;
             document.getElementById('modalThreatContent').innerHTML = `
                 <div class="text-2xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-4 break-all">${threat.attemptedEmail}</div>
                 <div class="flex items-center gap-3 mb-6 glass-card p-4 rounded-xl">
@@ -947,12 +838,6 @@
                     </div>
                     ${threat.userAgent ? `<div class="mt-2 text-[10px] break-all opacity-60">${threat.userAgent}</div>` : ''}
                 </div>
-                <div class="mt-10 flex gap-3">
-                    <button onclick="closeThreatModal()" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all btn-hover">
-                        <i class="fa-solid fa-check mr-2"></i>DISMISS
-                    </button>
-                    ${actionButton}
-                </div>
             `;
         }
        
@@ -961,22 +846,10 @@
         }
        
         function blockIP() {
-            const emailEl = document.querySelector('#modalThreatContent .break-all');
-            const email = emailEl ? emailEl.textContent : null;
+            const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
             if (email) {
                 blockedIPs.add(email);
                 showNotification(`IP/Email ${email} has been blocked`, 'success');
-                renderThreats();
-            }
-            closeThreatModal();
-        }
-       
-        function unblockIP() {
-            const emailEl = document.querySelector('#modalThreatContent .break-all');
-            const email = emailEl ? emailEl.textContent : null;
-            if (email) {
-                blockedIPs.delete(email);
-                showNotification(`IP/Email ${email} has been unblocked`, 'success');
                 renderThreats();
             }
             closeThreatModal();
@@ -1218,24 +1091,25 @@
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
        
+        // Close modal on backdrop click
         document.getElementById('threatModal').addEventListener('click', (e) => {
             if (e.target.id === 'threatModal') closeThreatModal();
         });
        
+        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeThreatModal();
-                closeGeoModal();
-            }
+            if (e.key === 'Escape') closeThreatModal();
             if (e.key === 'r' && e.ctrlKey) {
                 e.preventDefault();
                 refreshAll();
             }
         });
        
+        // Initialize audio context on first user click anywhere
         document.addEventListener('click', initAudioContext, { once: true });
        
         window.onload = () => {
+            // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
@@ -1258,6 +1132,7 @@
                 document.getElementById('perfBar').style.width = '98%';
             }, 500);
            
+            // Welcome notification
             setTimeout(() => {
                 showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
             }, 1000);
