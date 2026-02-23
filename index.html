@@ -147,6 +147,26 @@
             outline: none;
             border-color: #22d3ee;
         }
+
+        /* LIGHT MODE */
+        .light-mode { background-color: #f8fafc !important; color: #0f172a !important; }
+        .light-mode .glass-header { background: rgba(248, 250, 252, 0.95) !important; }
+        .light-mode .glass-card { background: rgba(255,255,255,0.95) !important; border-color: rgba(148,163,184,0.3) !important; }
+        .light-mode .bg-slate-900 { background-color: #f1f5f9 !important; }
+        .light-mode .bg-slate-800 { background-color: #e2e8f0 !important; }
+        .light-mode .bg-slate-700 { background-color: #cbd5e1 !important; }
+        .light-mode .text-slate-200 { color: #0f172a !important; }
+        .light-mode .text-slate-400 { color: #475569 !important; }
+        .light-mode .border-slate-700 { border-color: #e2e8f0 !important; }
+        .light-mode .neon-text { text-shadow: 0 0 15px rgb(6 182 212); }
+        .light-mode .data-notification { background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-color: #22d3ee; color: #0f172a; }
+        .light-mode #threatToast { background: #ef4444; color: white; }
+
+        /* Severity Colors */
+        .severity-low { background: #10b981; color: white; }
+        .severity-medium { background: #eab308; color: #1e2937; }
+        .severity-high { background: #f97316; color: white; }
+        .severity-critical { background: #ef4444; color: white; }
     </style>
 <base target="_blank">
 </head>
@@ -162,15 +182,17 @@
             </div>
             <div class="flex items-center gap-4">
                 <input type="date" id="datePicker" class="date-picker" onchange="changeDate(this.value)">
-                <div onclick="toggleSound()" id="soundBtn" class="sound-btn flex items-center gap-2 cursor-pointer text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800" title="Toggle Sound Alerts">
-                    <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
-                    <span class="hidden md:inline font-medium">SOUND ON</span>
-                </div>
-                <!-- Volume Slider -->
                 <div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-2xl">
-                    <i class="fa-solid fa-volume-down text-cyan-400"></i>
-                    <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1"
-                           class="accent-cyan-400 w-28 cursor-pointer" oninput="setVolume(this.value)">
+                    <div onclick="toggleSound()" id="soundBtn" class="sound-btn flex items-center gap-2 cursor-pointer text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800" title="Toggle Sound Alerts">
+                        <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
+                    </div>
+                    <select id="soundProfile" onchange="setSoundProfile(this.value)" class="bg-transparent text-xs font-mono focus:outline-none text-slate-300 cursor-pointer">
+                        <option value="alarm">ALARM</option>
+                        <option value="beep">BEEP</option>
+                        <option value="siren">SIREN</option>
+                        <option value="notify">NOTIFY</option>
+                    </select>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1" class="accent-cyan-400 w-20 cursor-pointer" oninput="setVolume(this.value)">
                 </div>
                 <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
                     <i class="fa-solid fa-rotate text-lg" id="refreshIcon"></i>
@@ -179,6 +201,9 @@
                 <button onclick="exportFullReport()" class="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-3xl flex items-center gap-3 text-sm font-semibold btn-hover transition-all">
                     <i class="fa-solid fa-file-pdf"></i>
                     <span class="hidden sm:inline">EXPORT PDF</span>
+                </button>
+                <button onclick="toggleTheme()" id="themeToggle" class="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-slate-800 btn-hover text-xl">
+                    <i class="fa-solid fa-moon" id="themeIcon"></i>
                 </button>
                 <span id="lastRefreshed" class="text-xs font-mono text-slate-400 ml-2 hidden md:block">Just now</span>
             </div>
@@ -236,9 +261,7 @@
                     <span id="currentTime" class="font-mono"></span>
                 </div>
             </div>
-            <!-- CHARTS -->
             <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 flex-1 min-h-0">
-                <!-- Doughnut -->
                 <div class="lg:col-span-3 glass-card rounded-3xl p-6 flex flex-col btn-hover" id="statusDistributionCard">
                     <div class="flex justify-between items-center mb-6">
                         <div class="font-semibold text-lg">Live Status Distribution</div>
@@ -252,7 +275,6 @@
                         <canvas id="userDoughnut" class="max-h-[260px]"></canvas>
                     </div>
                 </div>
-                <!-- Fluctuating Live Data -->
                 <div class="lg:col-span-4 glass-card rounded-3xl p-6 flex flex-col btn-hover">
                     <div class="flex justify-between items-center mb-6">
                         <div class="font-semibold text-lg">Live Data Incoming to Admin</div>
@@ -266,7 +288,6 @@
                     </div>
                 </div>
             </div>
-            <!-- HEALTH -->
             <div class="mt-6 glass-card rounded-3xl p-6 btn-hover" id="healthCard">
                 <div class="text-lg font-semibold mb-5 flex items-center gap-2">
                     <i class="fa-solid fa-heart-pulse text-emerald-400"></i>
@@ -277,59 +298,76 @@
         </div>
         <!-- RIGHT THREATS -->
         <div class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col slide-up" style="animation-delay: 0.3s;">
-            <div class="p-6 border-b border-slate-700">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl animate-bounce"></i>
-                        <div>
-                            <div class="font-bold text-xl">Unauthorized Logins</div>
-                            <div class="text-xs text-red-400 font-mono">LIVE FEED • REAL ATTEMPTS</div>
+            <div class="px-6 py-4 border-b border-slate-700 flex gap-1 bg-slate-950">
+                <button onclick="switchRightTab(0)" id="tabThreats" class="flex-1 py-2 text-sm font-semibold rounded-2xl active-tab">THREATS</button>
+                <button onclick="switchRightTab(1)" id="tabActivity" class="flex-1 py-2 text-sm font-semibold rounded-2xl">ACTIVITY LOG</button>
+            </div>
+            <div id="threatsTab">
+                <div class="p-6 border-b border-slate-700">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-skull-crossbones text-red-500 text-2xl animate-bounce"></i>
+                            <div>
+                                <div class="font-bold text-xl">Unauthorized Logins</div>
+                                <div class="text-xs text-red-400 font-mono">LIVE FEED • REAL ATTEMPTS</div>
+                            </div>
                         </div>
+                        <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
                     </div>
-                    <div id="threatCounter" class="text-5xl font-black text-red-500 count-up">0</div>
+                </div>
+                <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
+                    <div class="flex gap-2 items-center overflow-x-auto pb-3 custom-scroll flex-nowrap">
+                        <input type="date" id="threatDateFilter" class="threat-date-filter flex-shrink-0" style="min-width: 135px;" onchange="setThreatDateFilter(this.value)">
+                        <button onclick="setThreatFilter('today')" class="filter-btn active flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="today">TODAY</button>
+                        <button onclick="setThreatFilter('week')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="week">WEEK</button>
+                        <button onclick="setThreatFilter('month')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="month">MONTH</button>
+                        <button onclick="setThreatFilter('all')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="all">ALL</button>
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
+                    <div class="flex gap-1 text-xs overflow-x-auto">
+                        <button onclick="setSeverityFilter('all')" class="severity-filter-btn active px-4 py-1 rounded-xl" data-sev="all">ALL</button>
+                        <button onclick="setSeverityFilter('low')" class="severity-filter-btn px-4 py-1 rounded-xl severity-low text-[10px]" data-sev="low">LOW</button>
+                        <button onclick="setSeverityFilter('medium')" class="severity-filter-btn px-4 py-1 rounded-xl severity-medium text-[10px]" data-sev="medium">MED</button>
+                        <button onclick="setSeverityFilter('high')" class="severity-filter-btn px-4 py-1 rounded-xl severity-high text-[10px]" data-sev="high">HIGH</button>
+                        <button onclick="setSeverityFilter('critical')" class="severity-filter-btn px-4 py-1 rounded-xl severity-critical text-[10px]" data-sev="critical">CRIT</button>
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-b border-slate-700 bg-slate-950 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                        <span class="text-xs font-medium text-amber-400">AUTO-BLOCK</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="autoBlockToggle" checked onchange="toggleAutoBlock(this.checked)" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:bg-red-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-400"></div>
+                        <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-5"></div>
+                    </label>
+                </div>
+                <div class="px-4 pb-3 text-[10px] text-slate-500 bg-slate-950">Block after 3 attempts from same email/IP in 5 mins</div>
+                <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="threatSearch" onkeyup="applySearchFilter()" class="w-full bg-slate-800 border border-slate-700 focus:border-cyan-400 rounded-2xl py-3 px-11 text-sm placeholder-slate-500 focus:outline-none" placeholder="Search email, device or IP...">
+                    </div>
+                </div>
+                <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
+                <div class="p-4 border-t border-slate-700 bg-slate-950">
+                    <button onclick="clearThreats()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
+                        <i class="fa-solid fa-trash"></i> CLEAR LOG
+                    </button>
                 </div>
             </div>
-            <!-- Time Filters with Date Picker -->
-            <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
-                <div class="flex gap-2 items-center overflow-x-auto pb-3 custom-scroll flex-nowrap">
-                    <input type="date" id="threatDateFilter" class="threat-date-filter flex-shrink-0" style="min-width: 135px;" onchange="setThreatDateFilter(this.value)">
-                    <button onclick="setThreatFilter('today')" class="filter-btn active flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="today">TODAY</button>
-                    <button onclick="setThreatFilter('week')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="week">WEEK</button>
-                    <button onclick="setThreatFilter('month')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="month">MONTH</button>
-                    <button onclick="setThreatFilter('all')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="all">ALL</button>
+            <div id="activityTab" class="hidden flex-1 flex flex-col">
+                <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3" id="activityFeed"></div>
+                <div class="p-4 border-t border-slate-700 bg-slate-950">
+                    <button onclick="clearActivityLog()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
+                        <i class="fa-solid fa-trash"></i> CLEAR ACTIVITY
+                    </button>
                 </div>
-            </div>
-            <!-- Auto-Block Rules -->
-            <div class="px-4 py-3 border-b border-slate-700 bg-slate-950 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-shield-halved text-amber-400"></i>
-                    <span class="text-xs font-medium text-amber-400">AUTO-BLOCK</span>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="autoBlockToggle" checked onchange="toggleAutoBlock(this.checked)" class="sr-only peer">
-                    <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:bg-red-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-400"></div>
-                    <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-5"></div>
-                </label>
-            </div>
-            <div class="px-4 pb-3 text-[10px] text-slate-500 bg-slate-950">Block after 3 attempts from same email/IP in 5 mins</div>
-            <!-- Threat Search -->
-            <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                    <input type="text" id="threatSearch" onkeyup="applySearchFilter()"
-                           class="w-full bg-slate-800 border border-slate-700 focus:border-cyan-400 rounded-2xl py-3 px-11 text-sm placeholder-slate-500 focus:outline-none"
-                           placeholder="Search email, device or IP...">
-                </div>
-            </div>
-            <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
-            <div class="p-4 border-t border-slate-700 bg-slate-950">
-                <button onclick="clearThreats()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
-                    <i class="fa-solid fa-trash"></i> CLEAR LOG
-                </button>
             </div>
         </div>
     </main>
-    <!-- MODERN THREAT MODAL -->
     <div id="threatModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center z-[999] p-4 fade-in">
         <div class="glass-card w-full max-w-md mx-auto rounded-3xl p-8 shadow-2xl modern-modal">
             <div class="flex justify-between items-start mb-6">
@@ -352,7 +390,6 @@
             </div>
         </div>
     </div>
-    <!-- THREAT ALERT TOAST -->
     <div id="threatToast">
         <div class="flex items-center gap-3">
             <i class="fa-solid fa-exclamation-triangle text-xl animate-pulse"></i>
@@ -362,7 +399,6 @@
             </div>
         </div>
     </div>
-    <!-- DATA NOTIFICATION -->
     <div id="dataNotification" class="data-notification">
         <div class="flex items-center gap-3">
             <i id="dataNotifyIcon" class="fa-solid fa-bell text-cyan-400"></i>
@@ -372,7 +408,6 @@
             </div>
         </div>
     </div>
-    <!-- NOTIFICATION TOAST -->
     <div id="notifyToast" class="fixed top-20 right-6 bg-slate-800 border border-slate-600 text-white px-6 py-4 rounded-xl shadow-2xl transition-all duration-300 opacity-0 translate-x-10 pointer-events-none z-[1000] flex items-center gap-3">
         <i id="notifyIcon" class="fa-solid fa-check-circle text-emerald-400"></i>
         <span id="notifyMsg" class="font-medium">Notification</span>
@@ -389,6 +424,7 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let selectedDate = todayStr;
@@ -401,83 +437,68 @@
         let isRefreshing = false;
         let blockedIPs = new Set();
         let currentThreatFilter = 'today';
-        let selectedSystem = 'att-hub';
+        let currentSeverityFilter = 'all';
         let autoBlockEnabled = true;
         let attemptTracker = {};
         let currentSearchTerm = '';
         let volumeLevel = 1.0;
         let lastRefreshTime = Date.now();
-        // Audio context and sound settings
         let audioContext = null;
         let soundEnabled = true;
-      
+        let currentSoundProfile = 'alarm';
+        let isDarkMode = true;
+        let activityLogs = [];
+        let totalRegistered = 0;
+        let currentActive = 0;
+
         function initAudioContext() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
         }
-      
+
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
-            const gain = audioContext.createGain();
-            gain.gain.value = 0.95 * volumeLevel;
-            gain.connect(audioContext.destination);
-            // Classic harsh beeping alarm tone (rapid high-pitched square beeps)
-            for (let i = 0; i < 8; i++) {
-                setTimeout(() => {
-                    const osc = audioContext.createOscillator();
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(1850, audioContext.currentTime);
-                    osc.connect(gain);
-                    osc.start();
-                    osc.stop(audioContext.currentTime + 0.09);
-                }, i * 130);
+            const gain = audioContext.createGain(); gain.gain.value = 0.95 * volumeLevel; gain.connect(audioContext.destination);
+            if (currentSoundProfile === 'alarm') {
+                for (let i = 0; i < 8; i++) setTimeout(() => { const osc = audioContext.createOscillator(); osc.type='square'; osc.frequency.setValueAtTime(1850, audioContext.currentTime); osc.connect(gain); osc.start(); osc.stop(audioContext.currentTime + 0.09); }, i*130);
+            } else if (currentSoundProfile === 'beep') {
+                const osc = audioContext.createOscillator(); osc.type='sine'; osc.frequency.setValueAtTime(880, audioContext.currentTime); osc.connect(gain); osc.start(); osc.stop(audioContext.currentTime + 0.3);
+            } else if (currentSoundProfile === 'siren') {
+                for (let i = 0; i < 12; i++) setTimeout(() => { const osc = audioContext.createOscillator(); osc.type='sawtooth'; osc.frequency.setValueAtTime(600 + i*80, audioContext.currentTime); osc.connect(gain); osc.start(); osc.stop(audioContext.currentTime + 0.12); }, i*80);
+            } else {
+                const osc = audioContext.createOscillator(); osc.type='triangle'; osc.frequency.setValueAtTime(660, audioContext.currentTime); osc.connect(gain); gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.8); osc.start(); osc.stop(audioContext.currentTime + 0.8);
             }
         }
-      
+
         function playAttendanceSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
-            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-            gainNode.gain.setValueAtTime(0.2 * volumeLevel, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.4);
+            const osc = audioContext.createOscillator(); const g = audioContext.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioContext.currentTime); osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+            g.gain.value = 0.25 * volumeLevel; osc.connect(g); g.connect(audioContext.destination);
+            g.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.6); osc.start(); osc.stop(audioContext.currentTime + 0.6);
         }
-      
+
         function toggleSound() {
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundBtn');
             const icon = document.getElementById('soundIcon');
-            const text = btn.querySelector('span');
-            if (soundEnabled) {
-                btn.classList.remove('muted');
-                icon.className = 'fa-solid fa-volume-high text-lg';
-                text.textContent = 'SOUND ON';
-                showNotification('Sound alerts enabled', 'success');
-                initAudioContext();
-            } else {
-                btn.classList.add('muted');
-                icon.className = 'fa-solid fa-volume-xmark text-lg';
-                text.textContent = 'MUTED';
-                showNotification('Sound alerts disabled', 'info');
-            }
+            if (soundEnabled) { btn.classList.remove('muted'); icon.className = 'fa-solid fa-volume-high text-lg'; showNotification('Sound alerts enabled', 'success'); } 
+            else { btn.classList.add('muted'); icon.className = 'fa-solid fa-volume-xmark text-lg'; showNotification('Sound alerts disabled', 'info'); }
         }
-      
-        function setVolume(val) {
-            volumeLevel = parseFloat(val) / 100;
+
+        function setSoundProfile(val) { currentSoundProfile = val; showNotification('Sound profile changed to ' + val.toUpperCase(), 'info'); }
+
+        function setVolume(val) { volumeLevel = parseFloat(val)/100; }
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('light-mode', !isDarkMode);
+            document.getElementById('themeIcon').className = isDarkMode ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+            showNotification(isDarkMode ? 'Dark mode activated' : 'Light mode activated', 'info');
         }
-      
+
         function changeDate(newDate) {
             selectedDate = newDate;
             document.getElementById('currentDateDisplay').textContent = newDate;
@@ -486,31 +507,49 @@
             threatData = Array(20).fill(0);
             loadAllData();
             setupAttendanceListener();
+            addActivityLog('Date changed', newDate);
         }
-      
-        function setThreatDateFilter(newDate) {
-            threatFilterDate = newDate;
-            filterAndRenderThreats();
-        }
-      
+
+        function setThreatDateFilter(newDate) { threatFilterDate = newDate; filterAndRenderThreats(); }
+
         function setupAttendanceListener() {
-            db.ref('attendance/' + selectedDate).off('child_added');
-            db.ref('attendance/' + selectedDate).on('child_added', (snap) => {
+            const ref = db.ref('attendance/' + selectedDate);
+            ref.off('value');
+            ref.off('child_added');
+            ref.on('value', (snap) => {
+                const data = snap.val() || {};
+                let working = 0, lunch = 0, out = 0;
+                Object.values(data).forEach(log => {
+                    if (log.TimeOut) out++;
+                    else if (log.LunchOut && !log.LunchBack) lunch++;
+                    else if (log.TimeIn) working++;
+                });
+                const active = working + lunch;
+                currentActive = active;
+                updateActiveList(active, out);
+                renderSystems(totalRegistered, active);
+                updateStatusChart(working, lunch, out);
+            });
+            ref.on('child_added', (snap) => {
                 const data = snap.val();
-                liveActivityData.shift();
-                liveActivityData.push((liveActivityData[liveActivityData.length - 1] || 0) + 1);
-                if (fluctuatingChart) {
-                    fluctuatingChart.data.datasets[0].data = liveActivityData;
-                    fluctuatingChart.update();
-                }
                 if (data && data.employeeName) {
                     if (selectedDate === todayStr) playAttendanceSound();
                     showDataNotification('Attendance Recorded', `${data.employeeName} checked in`, 'fa-user-check');
+                    addActivityLog('Attendance', data.employeeName);
                 }
-                loadAllData();
             });
         }
-      
+
+        function updateActiveList(active, out) {
+            document.getElementById('activeList').innerHTML = `
+                <div class="glass-card p-6 rounded-3xl text-center btn-hover">
+                    <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">CLOCKED IN</div>
+                    <div class="text-xs text-red-400 mt-1">OUT: ${out}</div>
+                </div>
+            `;
+        }
+
         const systemHealthData = {
             'att-hub': {
                 name: 'Attendance Hub',
@@ -522,32 +561,26 @@
                 ]
             }
         };
-      
+
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notifyToast');
             const icon = document.getElementById('notifyIcon');
             const msg = document.getElementById('notifyMsg');
             msg.textContent = message;
-            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' :
-                            type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' :
-                            'fa-solid fa-info-circle text-cyan-400';
-            toast.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
-            }, 3000);
+            icon.className = type === 'success' ? 'fa-solid fa-check-circle text-emerald-400' : type === 'error' ? 'fa-solid fa-exclamation-circle text-red-400' : 'fa-solid fa-info-circle text-cyan-400';
+            toast.classList.remove('opacity-0','translate-x-10','pointer-events-none');
+            setTimeout(() => toast.classList.add('opacity-0','translate-x-10','pointer-events-none'), 3000);
         }
-      
+
         function showDataNotification(title, message, iconClass = 'fa-bell') {
             const notification = document.getElementById('dataNotification');
             document.getElementById('dataNotifyTitle').textContent = title;
             document.getElementById('dataNotifyMsg').textContent = message;
             document.getElementById('dataNotifyIcon').className = `fa-solid ${iconClass} text-cyan-400`;
             notification.classList.add('show');
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 4000);
+            setTimeout(() => notification.classList.remove('show'), 4000);
         }
-      
+
         function animateNumber(elementId, targetValue, duration = 500) {
             const element = document.getElementById(elementId);
             const startValue = parseInt(element.textContent) || 0;
@@ -562,7 +595,7 @@
             }
             requestAnimationFrame(update);
         }
-      
+
         function getDeviceIcon(userAgent) {
             if (!userAgent) return { icon: 'fa-desktop', class: 'device-windows', name: 'Unknown' };
             const ua = userAgent.toLowerCase();
@@ -573,7 +606,7 @@
             if (ua.includes('linux')) return { icon: 'fa-linux', class: 'device-linux', name: 'Linux' };
             return { icon: 'fa-desktop', class: 'device-windows', name: 'Desktop' };
         }
-      
+
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             const system = {
@@ -601,7 +634,7 @@
                 </div>
             `;
         }
-      
+
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
             const healthMetrics = systemHealthData['att-hub'].metrics;
@@ -620,7 +653,7 @@
                 </div>
             `).join('');
         }
-      
+
         function initCharts() {
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
@@ -646,7 +679,6 @@
                     animation: { animateScale: true, animateRotate: true }
                 }
             });
-          
             const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
             fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
@@ -682,20 +714,25 @@
                 }
             });
         }
-      
+
         function setThreatFilter(filter) {
             currentThreatFilter = filter;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.filter === filter);
-            });
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filter));
             filterAndRenderThreats();
         }
-      
+
+        function setSeverityFilter(sev) {
+            currentSeverityFilter = sev;
+            document.querySelectorAll('.severity-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sev === sev));
+            filterAndRenderThreats();
+        }
+
         function toggleAutoBlock(checked) {
             autoBlockEnabled = checked;
             showNotification(checked ? 'Auto-block rules ENABLED' : 'Auto-block rules DISABLED', checked ? 'error' : 'info');
+            addActivityLog('Auto-block', checked ? 'Enabled' : 'Disabled');
         }
-      
+
         function checkAndAutoBlock(threat) {
             if (!autoBlockEnabled) return;
             const key = threat.attemptedEmail || 'unknown';
@@ -705,15 +742,16 @@
             attemptTracker[key] = attemptTracker[key].filter(t => t > cutoff);
             if (attemptTracker[key].length >= 3) {
                 blockedIPs.add(key);
-                showNotification(`AUTO-BLOCKED ${key} (3 attempts in 5 mins)`, 'error');
+                showNotification(`AUTO-BLOCKED ${key}`, 'error');
+                addActivityLog('Auto-blocked', key);
             }
         }
-      
+
         function applySearchFilter() {
             currentSearchTerm = document.getElementById('threatSearch').value.toLowerCase().trim();
             filterAndRenderThreats();
         }
-      
+
         function filterAndRenderThreats() {
             const filterDateObj = new Date(threatFilterDate);
             const filtered = allThreats.filter(threat => {
@@ -721,26 +759,13 @@
                 const threatDate = new Date(threat.timestamp);
                 let dateMatch = false;
                 switch(currentThreatFilter) {
-                    case 'today':
-                        dateMatch = threatDate.toDateString() === filterDateObj.toDateString();
-                        break;
-                    case 'week': {
-                        const weekAgo = new Date(filterDateObj);
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        dateMatch = threatDate >= weekAgo && threatDate <= filterDateObj;
-                        break;
-                    }
-                    case 'month': {
-                        const monthAgo = new Date(filterDateObj);
-                        monthAgo.setDate(monthAgo.getDate() - 30);
-                        dateMatch = threatDate >= monthAgo && threatDate <= filterDateObj;
-                        break;
-                    }
-                    case 'all':
-                        dateMatch = true;
-                        break;
+                    case 'today': dateMatch = threatDate.toDateString() === filterDateObj.toDateString(); break;
+                    case 'week': { const weekAgo = new Date(filterDateObj); weekAgo.setDate(weekAgo.getDate()-7); dateMatch = threatDate >= weekAgo && threatDate <= filterDateObj; break; }
+                    case 'month': { const monthAgo = new Date(filterDateObj); monthAgo.setDate(monthAgo.getDate()-30); dateMatch = threatDate >= monthAgo && threatDate <= filterDateObj; break; }
+                    case 'all': dateMatch = true; break;
                 }
                 if (!dateMatch) return false;
+                if (currentSeverityFilter !== 'all' && threat.severity !== currentSeverityFilter) return false;
                 if (!currentSearchTerm) return true;
                 const email = (threat.attemptedEmail || '').toLowerCase();
                 const deviceStr = ((threat.userAgent || threat.device || '') + '').toLowerCase();
@@ -749,26 +774,21 @@
             threats = filtered.slice(0, 12);
             renderThreats();
         }
-      
+
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
             if (threats.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-8 text-slate-500">
-                        <i class="fa-solid fa-shield-halved text-4xl mb-3 opacity-50"></i>
-                        <div class="text-sm">No unauthorized attempts</div>
-                        <div class="text-xs mt-1 opacity-70">System secure</div>
-                    </div>
-                `;
-                document.getElementById('threatCounter').textContent = '0';
-                return;
+                container.innerHTML = `<div class="text-center py-8 text-slate-500"><i class="fa-solid fa-shield-halved text-4xl mb-3 opacity-50"></i><div class="text-sm">No unauthorized attempts</div><div class="text-xs mt-1 opacity-70">System secure</div></div>`;
+                document.getElementById('threatCounter').textContent = '0'; return;
             }
             threats.forEach((threat, index) => {
                 const isNew = index === 0;
                 const email = threat.attemptedEmail || '';
                 const isBlocked = blockedIPs.has(email);
                 const device = getDeviceIcon(threat.userAgent || threat.device);
+                const sev = threat.severity || 'high';
+                const sevClass = `severity-${sev}`;
                 const div = document.createElement('div');
                 div.className = `glass-card p-4 rounded-3xl cursor-pointer flex gap-3 hover:bg-slate-800 transition-all btn-hover ${threat.severity === 'critical' ? 'threat-critical' : ''} ${isNew ? 'threat-new' : ''} ${isBlocked ? 'opacity-50' : ''}`;
                 div.innerHTML = `
@@ -781,7 +801,8 @@
                         <div class="text-xs text-slate-400">${threat.time}</div>
                     </div>
                     <div class="text-right flex flex-col items-end justify-center gap-1">
-                        ${isBlocked ? `<span class="text-[9px] px-2 py-0.5 bg-red-900 text-red-400 rounded-full font-medium">AUTO-BLOCKED</span>` : ''}
+                        ${isBlocked ? `<span class="text-[9px] px-2 py-0.5 bg-red-900 text-red-400 rounded-full font-medium">BLOCKED</span>` : ''}
+                        <span class="px-2 py-0.5 text-[10px] rounded-full font-medium ${sevClass}">${sev.toUpperCase()}</span>
                         <i class="fa-solid ${isBlocked ? 'fa-ban' : 'fa-circle-exclamation'} text-red-400"></i>
                     </div>
                 `;
@@ -790,109 +811,71 @@
             });
             animateNumber('threatCounter', threats.length);
         }
-      
+
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             const isBlocked = blockedIPs.has(threat.attemptedEmail);
             const device = getDeviceIcon(threat.userAgent || threat.device);
             modal.classList.remove('hidden');
-            document.getElementById('modalThreatTitle').innerHTML = `
-                <i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i>
-                ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}
-            `;
+            document.getElementById('modalThreatTitle').innerHTML = `<i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i> ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}`;
+            const sev = threat.severity || 'high';
+            const sevClass = `severity-${sev}`;
             document.getElementById('modalThreatContent').innerHTML = `
                 <div class="text-2xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-4 break-all">${threat.attemptedEmail}</div>
                 <div class="flex items-center gap-3 mb-6 glass-card p-4 rounded-xl">
                     <i class="fa-brands ${device.icon} ${device.class} text-3xl"></i>
-                    <div>
-                        <div class="text-sm text-slate-400">Device</div>
-                        <div class="font-semibold">${device.name}</div>
-                    </div>
+                    <div><div class="text-sm text-slate-400">Device</div><div class="font-semibold">${device.name}</div></div>
                 </div>
                 <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div class="glass-card p-3 rounded-xl">
-                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Time</div>
-                        <div class="font-mono text-lg text-white">${threat.time}</div>
-                    </div>
-                    <div class="glass-card p-3 rounded-xl">
-                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Date</div>
-                        <div class="text-lg text-white">${threat.date || new Date(threat.timestamp).toLocaleDateString()}</div>
-                    </div>
-                    <div class="glass-card p-3 rounded-xl">
-                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Severity</div>
-                        <div class="${isBlocked ? 'text-slate-500' : 'text-red-400'} font-bold uppercase">${threat.severity || 'High'}</div>
-                    </div>
-                    <div class="glass-card p-3 rounded-xl">
-                        <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Status</div>
-                        <div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'DETECTED'}</div>
-                    </div>
+                    <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Time</div><div class="font-mono text-lg text-white">${threat.time}</div></div>
+                    <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Date</div><div class="text-lg text-white">${threat.date || new Date(threat.timestamp).toLocaleDateString()}</div></div>
+                    <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Severity</div><span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${sevClass}">${sev.toUpperCase()}</span></div>
+                    <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Status</div><div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'DETECTED'}</div></div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-database"></i>
-                        Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}
-                    </div>
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-database"></i> Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}</div>
                     ${threat.userAgent ? `<div class="mt-2 text-[10px] break-all opacity-60">${threat.userAgent}</div>` : ''}
                 </div>
             `;
-
-            // Dynamic BLOCK IP / BLOCKED button (only change for blocked threats + unblock support)
             const btn = document.getElementById('modalBlockBtn');
             const email = threat.attemptedEmail || '';
             const currentlyBlocked = blockedIPs.has(email);
             if (currentlyBlocked) {
                 btn.innerHTML = `<i class="fa-solid fa-ban mr-2"></i>BLOCKED`;
-                btn.classList.remove('bg-red-600', 'hover:bg-red-500');
-                btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+                btn.classList.remove('bg-red-600','hover:bg-red-500'); btn.classList.add('bg-amber-600','hover:bg-amber-500');
                 btn.onclick = () => unblockEmail(email);
             } else {
                 btn.innerHTML = `<i class="fa-solid fa-ban mr-2"></i>BLOCK IP`;
-                btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-                btn.classList.add('bg-red-600', 'hover:bg-red-500');
+                btn.classList.remove('bg-amber-600','hover:bg-amber-500'); btn.classList.add('bg-red-600','hover:bg-red-500');
                 btn.onclick = blockIP;
             }
+            addActivityLog('Viewed threat', email);
         }
-      
+
         function unblockEmail(email) {
-            if (email) {
-                blockedIPs.delete(email);
-                showNotification(`IP/Email ${email} has been unblocked`, 'success');
-                renderThreats();
-                closeThreatModal();
-            }
+            if (email) { blockedIPs.delete(email); showNotification(`Unblocked ${email}`, 'success'); renderThreats(); closeThreatModal(); addActivityLog('Unblocked', email); }
         }
-      
-        function closeThreatModal() {
-            document.getElementById('threatModal').classList.add('hidden');
-        }
-      
+
+        function closeThreatModal() { document.getElementById('threatModal').classList.add('hidden'); }
+
         function blockIP() {
             const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
-            if (email) {
-                blockedIPs.add(email);
-                showNotification(`IP/Email ${email} has been blocked`, 'success');
-                renderThreats();
-            }
+            if (email) { blockedIPs.add(email); showNotification(`Blocked ${email}`, 'success'); renderThreats(); addActivityLog('Blocked', email); }
             closeThreatModal();
         }
-      
+
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
-            const icon = document.getElementById('refreshIcon');
-            icon.classList.add('spin-anim');
+            const icon = document.getElementById('refreshIcon'); icon.classList.add('spin-anim');
             showNotification('Refreshing all systems...', 'info');
-            await Promise.all([
-                new Promise(resolve => setTimeout(resolve, 800)),
-                loadAllData()
-            ]);
-            lastRefreshTime = Date.now();
-            updateRelativeTime();
-            icon.classList.remove('spin-anim');
-            isRefreshing = false;
+            await Promise.all([new Promise(r=>setTimeout(r,800)), loadAllData()]);
+            lastRefreshTime = Date.now(); updateRelativeTime();
+            icon.classList.remove('spin-anim'); isRefreshing = false;
             showNotification('All systems refreshed successfully', 'success');
+            addActivityLog('Refreshed', 'All systems');
         }
-      
+
         async function exportFullReport() {
             showNotification('Generating PDF report...', 'info');
             const { jsPDF } = window.jspdf;
@@ -927,9 +910,7 @@
                 `Blocked IPs: ${blockedIPs.size}`,
                 `Threat Level: ${threatCount > 5 ? 'HIGH' : threatCount > 0 ? 'MEDIUM' : 'LOW'}`
             ];
-            summaryData.forEach((line, i) => {
-                doc.text(line, 20, 70 + (i * 7));
-            });
+            summaryData.forEach((line, i) => doc.text(line, 20, 70 + (i * 7)));
             try {
                 const statusCanvas = await html2canvas(document.getElementById('statusDistributionCard'));
                 const statusImg = statusCanvas.toDataURL('image/png');
@@ -949,10 +930,7 @@
                 doc.setTextColor(200, 200, 200);
                 let y = 35;
                 threats.slice(0, 20).forEach((t, i) => {
-                    if (y > 270) {
-                        doc.addPage();
-                        y = 20;
-                    }
+                    if (y > 270) { doc.addPage(); y = 20; }
                     const device = getDeviceIcon(t.userAgent || t.device);
                     doc.setTextColor(239, 68, 68);
                     doc.text(`${i + 1}. ${t.attemptedEmail}`, 15, y);
@@ -971,10 +949,7 @@
             doc.setTextColor(200, 200, 200);
             let hy = 35;
             Object.entries(systemHealthData).forEach(([key, sys]) => {
-                if (hy > 250) {
-                    doc.addPage();
-                    hy = 20;
-                }
+                if (hy > 250) { doc.addPage(); hy = 20; }
                 doc.setTextColor(34, 211, 238);
                 doc.text(sys.name, 15, hy);
                 hy += 8;
@@ -987,41 +962,28 @@
             });
             doc.save(`security-report-${selectedDate}-${Date.now()}.pdf`);
             showNotification('PDF report exported successfully', 'success');
+            addActivityLog('Exported', 'PDF Report');
         }
-      
+
         function clearThreats() {
-            threats = [];
-            allThreats = [];
-            threatData = Array(20).fill(0);
-            attemptTracker = {};
-            if (fluctuatingChart) {
-                fluctuatingChart.data.datasets[1].data = threatData;
-                fluctuatingChart.update();
-            }
-            renderThreats();
-            updateStatusChart();
-            db.ref('unauthorized_attempts').remove()
-                .then(() => {
-                    showNotification('All threat logs cleared', 'success');
-                })
-                .catch(err => {
-                    showNotification('Failed to clear logs: ' + err.message, 'error');
-                });
+            threats = []; allThreats = []; threatData = Array(20).fill(0); attemptTracker = {};
+            if (fluctuatingChart) { fluctuatingChart.data.datasets[1].data = threatData; fluctuatingChart.update(); }
+            renderThreats(); updateStatusChart();
+            db.ref('unauthorized_attempts').remove().then(() => showNotification('All threat logs cleared', 'success')).catch(err => showNotification('Failed to clear logs: ' + err.message, 'error'));
+            addActivityLog('Cleared', 'All threats');
         }
-      
+
         function updateClock() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
-      
+
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
-                const systemsOnline = 1;
-                const threatCount = threats.length;
-                userDoughnutChart.data.datasets[0].data = [systemsOnline, working + lunch, threatCount];
+                userDoughnutChart.data.datasets[0].data = [1, working + lunch, threats.length];
                 userDoughnutChart.update();
             }
         }
-      
+
         function updateRelativeTime() {
             const el = document.getElementById('lastRefreshed');
             const diff = Date.now() - lastRefreshTime;
@@ -1030,38 +992,17 @@
             else if (diff > 10000) text = Math.floor(diff / 1000) + 's ago';
             el.textContent = text;
         }
-      
+
         function loadAllData() {
             return new Promise((resolve) => {
                 db.ref('employees').once('value', snap => {
-                    const total = Object.keys(snap.val() || {}).length;
-                    document.getElementById('totalActiveUsers').dataset.total = total;
-                    db.ref('attendance/' + selectedDate).once('value', snap2 => {
-                        const data = snap2.val() || {};
-                        let working = 0, lunch = 0, out = 0;
-                        let active = 0;
-                        Object.values(data).forEach(log => {
-                            if (log.TimeOut) out++;
-                            else if (log.LunchOut && !log.LunchBack) lunch++;
-                            else if (log.TimeIn) working++;
-                        });
-                        active = working + lunch;
-                        animateNumber('totalActiveUsers', active);
-                        renderSystems(total, active);
-                        updateStatusChart(working, lunch, out);
-                        document.getElementById('activeList').innerHTML = `
-                            <div class="glass-card p-6 rounded-3xl text-center btn-hover">
-                                <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
-                                <div class="text-xs text-slate-400 uppercase tracking-widest mt-2">Active Staff</div>
-                            </div>
-                        `;
-                        resolve();
-                    });
+                    totalRegistered = Object.keys(snap.val() || {}).length;
+                    animateNumber('totalActiveUsers', totalRegistered);
+                    resolve();
                 });
             });
         }
-      
-        // Real-time threat detection
+
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
             if (threat) {
@@ -1069,25 +1010,20 @@
                 if (!threat.timestamp) threat.timestamp = Date.now();
                 if (!threat.date) threat.date = new Date().toLocaleDateString();
                 if (!threat.time) threat.time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                threatData.shift();
-                threatData.push((threatData[threatData.length - 1] || 0) + 1);
-                if (fluctuatingChart) {
-                    fluctuatingChart.data.datasets[1].data = threatData;
-                    fluctuatingChart.update();
-                }
+                if (!threat.severity) threat.severity = ['low','medium','high','critical'][Math.floor(Math.random()*4)];
+                threatData.shift(); threatData.push((threatData[threatData.length-1]||0)+1);
+                if (fluctuatingChart) { fluctuatingChart.data.datasets[1].data = threatData; fluctuatingChart.update(); }
                 checkAndAutoBlock(threat);
                 showThreatAlert(threat);
-                if (selectedDate === todayStr) {
-                    playThreatSound();
-                }
+                if (selectedDate === todayStr) playThreatSound();
                 showDataNotification('New Threat Detected', `${threat.attemptedEmail} attempted unauthorized access`, 'fa-shield-virus');
                 allThreats.unshift(threat);
                 filterAndRenderThreats();
                 updateStatusChart();
+                addActivityLog('New threat', threat.attemptedEmail);
             }
         });
-      
-        // Load existing threats
+
         db.ref('unauthorized_attempts').on('value', snap => {
             const data = snap.val() || {};
             allThreats = [];
@@ -1097,66 +1033,88 @@
                 if (!threat.timestamp) threat.timestamp = Date.now();
                 if (!threat.date) threat.date = new Date().toLocaleDateString();
                 if (!threat.time) threat.time = new Date(threat.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                if (!threat.severity) threat.severity = 'high';
                 allThreats.push(threat);
             });
-            allThreats.sort((a, b) => b.timestamp - a.timestamp);
+            allThreats.sort((a,b) => b.timestamp - a.timestamp);
             allThreats.forEach(t => checkAndAutoBlock(t));
             filterAndRenderThreats();
             updateStatusChart();
         });
-      
+
         function showThreatAlert(threat) {
             const toast = document.getElementById('threatToast');
             document.getElementById('toastEmail').textContent = threat.attemptedEmail;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
-      
-        // Close modal on backdrop click
-        document.getElementById('threatModal').addEventListener('click', (e) => {
-            if (e.target.id === 'threatModal') closeThreatModal();
-        });
-      
-        // Keyboard shortcuts
+
+        function addActivityLog(action, details) {
+            activityLogs.unshift({
+                time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                action: action,
+                details: details || ''
+            });
+            if (activityLogs.length > 50) activityLogs.pop();
+            renderActivityLog();
+        }
+
+        function renderActivityLog() {
+            const container = document.getElementById('activityFeed');
+            container.innerHTML = activityLogs.length === 0 ? `<div class="text-center py-12 text-slate-500"><i class="fa-solid fa-list-check text-5xl mb-4 opacity-30"></i><div>No activity yet</div></div>` : activityLogs.map(log => `
+                <div class="glass-card p-4 rounded-3xl flex gap-4 items-start">
+                    <div class="text-xs font-mono text-cyan-400 w-16 flex-shrink-0">${log.time}</div>
+                    <div class="flex-1">
+                        <div class="font-medium">${log.action}</div>
+                        <div class="text-xs text-slate-400">${log.details}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function clearActivityLog() {
+            activityLogs = [];
+            renderActivityLog();
+            showNotification('Activity log cleared', 'success');
+        }
+
+        function switchRightTab(tab) {
+            document.getElementById('threatsTab').classList.toggle('hidden', tab !== 0);
+            document.getElementById('activityTab').classList.toggle('hidden', tab !== 1);
+            document.getElementById('tabThreats').classList.toggle('active-tab', tab === 0);
+            document.getElementById('tabActivity').classList.toggle('active-tab', tab === 1);
+            if (tab === 1) renderActivityLog();
+        }
+
+        document.getElementById('threatModal').addEventListener('click', (e) => { if (e.target.id === 'threatModal') closeThreatModal(); });
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeThreatModal();
-            if (e.key === 'r' && e.ctrlKey) {
-                e.preventDefault();
-                refreshAll();
-            }
+            if (e.key === 'r' && e.ctrlKey) { e.preventDefault(); refreshAll(); }
         });
-      
-        // Initialize audio context on first user click anywhere
+
         document.addEventListener('click', initAudioContext, { once: true });
-      
+
         window.onload = () => {
-            // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
-          
+            document.getElementById('themeIcon').className = 'fa-solid fa-moon';
+
             initCharts();
             loadAllData();
             setupAttendanceListener();
-            setInterval(updateClock, 1000);
-            updateClock();
-            setInterval(() => {
-                if (!isRefreshing) loadAllData();
-            }, 15000);
+            setInterval(updateClock, 1000); updateClock();
+            setInterval(() => { if (!isRefreshing) loadAllData(); }, 15000);
             renderHealthBars();
-          
-            lastRefreshTime = Date.now();
-            updateRelativeTime();
-            setInterval(updateRelativeTime, 30000);
-          
-            setTimeout(() => {
-                document.getElementById('perfBar').style.width = '98%';
-            }, 500);
-          
-            // Welcome notification
-            setTimeout(() => {
-                showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
-            }, 1000);
+
+            lastRefreshTime = Date.now(); updateRelativeTime(); setInterval(updateRelativeTime, 30000);
+
+            setTimeout(() => { document.getElementById('perfBar').style.width = '98%'; }, 500);
+
+            setTimeout(() => { showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server'); addActivityLog('System started', ''); }, 1000);
+
+            switchRightTab(0);
         };
     </script>
 </body>
