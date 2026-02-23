@@ -809,6 +809,8 @@
             document.getElementById('modalThreatTitle').innerHTML = `<i class="fa-solid fa-triangle-exclamation ${isBlocked ? 'text-slate-500' : 'text-red-400'}"></i> ${isBlocked ? 'BLOCKED LOGIN' : 'UNAUTHORIZED LOGIN'}`;
             const sev = threat.severity || 'high';
             const sevClass = `severity-${sev}`;
+            const locationStr = threat.location ? `${threat.location.country_flag} ${threat.location.city}, ${threat.location.country}` : 'Unknown';
+            const mapsUrl = threat.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(threat.location.city + ', ' + threat.location.country)}` : '#';
             document.getElementById('modalThreatContent').innerHTML = `
                 <div class="text-2xl font-black ${isBlocked ? 'text-slate-500 line-through' : 'text-red-400'} mb-4 break-all">${threat.attemptedEmail}</div>
                 <div class="flex items-center gap-3 mb-6 glass-card p-4 rounded-xl">
@@ -820,6 +822,7 @@
                     <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Date</div><div class="text-lg text-white">${threat.date || new Date(threat.timestamp).toLocaleDateString()}</div></div>
                     <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Severity</div><span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${sevClass}">${sev.toUpperCase()}</span></div>
                     <div class="glass-card p-3 rounded-xl"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Status</div><div class="${isBlocked ? 'text-red-400' : 'text-emerald-400'} font-bold">${isBlocked ? 'BLOCKED' : 'DETECTED'}</div></div>
+                    <div class="glass-card p-3 rounded-xl col-span-2"><div class="text-slate-400 text-xs uppercase tracking-wider mb-1">Location</div><a href="${mapsUrl}" target="_blank" class="text-cyan-400 hover:underline">${locationStr}</a><div class="text-[10px] opacity-60">(approximate from IP)</div></div>
                 </div>
                 <div class="pt-4 border-t border-slate-700 text-xs text-slate-400">
                     <div class="flex items-center gap-2"><i class="fa-solid fa-database"></i> Logged in Firebase • ${new Date(threat.timestamp).toLocaleString()}</div>
