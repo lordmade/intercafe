@@ -169,7 +169,7 @@
                 <!-- Volume Slider -->
                 <div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-2xl">
                     <i class="fa-solid fa-volume-down text-cyan-400"></i>
-                    <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1" 
+                    <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1"
                            class="accent-cyan-400 w-28 cursor-pointer" oninput="setVolume(this.value)">
                 </div>
                 <div onclick="refreshAll()" id="refreshBtn" class="flex items-center gap-2 cursor-pointer hover:text-cyan-400 transition-all duration-300 text-sm btn-hover px-3 py-2 rounded-xl hover:bg-slate-800">
@@ -299,7 +299,6 @@
                     <button onclick="setThreatFilter('all')" class="filter-btn flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 whitespace-nowrap" data-filter="all">ALL</button>
                 </div>
             </div>
-
             <!-- Auto-Block Rules -->
             <div class="px-4 py-3 border-b border-slate-700 bg-slate-950 flex items-center justify-between">
                 <div class="flex items-center gap-2">
@@ -313,17 +312,15 @@
                 </label>
             </div>
             <div class="px-4 pb-3 text-[10px] text-slate-500 bg-slate-950">Block after 3 attempts from same email/IP in 5 mins</div>
-
             <!-- Threat Search -->
             <div class="px-4 py-3 border-b border-slate-700 bg-slate-950">
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                    <input type="text" id="threatSearch" onkeyup="applySearchFilter()" 
+                    <input type="text" id="threatSearch" onkeyup="applySearchFilter()"
                            class="w-full bg-slate-800 border border-slate-700 focus:border-cyan-400 rounded-2xl py-3 px-11 text-sm placeholder-slate-500 focus:outline-none"
                            placeholder="Search email, device or IP...">
                 </div>
             </div>
-
             <div id="threatsFeed" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3"></div>
             <div class="p-4 border-t border-slate-700 bg-slate-950">
                 <button onclick="clearThreats()" class="w-full text-center text-xs text-slate-400 hover:text-red-400 cursor-pointer flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-800 transition-all btn-hover">
@@ -349,7 +346,7 @@
                 <button onclick="closeThreatModal()" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-2xl font-semibold transition-all btn-hover">
                     <i class="fa-solid fa-check mr-2"></i>DISMISS
                 </button>
-                <button onclick="blockIP()" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all btn-hover">
+                <button id="modalBlockBtn" onclick="blockIP()" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-semibold transition-all btn-hover">
                     <i class="fa-solid fa-ban mr-2"></i>BLOCK IP
                 </button>
             </div>
@@ -410,11 +407,10 @@
         let currentSearchTerm = '';
         let volumeLevel = 1.0;
         let lastRefreshTime = Date.now();
-
         // Audio context and sound settings
         let audioContext = null;
         let soundEnabled = true;
-       
+      
         function initAudioContext() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -423,7 +419,7 @@
                 audioContext.resume();
             }
         }
-       
+      
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
@@ -442,7 +438,7 @@
                 }, i * 130);
             }
         }
-       
+      
         function playAttendanceSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
@@ -458,7 +454,7 @@
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.4);
         }
-       
+      
         function toggleSound() {
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundBtn');
@@ -477,11 +473,11 @@
                 showNotification('Sound alerts disabled', 'info');
             }
         }
-       
+      
         function setVolume(val) {
             volumeLevel = parseFloat(val) / 100;
         }
-       
+      
         function changeDate(newDate) {
             selectedDate = newDate;
             document.getElementById('currentDateDisplay').textContent = newDate;
@@ -491,12 +487,12 @@
             loadAllData();
             setupAttendanceListener();
         }
-       
+      
         function setThreatDateFilter(newDate) {
             threatFilterDate = newDate;
             filterAndRenderThreats();
         }
-       
+      
         function setupAttendanceListener() {
             db.ref('attendance/' + selectedDate).off('child_added');
             db.ref('attendance/' + selectedDate).on('child_added', (snap) => {
@@ -514,7 +510,7 @@
                 loadAllData();
             });
         }
-       
+      
         const systemHealthData = {
             'att-hub': {
                 name: 'Attendance Hub',
@@ -526,7 +522,7 @@
                 ]
             }
         };
-       
+      
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notifyToast');
             const icon = document.getElementById('notifyIcon');
@@ -540,7 +536,7 @@
                 toast.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
             }, 3000);
         }
-       
+      
         function showDataNotification(title, message, iconClass = 'fa-bell') {
             const notification = document.getElementById('dataNotification');
             document.getElementById('dataNotifyTitle').textContent = title;
@@ -551,7 +547,7 @@
                 notification.classList.remove('show');
             }, 4000);
         }
-       
+      
         function animateNumber(elementId, targetValue, duration = 500) {
             const element = document.getElementById(elementId);
             const startValue = parseInt(element.textContent) || 0;
@@ -566,7 +562,7 @@
             }
             requestAnimationFrame(update);
         }
-       
+      
         function getDeviceIcon(userAgent) {
             if (!userAgent) return { icon: 'fa-desktop', class: 'device-windows', name: 'Unknown' };
             const ua = userAgent.toLowerCase();
@@ -577,7 +573,7 @@
             if (ua.includes('linux')) return { icon: 'fa-linux', class: 'device-linux', name: 'Linux' };
             return { icon: 'fa-desktop', class: 'device-windows', name: 'Desktop' };
         }
-       
+      
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             const system = {
@@ -605,7 +601,7 @@
                 </div>
             `;
         }
-       
+      
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
             const healthMetrics = systemHealthData['att-hub'].metrics;
@@ -624,7 +620,7 @@
                 </div>
             `).join('');
         }
-       
+      
         function initCharts() {
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
@@ -650,7 +646,7 @@
                     animation: { animateScale: true, animateRotate: true }
                 }
             });
-           
+          
             const fluctCtx = document.getElementById('fluctuatingChart').getContext('2d');
             fluctuatingChart = new Chart(fluctCtx, {
                 type: 'line',
@@ -686,7 +682,7 @@
                 }
             });
         }
-       
+      
         function setThreatFilter(filter) {
             currentThreatFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -694,12 +690,12 @@
             });
             filterAndRenderThreats();
         }
-       
+      
         function toggleAutoBlock(checked) {
             autoBlockEnabled = checked;
             showNotification(checked ? 'Auto-block rules ENABLED' : 'Auto-block rules DISABLED', checked ? 'error' : 'info');
         }
-       
+      
         function checkAndAutoBlock(threat) {
             if (!autoBlockEnabled) return;
             const key = threat.attemptedEmail || 'unknown';
@@ -712,12 +708,12 @@
                 showNotification(`AUTO-BLOCKED ${key} (3 attempts in 5 mins)`, 'error');
             }
         }
-       
+      
         function applySearchFilter() {
             currentSearchTerm = document.getElementById('threatSearch').value.toLowerCase().trim();
             filterAndRenderThreats();
         }
-       
+      
         function filterAndRenderThreats() {
             const filterDateObj = new Date(threatFilterDate);
             const filtered = allThreats.filter(threat => {
@@ -753,7 +749,7 @@
             threats = filtered.slice(0, 12);
             renderThreats();
         }
-       
+      
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
@@ -794,7 +790,7 @@
             });
             animateNumber('threatCounter', threats.length);
         }
-       
+      
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             const isBlocked = blockedIPs.has(threat.attemptedEmail);
@@ -839,12 +835,37 @@
                     ${threat.userAgent ? `<div class="mt-2 text-[10px] break-all opacity-60">${threat.userAgent}</div>` : ''}
                 </div>
             `;
+
+            // Dynamic BLOCK IP / BLOCKED button (only change for blocked threats + unblock support)
+            const btn = document.getElementById('modalBlockBtn');
+            const email = threat.attemptedEmail || '';
+            const currentlyBlocked = blockedIPs.has(email);
+            if (currentlyBlocked) {
+                btn.innerHTML = `<i class="fa-solid fa-ban mr-2"></i>BLOCKED`;
+                btn.classList.remove('bg-red-600', 'hover:bg-red-500');
+                btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+                btn.onclick = () => unblockEmail(email);
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-ban mr-2"></i>BLOCK IP`;
+                btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+                btn.classList.add('bg-red-600', 'hover:bg-red-500');
+                btn.onclick = blockIP;
+            }
         }
-       
+      
+        function unblockEmail(email) {
+            if (email) {
+                blockedIPs.delete(email);
+                showNotification(`IP/Email ${email} has been unblocked`, 'success');
+                renderThreats();
+                closeThreatModal();
+            }
+        }
+      
         function closeThreatModal() {
             document.getElementById('threatModal').classList.add('hidden');
         }
-       
+      
         function blockIP() {
             const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
             if (email) {
@@ -854,7 +875,7 @@
             }
             closeThreatModal();
         }
-       
+      
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
@@ -871,7 +892,7 @@
             isRefreshing = false;
             showNotification('All systems refreshed successfully', 'success');
         }
-       
+      
         async function exportFullReport() {
             showNotification('Generating PDF report...', 'info');
             const { jsPDF } = window.jspdf;
@@ -967,7 +988,7 @@
             doc.save(`security-report-${selectedDate}-${Date.now()}.pdf`);
             showNotification('PDF report exported successfully', 'success');
         }
-       
+      
         function clearThreats() {
             threats = [];
             allThreats = [];
@@ -987,11 +1008,11 @@
                     showNotification('Failed to clear logs: ' + err.message, 'error');
                 });
         }
-       
+      
         function updateClock() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
-       
+      
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
                 const systemsOnline = 1;
@@ -1000,7 +1021,7 @@
                 userDoughnutChart.update();
             }
         }
-       
+      
         function updateRelativeTime() {
             const el = document.getElementById('lastRefreshed');
             const diff = Date.now() - lastRefreshTime;
@@ -1009,7 +1030,7 @@
             else if (diff > 10000) text = Math.floor(diff / 1000) + 's ago';
             el.textContent = text;
         }
-       
+      
         function loadAllData() {
             return new Promise((resolve) => {
                 db.ref('employees').once('value', snap => {
@@ -1039,7 +1060,7 @@
                 });
             });
         }
-       
+      
         // Real-time threat detection
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
@@ -1065,7 +1086,7 @@
                 updateStatusChart();
             }
         });
-       
+      
         // Load existing threats
         db.ref('unauthorized_attempts').on('value', snap => {
             const data = snap.val() || {};
@@ -1083,19 +1104,19 @@
             filterAndRenderThreats();
             updateStatusChart();
         });
-       
+      
         function showThreatAlert(threat) {
             const toast = document.getElementById('threatToast');
             document.getElementById('toastEmail').textContent = threat.attemptedEmail;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
-       
+      
         // Close modal on backdrop click
         document.getElementById('threatModal').addEventListener('click', (e) => {
             if (e.target.id === 'threatModal') closeThreatModal();
         });
-       
+      
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeThreatModal();
@@ -1104,16 +1125,16 @@
                 refreshAll();
             }
         });
-       
+      
         // Initialize audio context on first user click anywhere
         document.addEventListener('click', initAudioContext, { once: true });
-       
+      
         window.onload = () => {
             // Set default date in pickers
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
-           
+          
             initCharts();
             loadAllData();
             setupAttendanceListener();
@@ -1123,15 +1144,15 @@
                 if (!isRefreshing) loadAllData();
             }, 15000);
             renderHealthBars();
-           
+          
             lastRefreshTime = Date.now();
             updateRelativeTime();
             setInterval(updateRelativeTime, 30000);
-           
+          
             setTimeout(() => {
                 document.getElementById('perfBar').style.width = '98%';
             }, 500);
-           
+          
             // Welcome notification
             setTimeout(() => {
                 showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server');
