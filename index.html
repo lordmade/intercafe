@@ -147,7 +147,6 @@
             outline: none;
             border-color: #22d3ee;
         }
-
         /* Severity Colors */
         .severity-low { background: #10b981; color: white; animation: pulse-green 2s infinite; }
         .severity-medium { background: #eab308; color: #1e2937; animation: pulse-yellow 2s infinite; }
@@ -156,7 +155,6 @@
         @keyframes pulse-green { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
         @keyframes pulse-yellow { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
         @keyframes pulse-orange { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
-
         /* Loading Animations */
         .loading-spinner { animation: spin 1s linear infinite; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #22d3ee; border-radius: 50%; margin: auto; }
         .shimmer {
@@ -422,7 +420,6 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
         let userDoughnutChart, fluctuatingChart;
         let todayStr = new Date().toISOString().split('T')[0];
         let selectedDate = todayStr;
@@ -447,12 +444,10 @@
         let activityLogs = [];
         let totalRegistered = 0;
         let currentActive = 0;
-
         function initAudioContext() {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
         }
-
         function playThreatSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
@@ -467,7 +462,6 @@
                 const osc = audioContext.createOscillator(); osc.type='triangle'; osc.frequency.setValueAtTime(660, audioContext.currentTime); osc.connect(gain); gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.8); osc.start(); osc.stop(audioContext.currentTime + 0.8);
             }
         }
-
         function playAttendanceSound() {
             if (!soundEnabled || !audioContext) return;
             initAudioContext();
@@ -476,19 +470,15 @@
             g.gain.value = 0.25 * volumeLevel; osc.connect(g); g.connect(audioContext.destination);
             g.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.6); osc.start(); osc.stop(audioContext.currentTime + 0.6);
         }
-
         function toggleSound() {
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundBtn');
             const icon = document.getElementById('soundIcon');
-            if (soundEnabled) { btn.classList.remove('muted'); icon.className = 'fa-solid fa-volume-high text-lg'; showNotification('Sound alerts enabled', 'success'); } 
+            if (soundEnabled) { btn.classList.remove('muted'); icon.className = 'fa-solid fa-volume-high text-lg'; showNotification('Sound alerts enabled', 'success'); }
             else { btn.classList.add('muted'); icon.className = 'fa-solid fa-volume-xmark text-lg'; showNotification('Sound alerts disabled', 'info'); }
         }
-
         function setSoundProfile(val) { currentSoundProfile = val; showNotification('Sound profile changed to ' + val.toUpperCase(), 'info'); }
-
         function setVolume(val) { volumeLevel = parseFloat(val)/100; }
-
         function changeDate(newDate) {
             selectedDate = newDate;
             document.getElementById('currentDateDisplay').textContent = newDate;
@@ -499,9 +489,7 @@
             setupAttendanceListener();
             addActivityLog('Date changed', newDate);
         }
-
         function setThreatDateFilter(newDate) { threatFilterDate = newDate; filterAndRenderThreats(); }
-
         function setupAttendanceListener() {
             const ref = db.ref('attendance/' + selectedDate);
             ref.off('value');
@@ -529,16 +517,13 @@
                 }
             });
         }
-
         function updateActiveList(active, out) {
             document.getElementById('activeList').innerHTML = `
                 <div class="glass-card p-6 rounded-3xl text-center btn-hover">
                     <div class="text-8xl font-black text-emerald-400 count-up">${active}</div>
-                    <div class="text-xs text-red-400 mt-1">${out}</div>
                 </div>
             `;
         }
-
         const systemHealthData = {
             'att-hub': {
                 name: 'Attendance Hub',
@@ -550,7 +535,6 @@
                 ]
             }
         };
-
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notifyToast');
             const icon = document.getElementById('notifyIcon');
@@ -560,7 +544,6 @@
             toast.classList.remove('opacity-0','translate-x-10','pointer-events-none');
             setTimeout(() => toast.classList.add('opacity-0','translate-x-10','pointer-events-none'), 3000);
         }
-
         function showDataNotification(title, message, iconClass = 'fa-bell') {
             const notification = document.getElementById('dataNotification');
             document.getElementById('dataNotifyTitle').textContent = title;
@@ -569,7 +552,6 @@
             notification.classList.add('show');
             setTimeout(() => notification.classList.remove('show'), 4000);
         }
-
         function animateNumber(elementId, targetValue, duration = 500) {
             const element = document.getElementById(elementId);
             const startValue = parseInt(element.textContent) || 0;
@@ -584,7 +566,6 @@
             }
             requestAnimationFrame(update);
         }
-
         function getDeviceIcon(userAgent) {
             if (!userAgent) return { icon: 'fa-desktop', class: 'device-windows', name: 'Unknown' };
             const ua = userAgent.toLowerCase();
@@ -595,7 +576,6 @@
             if (ua.includes('linux')) return { icon: 'fa-linux', class: 'device-linux', name: 'Linux' };
             return { icon: 'fa-desktop', class: 'device-windows', name: 'Desktop' };
         }
-
         function renderSystems(totalEmployees, presentToday) {
             const container = document.getElementById('systemsList');
             const system = {
@@ -623,7 +603,6 @@
                 </div>
             `;
         }
-
         function renderHealthBars() {
             const container = document.getElementById('healthBars');
             const healthMetrics = systemHealthData['att-hub'].metrics;
@@ -642,7 +621,6 @@
                 </div>
             `).join('');
         }
-
         function initCharts() {
             const doughnutCtx = document.getElementById('userDoughnut').getContext('2d');
             userDoughnutChart = new Chart(doughnutCtx, {
@@ -703,25 +681,21 @@
                 }
             });
         }
-
         function setThreatFilter(filter) {
             currentThreatFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filter));
             filterAndRenderThreats();
         }
-
         function setSeverityFilter(sev) {
             currentSeverityFilter = sev;
             document.querySelectorAll('.severity-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sev === sev));
             filterAndRenderThreats();
         }
-
         function toggleAutoBlock(checked) {
             autoBlockEnabled = checked;
             showNotification(checked ? 'Auto-block rules ENABLED' : 'Auto-block rules DISABLED', checked ? 'error' : 'info');
             addActivityLog('Auto-block', checked ? 'Enabled' : 'Disabled');
         }
-
         function checkAndAutoBlock(threat) {
             if (!autoBlockEnabled) return;
             const key = threat.attemptedEmail || 'unknown';
@@ -735,12 +709,10 @@
                 addActivityLog('Auto-blocked', key);
             }
         }
-
         function applySearchFilter() {
             currentSearchTerm = document.getElementById('threatSearch').value.toLowerCase().trim();
             filterAndRenderThreats();
         }
-
         function filterAndRenderThreats() {
             const filterDateObj = new Date(threatFilterDate);
             const filtered = allThreats.filter(threat => {
@@ -763,7 +735,6 @@
             threats = filtered.slice(0, 12);
             renderThreats();
         }
-
         function renderThreats() {
             const container = document.getElementById('threatsFeed');
             container.innerHTML = '';
@@ -800,7 +771,6 @@
             });
             animateNumber('threatCounter', threats.length);
         }
-
         function showThreatDetail(threat) {
             const modal = document.getElementById('threatModal');
             const isBlocked = blockedIPs.has(threat.attemptedEmail);
@@ -840,19 +810,15 @@
             }
             addActivityLog('Viewed threat', email);
         }
-
         function unblockEmail(email) {
             if (email) { blockedIPs.delete(email); showNotification(`Unblocked ${email}`, 'success'); renderThreats(); closeThreatModal(); addActivityLog('Unblocked', email); }
         }
-
         function closeThreatModal() { document.getElementById('threatModal').classList.add('hidden'); }
-
         function blockIP() {
             const email = document.querySelector('#modalThreatContent .break-all')?.textContent;
             if (email) { blockedIPs.add(email); showNotification(`Blocked ${email}`, 'success'); renderThreats(); addActivityLog('Blocked', email); }
             closeThreatModal();
         }
-
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
@@ -866,7 +832,6 @@
             showNotification('All systems refreshed successfully', 'success');
             addActivityLog('Refreshed', 'All systems');
         }
-
         function startShimmer() {
             document.getElementById('systemsList').classList.add('shimmer');
             document.getElementById('activeList').classList.add('shimmer');
@@ -879,7 +844,6 @@
             document.getElementById('healthBars').innerHTML = '<div class="loading-spinner"></div>';
             document.getElementById('threatsFeed').innerHTML = '<div class="loading-spinner"></div>';
         }
-
         function stopShimmer() {
             document.getElementById('systemsList').classList.remove('shimmer');
             document.getElementById('activeList').classList.remove('shimmer');
@@ -888,7 +852,6 @@
             document.getElementById('healthBars').classList.remove('shimmer');
             document.getElementById('threatsFeed').classList.remove('shimmer');
         }
-
         async function exportFullReport() {
             showNotification('Generating PDF report...', 'info');
             const { jsPDF } = window.jspdf;
@@ -977,7 +940,6 @@
             showNotification('PDF report exported successfully', 'success');
             addActivityLog('Exported', 'PDF Report');
         }
-
         function clearThreats() {
             threats = []; allThreats = []; threatData = Array(20).fill(0); attemptTracker = {};
             if (fluctuatingChart) { fluctuatingChart.data.datasets[1].data = threatData; fluctuatingChart.update(); }
@@ -985,18 +947,15 @@
             db.ref('unauthorized_attempts').remove().then(() => showNotification('All threat logs cleared', 'success')).catch(err => showNotification('Failed to clear logs: ' + err.message, 'error'));
             addActivityLog('Cleared', 'All threats');
         }
-
         function updateClock() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
         }
-
         function updateStatusChart(working = 0, lunch = 0, out = 0) {
             if (userDoughnutChart) {
                 userDoughnutChart.data.datasets[0].data = [1, totalRegistered, threats.length];
                 userDoughnutChart.update();
             }
         }
-
         function updateRelativeTime() {
             const el = document.getElementById('lastRefreshed');
             const diff = Date.now() - lastRefreshTime;
@@ -1005,7 +964,6 @@
             else if (diff > 10000) text = Math.floor(diff / 1000) + 's ago';
             el.textContent = text;
         }
-
         function loadAllData() {
             return new Promise((resolve) => {
                 db.ref('employees').once('value', snap => {
@@ -1015,7 +973,6 @@
                 });
             });
         }
-
         db.ref('unauthorized_attempts').on('child_added', (snap) => {
             const threat = snap.val();
             if (threat) {
@@ -1036,7 +993,6 @@
                 addActivityLog('New threat', threat.attemptedEmail);
             }
         });
-
         db.ref('unauthorized_attempts').on('value', snap => {
             const data = snap.val() || {};
             allThreats = [];
@@ -1054,14 +1010,12 @@
             filterAndRenderThreats();
             updateStatusChart();
         });
-
         function showThreatAlert(threat) {
             const toast = document.getElementById('threatToast');
             document.getElementById('toastEmail').textContent = threat.attemptedEmail;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
-
         function addActivityLog(action, details) {
             activityLogs.unshift({
                 time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
@@ -1071,7 +1025,6 @@
             if (activityLogs.length > 50) activityLogs.pop();
             renderActivityLog();
         }
-
         function renderActivityLog() {
             const container = document.getElementById('activityFeed');
             container.innerHTML = activityLogs.length === 0 ? `<div class="text-center py-12 text-slate-500"><i class="fa-solid fa-list-check text-5xl mb-4 opacity-30"></i><div>No activity yet</div></div>` : activityLogs.map(log => `
@@ -1084,13 +1037,11 @@
                 </div>
             `).join('');
         }
-
         function clearActivityLog() {
             activityLogs = [];
             renderActivityLog();
             showNotification('Activity log cleared', 'success');
         }
-
         function switchRightTab(tab) {
             document.getElementById('threatsTab').classList.toggle('hidden', tab !== 0);
             document.getElementById('activityTab').classList.toggle('hidden', tab !== 1);
@@ -1098,34 +1049,25 @@
             document.getElementById('tabActivity').classList.toggle('active-tab', tab === 1);
             if (tab === 1) renderActivityLog();
         }
-
         document.getElementById('threatModal').addEventListener('click', (e) => { if (e.target.id === 'threatModal') closeThreatModal(); });
-
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeThreatModal();
             if (e.key === 'r' && e.ctrlKey) { e.preventDefault(); refreshAll(); }
         });
-
         document.addEventListener('click', initAudioContext, { once: true });
-
         window.onload = () => {
             document.getElementById('datePicker').value = todayStr;
             document.getElementById('currentDateDisplay').textContent = todayStr;
             document.getElementById('threatDateFilter').value = todayStr;
-
             initCharts();
             loadAllData();
             setupAttendanceListener();
             setInterval(updateClock, 1000); updateClock();
             setInterval(() => { if (!isRefreshing) loadAllData(); }, 15000);
             renderHealthBars();
-
             lastRefreshTime = Date.now(); updateRelativeTime(); setInterval(updateRelativeTime, 30000);
-
             setTimeout(() => { document.getElementById('perfBar').style.width = '98%'; }, 500);
-
             setTimeout(() => { showDataNotification('Systems Online', 'All monitoring systems are active', 'fa-server'); addActivityLog('System started', ''); }, 1000);
-
             switchRightTab(0);
         };
     </script>
